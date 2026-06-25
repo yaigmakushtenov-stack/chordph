@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorshipApp</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: #1a1a2e;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            background-color: #12122a;
+            border-bottom: 1px solid #2a2a4a;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .top-bar-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #e94560;
+        }
+
+        .top-bar-sub {
+            font-size: 12px;
+            color: #a0a0b0;
+        }
+
+        .hamburger-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .hamburger-btn span {
+            display: block;
+            width: 24px;
+            height: 2px;
+            background-color: #ffffff;
+            border-radius: 2px;
+        }
+
+        .drawer-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 200;
+        }
+
+        .drawer-overlay.open { display: block; }
+
+        .drawer {
+            position: fixed;
+            top: 0; right: -300px;
+            width: 280px;
+            height: 100%;
+            background-color: #12122a;
+            border-left: 1px solid #2a2a4a;
+            z-index: 300;
+            padding: 20px;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .drawer.open { right: 0; }
+
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .drawer-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #e94560;
+        }
+
+        .drawer-close {
+            background: none;
+            border: none;
+            color: #ffffff;
+            font-size: 22px;
+            cursor: pointer;
+        }
+
+        .drawer-section-title {
+            font-size: 11px;
+            color: #a0a0b0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .profile-name-input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #2a2a4a;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            font-size: 15px;
+            margin-bottom: 12px;
+            outline: none;
+        }
+
+        .profile-name-input:focus { border-color: #e94560; }
+
+        .drawer-instrument-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .drawer-instrument-btn {
+            background-color: #1a1a2e;
+            color: #ffffff;
+            border: 1px solid #2a2a4a;
+            padding: 10px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .drawer-instrument-btn .icon { font-size: 20px; }
+
+        .drawer-instrument-btn.selected {
+            border-color: #e94560;
+            color: #e94560;
+        }
+
+        .drawer-btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+
+        .btn-today {
+            background-color: #1a1a2e;
+            color: #ffffff;
+            border: 1px solid #e94560;
+        }
+
+        .btn-save {
+            background-color: #e94560;
+            color: #ffffff;
+            border: none;
+        }
+
+        .divider-line {
+            border: none;
+            border-top: 1px solid #2a2a4a;
+            margin: 16px 0;
+        }
+
+        #onboarding-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .app-logo { font-size: 48px; margin-bottom: 10px; }
+
+        .app-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #e94560;
+            margin-bottom: 8px;
+        }
+
+        .app-tagline {
+            font-size: 14px;
+            color: #a0a0b0;
+            margin-bottom: 30px;
+        }
+
+        .onboarding-label {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .instrument-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            width: 100%;
+            max-width: 320px;
+            margin-bottom: 25px;
+        }
+
+        .instrument-btn {
+            background-color: #16213e;
+            color: #ffffff;
+            border: 2px solid #2a2a4a;
+            padding: 15px 10px;
+            border-radius: 12px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .instrument-btn .icon { font-size: 28px; }
+
+        .instrument-btn.selected {
+            border-color: #e94560;
+            background-color: #2a1a2e;
+        }
+
+        .name-input {
+            width: 100%;
+            max-width: 320px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 2px solid #2a2a4a;
+            background-color: #16213e;
+            color: #ffffff;
+            font-size: 16px;
+            margin-bottom: 20px;
+            outline: none;
+        }
+
+        .name-input:focus { border-color: #e94560; }
+
+        .continue-btn {
+            background-color: #e94560;
+            color: #ffffff;
+            border: none;
+            padding: 14px 40px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            max-width: 320px;
+            opacity: 0.4;
+        }
+
+        .continue-btn.ready { opacity: 1; }
+
+        #list-view { display: none; }
+
+        .page-content { padding: 20px; }
+
+        ul { padding: 0; }
+
+        li {
+            padding: 12px;
+            margin: 8px 0;
+            background-color: #16213e;
+            border-radius: 10px;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .song-title {
+            font-size: 17px;
+            font-weight: bold;
+            color: #ffffff;
+            padding-right: 80px;
+        }
+
+        .song-artist {
+            font-size: 13px;
+            color: #a0a0b0;
+            margin-top: 3px;
+        }
+
+        .song-key {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #e94560;
+            color: #ffffff;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        #chart-view { display: none; }
+
+        .chart-song-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .chart-song-artist {
+            font-size: 13px;
+            color: #a0a0b0;
+            margin-bottom: 4px;
+        }
+
+        .chart-song-key {
+            font-size: 14px;
+            color: #e94560;
+            font-weight: bold;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 8px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+
+        .ctrl-btn {
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+        }
+
+        .ctrl-ghost {
+            background-color: #16213e;
+            color: #ffffff;
+            border: 1px solid #2a2a4a;
+        }
+
+        .ctrl-red {
+            background-color: #e94560;
+            color: #ffffff;
+        }
+
+        .ctrl-outline {
+            background-color: transparent;
+            color: #a0a0b0;
+            border: 1px solid #2a2a4a;
+        }
+
+        .ctrl-outline.active {
+            color: #e94560;
+            border-color: #e94560;
+        }
+
+        .transpose-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        #transpose-display {
+            color: #a0a0b0;
+            font-size: 13px;
+            min-width: 90px;
+            text-align: center;
+        }
+
+        .capo-section { margin: 12px 0; }
+
+        .capo-title {
+            color: #a0a0b0;
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .capo-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+        }
+
+        .capo-card {
+            background-color: #16213e;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            padding: 8px 4px;
+            text-align: center;
+        }
+
+        .capo-shape {
+            font-size: 16px;
+            font-weight: bold;
+            color: #e94560;
+        }
+
+        .capo-fret {
+            font-size: 10px;
+            color: #a0a0b0;
+            margin-top: 3px;
+        }
+
+        .capo-fret span {
+            font-size: 13px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .medley-block {
+            margin-top: 20px;
+            border-top: 2px dashed #e94560;
+            padding-top: 14px;
+        }
+
+        .medley-label {
+            font-size: 11px;
+            color: #e94560;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .medley-song-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+
+        .medley-song-key {
+            font-size: 12px;
+            color: #a0a0b0;
+            margin-bottom: 8px;
+        }
+
+        .medley-remove-btn {
+            background: none;
+            border: 1px solid #e94560;
+            color: #e94560;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 400;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background-color: #12122a;
+            border: 1px solid #2a2a4a;
+            border-radius: 14px;
+            padding: 20px;
+            width: 90%;
+            max-width: 340px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #e94560;
+            margin-bottom: 12px;
+        }
+
+        .modal-search {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #2a2a4a;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            font-size: 14px;
+            margin-bottom: 12px;
+            outline: none;
+        }
+
+        .modal-search:focus { border-color: #e94560; }
+
+        .modal-song-option {
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background-color: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .modal-song-option.selected {
+            border-color: #e94560;
+            color: #e94560;
+        }
+
+        .modal-label {
+            font-size: 12px;
+            color: #a0a0b0;
+            margin: 12px 0 8px 0;
+        }
+
+        .modal-key-options {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .modal-key-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            text-align: center;
+            border: 1px solid #2a2a4a;
+            background-color: #1a1a2e;
+            color: #a0a0b0;
+        }
+
+        .modal-key-btn.selected {
+            border-color: #e94560;
+            color: #e94560;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .modal-cancel {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            border: 1px solid #2a2a4a;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .modal-confirm {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #e94560;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid #2a2a4a;
+            margin: 12px 0;
+        }
+
+        pre {
+            font-size: 16px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            line-height: 1.8;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+    <div class="drawer" id="drawer">
+        <div class="drawer-header">
+            <div class="drawer-title">⚙️ Settings</div>
+            <button class="drawer-close" onclick="closeDrawer()">✕</button>
+        </div>
+        <div class="drawer-section-title">👤 My Profile</div>
+        <input class="profile-name-input" type="text" id="drawer-name" placeholder="Your name"/>
+        <div class="drawer-instrument-grid">
+            <button class="drawer-instrument-btn" onclick="selectDrawerInstrument('Lead Guitar')" id="di-Lead Guitar"><span class="icon">🎸</span>Lead</button>
+            <button class="drawer-instrument-btn" onclick="selectDrawerInstrument('Rhythm Guitar')" id="di-Rhythm Guitar"><span class="icon">🎸</span>Rhythm</button>
+            <button class="drawer-instrument-btn" onclick="selectDrawerInstrument('Bass')" id="di-Bass"><span class="icon">🎸</span>Bass</button>
+            <button class="drawer-instrument-btn" onclick="selectDrawerInstrument('Keyboard')" id="di-Keyboard"><span class="icon">🎹</span>Keys</button>
+            <button class="drawer-instrument-btn" onclick="selectDrawerInstrument('Drums')" id="di-Drums"><span class="icon">🥁</span>Drums</button>
+            <button class="drawer-instrument-btn" onclick="selectDrawerInstrument('Vocalist')" id="di-Vocalist"><span class="icon">🎤</span>Vocalist</button>
+        </div>
+        <button class="drawer-btn btn-today" onclick="applyTodayOnly()">Play as this instrument today</button>
+        <button class="drawer-btn btn-save" onclick="saveProfileFromDrawer()">Save Profile</button>
+        <hr class="divider-line">
+        <div style="font-size:12px;color:#a0a0b0;text-align:center;">WorshipApp v0.1 · Built for Filipino musicians</div>
+    </div>
+
+    <div class="modal-overlay" id="medley-modal">
+        <div class="modal">
+            <div class="modal-title">➕ Combine with...</div>
+            <input
+                class="modal-search"
+                type="text"
+                id="medley-search"
+                placeholder="Search songs..."
+                oninput="filterMedleySongs()"
+            />
+            <div id="medley-song-list"></div>
+            <div class="modal-label">Key for the added song:</div>
+            <div class="modal-key-options">
+                <div class="modal-key-btn selected" id="key-opt-same" onclick="selectMedleyKey('same')">Keep its own key</div>
+                <div class="modal-key-btn" id="key-opt-match" onclick="selectMedleyKey('match')">Match current key</div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-cancel" onclick="closeMedleyModal()">Cancel</button>
+                <button class="modal-confirm" onclick="confirmMedley()">Add to chart</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="onboarding-view">
+        <div class="app-logo">🎵</div>
+        <div class="app-name">WorshipApp</div>
+        <div class="app-tagline">Built for Filipino worship musicians</div>
+        <div class="onboarding-label">What's your instrument?</div>
+        <div class="instrument-grid">
+            <button class="instrument-btn" onclick="selectInstrument('Lead Guitar')" id="btn-Lead Guitar"><span class="icon">🎸</span>Lead Guitar</button>
+            <button class="instrument-btn" onclick="selectInstrument('Rhythm Guitar')" id="btn-Rhythm Guitar"><span class="icon">🎸</span>Rhythm Guitar</button>
+            <button class="instrument-btn" onclick="selectInstrument('Bass')" id="btn-Bass"><span class="icon">🎸</span>Bass</button>
+            <button class="instrument-btn" onclick="selectInstrument('Keyboard')" id="btn-Keyboard"><span class="icon">🎹</span>Keyboard</button>
+            <button class="instrument-btn" onclick="selectInstrument('Drums')" id="btn-Drums"><span class="icon">🥁</span>Drums</button>
+            <button class="instrument-btn" onclick="selectInstrument('Vocalist')" id="btn-Vocalist"><span class="icon">🎤</span>Vocalist</button>
+        </div>
+        <div class="onboarding-label">What should we call you?</div>
+        <input class="name-input" type="text" id="musician-name" placeholder="Your name" oninput="checkReady()"/>
+        <button class="continue-btn" id="continue-btn" onclick="saveProfile()">Let's Worship 🙏</button>
+    </div>
+
+    <div id="list-view">
+        <div class="top-bar">
+            <div>
+                <div class="top-bar-title">🎵 WorshipApp</div>
+                <div class="top-bar-sub" id="top-bar-sub"></div>
+            </div>
+            <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
+        </div>
+        <div class="page-content">
+            <ul>
+                <li onclick="openSong(0)">
+                    <span class="song-title">Glorious</span>
+                    <span class="song-artist">Victory Worship</span>
+                    <span class="song-key" id="list-key-0">Key of G</span>
+                </li>
+                <li onclick="openSong(1)">
+                    <span class="song-title">Way Maker</span>
+                    <span class="song-artist">Sinach</span>
+                    <span class="song-key" id="list-key-1">Key of B</span>
+                </li>
+                <li onclick="openSong(2)">
+                    <span class="song-title">Presence</span>
+                    <span class="song-artist">His Life Music</span>
+                    <span class="song-key" id="list-key-2">Key of A</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="chart-view">
+        <div class="top-bar">
+            <button class="ctrl-btn ctrl-ghost" onclick="goBack()">← Back</button>
+            <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
+        </div>
+        <div class="page-content">
+            <div class="chart-song-title" id="song-title"></div>
+            <div class="chart-song-artist" id="song-artist"></div>
+            <div class="chart-song-key" id="song-key"></div>
+            <hr class="divider">
+            <div class="controls-row">
+                <button class="ctrl-btn ctrl-ghost" onclick="changeFontSize(-2)">A−</button>
+                <button class="ctrl-btn ctrl-ghost" onclick="changeFontSize(2)">A+</button>
+                <button class="ctrl-btn ctrl-outline active" id="btn-sharp" onclick="setNotation('sharp')">♯</button>
+                <button class="ctrl-btn ctrl-outline" id="btn-flat" onclick="setNotation('flat')">♭</button>
+                <button class="ctrl-btn ctrl-ghost" onclick="openMedleyModal()">＋ Medley</button>
+            </div>
+            <div class="transpose-row">
+                <button class="ctrl-btn ctrl-red" onclick="transpose(-1)">− Key</button>
+                <span id="transpose-display">Original Key</span>
+                <button class="ctrl-btn ctrl-red" onclick="transpose(1)">+ Key</button>
+            </div>
+            <div class="capo-section" id="capo-section">
+                <div class="capo-title">Capo Calculator</div>
+                <div class="capo-grid" id="capo-grid"></div>
+            </div>
+            <hr class="divider">
+            <pre id="song-chart"></pre>
+            <div id="medley-container"></div>
+        </div>
+    </div>
+
+    <script>
+        var SHARPS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        var FLATS  = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+
+        var CAPO_SHAPES = [
+            { shape: 'E', index: 4 },
+            { shape: 'D', index: 2 },
+            { shape: 'C', index: 0 },
+            { shape: 'A', index: 9 },
+            { shape: 'G', index: 7 }
+        ];
+
+        var INSTRUMENT_VIEWS = {
+            'Lead Guitar':   'guitarist',
+            'Rhythm Guitar': 'guitarist',
+            'Bass':          'bassist',
+            'Keyboard':      'keys',
+            'Drums':         'drummer',
+            'Vocalist':      'vocalist'
+        };
+
+
+        var useFlats = false;
+        var currentSongIndex = 0;
+        var songSettings = {};
+        var musician = { name: '', instrument: '' };
+        var activeInstrument = '';
+        var selectedInstrument = '';
+        var pendingDrawerInstrument = '';
+        var medleySongs = [];
+        var pendingMedleySongIndex = null;
+        var pendingMedleyKeyOption = 'same';
+
+        var songs = [
+            {
+                title: "Glorious",
+                artist: "Victory Worship",
+                key: "G",
+                tempo: 72,
+                feel: 'Moderate Worship',
+                chart: "[Intro]\nG  D  Em  C\n\n[Verse 1]\nG              D\nYou are glorious, Lord\nEm             C\nWorthy of all praise\n\n[Chorus]\nG         D\nGlorious, glorious\nEm        C\nYou are glorious"
+            },
+            {
+                title: "Way Maker",
+                artist: "Sinach",
+                key: "B",
+                tempo: 68,
+                feel: 'Slow Worship',
+                chart: "[Intro]\nB  F#  G#m  E\n\n[Verse 1]\nB                F#\nYou are the way maker\nG#m              E\nMiracle worker, promise keeper\n\n[Chorus]\nB          F#\nWay maker, miracle worker\nG#m        E\nThat is who you are"
+            },
+            {
+                title: "Presence",
+                artist: "His Life Music",
+                key: "A",
+                tempo: 65,
+                feel: 'Slow Worship',
+                chart: "[Intro]\nA  E  F#m  D\n\n[Verse 1]\nA              E\nIn your presence Lord\nF#m            D\nI find everything I need\n\n[Chorus]\nA         E\nYour presence, your presence\nF#m       D\nIs all I need"
+            }
+        ];
+
+        function getActiveFontSize() {
+            var saved = localStorage.getItem('worshipapp_fontsize');
+            return saved ? parseInt(saved) : 16;
+        }
+
+        function getNotes() { return useFlats ? FLATS : SHARPS; }
+
+        function transposeNote(note, steps) {
+            var index = SHARPS.indexOf(note);
+            if (index === -1) return note;
+            return getNotes()[(index + steps + 12) % 12];
+        }
+
+        function transposeChart(chart, steps) {
+            if (steps === 0 && !useFlats) return chart;
+            var regex = /\b[A-G]#?(?=[m7sus4dim aug0-9\s\[]|$)/gm;
+            return chart.replace(regex, function(note) {
+                return transposeNote(note, steps);
+            });
+        }
+
+        function transposeKey(key, steps) {
+            return key.replace(/[A-G]#?/g, function(note) {
+                return transposeNote(note, steps);
+            });
+        }
+
+        function getStepsToMatch(fromKey, toKey) {
+            var from = fromKey.replace(/[^A-G#]/g, '');
+            var to = toKey.replace(/[^A-G#]/g, '');
+            var fromIndex = SHARPS.indexOf(from);
+            var toIndex = SHARPS.indexOf(to);
+            if (fromIndex === -1 || toIndex === -1) return 0;
+            return (toIndex - fromIndex + 12) % 12;
+        }
+
+        // --- DRAWER ---
+
+        function openDrawer() {
+            document.getElementById('drawer').classList.add('open');
+            document.getElementById('drawer-overlay').classList.add('open');
+            document.getElementById('drawer-name').value = musician.name;
+            pendingDrawerInstrument = activeInstrument;
+            highlightDrawerInstrument(activeInstrument);
+        }
+
+        function closeDrawer() {
+            document.getElementById('drawer').classList.remove('open');
+            document.getElementById('drawer-overlay').classList.remove('open');
+        }
+
+        function selectDrawerInstrument(instrument) {
+            pendingDrawerInstrument = instrument;
+            highlightDrawerInstrument(instrument);
+        }
+
+        function highlightDrawerInstrument(instrument) {
+            document.querySelectorAll('[id^="di-"]').forEach(function(btn) {
+                btn.classList.remove('selected');
+            });
+            var el = document.getElementById('di-' + instrument);
+            if (el) el.classList.add('selected');
+        }
+
+        function applyTodayOnly() {
+            if (!pendingDrawerInstrument) return;
+            activeInstrument = pendingDrawerInstrument;
+            updateTopBar();
+            closeDrawer();
+            if (document.getElementById('chart-view').style.display === 'block') renderChart();
+        }
+
+        function saveProfileFromDrawer() {
+            var name = document.getElementById('drawer-name').value.trim();
+            if (!name || !pendingDrawerInstrument) return;
+            musician.name = name;
+            musician.instrument = pendingDrawerInstrument;
+            activeInstrument = pendingDrawerInstrument;
+            localStorage.setItem('worshipapp_musician', JSON.stringify(musician));
+            updateTopBar();
+            closeDrawer();
+            if (document.getElementById('chart-view').style.display === 'block') renderChart();
+        }
+
+        function updateTopBar() {
+            document.getElementById('top-bar-sub').textContent =
+                musician.name + ' · ' + activeInstrument;
+        }
+
+        // --- MEDLEY SEARCH ---
+
+        function filterMedleySongs() {
+            var query = document.getElementById('medley-search').value.toLowerCase();
+            var options = document.querySelectorAll('.modal-song-option');
+            options.forEach(function(el) {
+                var text = el.textContent.toLowerCase();
+                el.style.display = text.indexOf(query) !== -1 ? 'block' : 'none';
+            });
+        }
+
+        // --- MEDLEY ---
+
+        function openMedleyModal() {
+            pendingMedleySongIndex = null;
+            pendingMedleyKeyOption = 'same';
+            document.getElementById('medley-search').value = '';
+            document.getElementById('key-opt-same').classList.add('selected');
+            document.getElementById('key-opt-match').classList.remove('selected');
+
+            var list = document.getElementById('medley-song-list');
+            list.innerHTML = '';
+
+            songs.forEach(function(song, index) {
+                if (index === currentSongIndex) return;
+                if (medleySongs.find(function(m) { return m.index === index; })) return;
+                var div = document.createElement('div');
+                div.className = 'modal-song-option';
+                div.textContent = song.title + ' — ' + song.key;
+                div.onclick = function() {
+                    pendingMedleySongIndex = index;
+                    document.querySelectorAll('.modal-song-option').forEach(function(el) {
+                        el.classList.remove('selected');
+                    });
+                    div.classList.add('selected');
+                };
+                list.appendChild(div);
+            });
+
+            document.getElementById('medley-modal').classList.add('open');
+        }
+
+        function closeMedleyModal() {
+            document.getElementById('medley-modal').classList.remove('open');
+        }
+
+        function selectMedleyKey(option) {
+            pendingMedleyKeyOption = option;
+            document.getElementById('key-opt-same').classList.toggle('selected', option === 'same');
+            document.getElementById('key-opt-match').classList.toggle('selected', option === 'match');
+        }
+
+        function confirmMedley() {
+            if (pendingMedleySongIndex === null) return;
+            medleySongs.push({
+                index: pendingMedleySongIndex,
+                keyOption: pendingMedleyKeyOption
+            });
+            closeMedleyModal();
+            renderMedley();
+        }
+
+        function renderMedley() {
+            var container = document.getElementById('medley-container');
+            container.innerHTML = '';
+            var steps = songSettings[currentSongIndex] || 0;
+            var currentKeyNote = transposeNote(
+                songs[currentSongIndex].key.replace(/[^A-G#]/g, ''),
+                steps
+            );
+            var fontSize = getActiveFontSize();
+            var view = INSTRUMENT_VIEWS[activeInstrument];
+
+            medleySongs.forEach(function(m) {
+                var song = songs[m.index];
+                var songKeyNote = song.key.replace(/[^A-G#]/g, '');
+                var medleySteps = m.keyOption === 'match'
+                    ? getStepsToMatch(songKeyNote, currentKeyNote)
+                    : 0;
+                var displayKey = transposeNote(songKeyNote, medleySteps);
+
+                var chartContent = view === 'drummer'
+                    ? 'Feel: ' + song.feel + '\nTempo: ' + song.tempo + ' BPM\n\n' + song.chart
+                    : transposeChart(song.chart, medleySteps);
+
+                var block = document.createElement('div');
+                block.className = 'medley-block';
+
+                var removeBtn = document.createElement('button');
+                removeBtn.className = 'medley-remove-btn';
+                removeBtn.textContent = '✕ Remove';
+                removeBtn.onclick = (function(idx) {
+                    return function() {
+                        medleySongs = medleySongs.filter(function(ms) {
+                            return ms.index !== idx;
+                        });
+                        renderMedley();
+                    };
+                })(m.index);
+
+                var label = document.createElement('div');
+                label.className = 'medley-label';
+                label.textContent = '⬇ Medley';
+
+                var title = document.createElement('div');
+                title.className = 'medley-song-title';
+                title.textContent = song.title;
+
+                var keyInfo = document.createElement('div');
+                keyInfo.className = 'medley-song-key';
+                keyInfo.textContent = song.artist + ' · Key of ' + displayKey +
+                    (m.keyOption === 'match' ? ' (matched)' : ' (original)');
+
+                var pre = document.createElement('pre');
+                pre.style.fontSize = fontSize + 'px';
+                pre.textContent = chartContent;
+
+                block.appendChild(removeBtn);
+                block.appendChild(label);
+                block.appendChild(title);
+                block.appendChild(keyInfo);
+                block.appendChild(pre);
+                container.appendChild(block);
+            });
+        }
+
+        // --- ONBOARDING ---
+
+        function selectInstrument(instrument) {
+            selectedInstrument = instrument;
+            document.querySelectorAll('.instrument-btn').forEach(function(btn) {
+                btn.classList.remove('selected');
+            });
+            document.getElementById('btn-' + instrument).classList.add('selected');
+            checkReady();
+        }
+
+        function checkReady() {
+            var name = document.getElementById('musician-name').value.trim();
+            document.getElementById('continue-btn').classList.toggle('ready',
+                name.length > 0 && selectedInstrument !== '');
+        }
+
+        function saveProfile() {
+            var name = document.getElementById('musician-name').value.trim();
+            if (!name || !selectedInstrument) return;
+            musician = { name: name, instrument: selectedInstrument };
+            activeInstrument = selectedInstrument;
+            localStorage.setItem('worshipapp_musician', JSON.stringify(musician));
+            var saved = localStorage.getItem('worshipapp_song_settings');
+            if (saved) songSettings = JSON.parse(saved);
+            launchApp();
+        }
+
+        function launchApp() {
+            activeInstrument = musician.instrument;
+            updateTopBar();
+            document.getElementById('onboarding-view').style.display = 'none';
+            document.getElementById('list-view').style.display = 'block';
+        }
+
+        // --- CAPO ---
+
+        function renderCapo() {
+            var song = songs[currentSongIndex];
+            var steps = songSettings[currentSongIndex] || 0;
+            var keyNote = song.key.replace(/[^A-G#]/g, '');
+            var keyIndex = SHARPS.indexOf(transposeNote(keyNote, steps));
+            var grid = document.getElementById('capo-grid');
+            grid.innerHTML = '';
+            CAPO_SHAPES.forEach(function(item) {
+                var capoFret = (keyIndex - item.index + 12) % 12;
+                var card = document.createElement('div');
+                card.className = 'capo-card';
+                card.innerHTML =
+                    '<div class="capo-shape">' + item.shape + '</div>' +
+                    '<div class="capo-fret">Capo <span>' +
+                    (capoFret === 0 ? 'None' : capoFret) + '</span></div>';
+                grid.appendChild(card);
+            });
+        }
+
+        // --- CHART RENDER ---
+
+        function renderChart() {
+            var song = songs[currentSongIndex];
+            var steps = songSettings[currentSongIndex] || 0;
+            var newKey = transposeNote(song.key.replace(/[^A-G#]/g, ''), steps);
+            var view = INSTRUMENT_VIEWS[activeInstrument];
+            var fontSize = getActiveFontSize();
+
+            document.getElementById('song-key').textContent = 'Key of ' + newKey;
+            document.getElementById('list-key-' + currentSongIndex).textContent = 'Key of ' + newKey;
+            document.getElementById('transpose-display').textContent =
+                steps === 0 ? 'Original Key' : (steps > 0 ? '+' : '') + steps + ' semitones';
+
+            var capoSection = document.getElementById('capo-section');
+            if (view === 'guitarist') {
+                capoSection.style.display = 'block';
+                renderCapo();
+            } else {
+                capoSection.style.display = 'none';
+            }
+
+            var chartEl = document.getElementById('song-chart');
+            chartEl.style.fontSize = fontSize + 'px';
+            chartEl.textContent = view === 'drummer'
+                ? 'Feel: ' + song.feel + '\nTempo: ' + song.tempo + ' BPM\n\n' + song.chart
+                : transposeChart(song.chart, steps);
+
+            if (medleySongs.length > 0) renderMedley();
+        }
+
+        // --- NAVIGATION ---
+
+        function openSong(index) {
+            currentSongIndex = index;
+            medleySongs = [];
+            document.getElementById('medley-container').innerHTML = '';
+            if (!(index in songSettings)) songSettings[index] = 0;
+            var song = songs[index];
+            document.getElementById('song-title').textContent = song.title;
+            document.getElementById('song-artist').textContent = song.artist;
+            document.getElementById('chart-view').style.display = 'block';
+            document.getElementById('list-view').style.display = 'none';
+            renderChart();
+        }
+
+        function goBack() {
+            document.getElementById('chart-view').style.display = 'none';
+            document.getElementById('list-view').style.display = 'block';
+        }
+
+        function transpose(direction) {
+            songSettings[currentSongIndex] = (songSettings[currentSongIndex] || 0) + direction;
+            localStorage.setItem('worshipapp_song_settings', JSON.stringify(songSettings));
+            renderChart();
+        }
+
+        function setNotation(type) {
+            useFlats = (type === 'flat');
+            document.getElementById('btn-sharp').classList.toggle('active', !useFlats);
+            document.getElementById('btn-flat').classList.toggle('active', useFlats);
+            renderChart();
+            if (medleySongs.length > 0) renderMedley();
+        }
+
+        function changeFontSize(amount) {
+            var fontSize = getActiveFontSize() + amount;
+            localStorage.setItem('worshipapp_fontsize', fontSize);
+            document.getElementById('song-chart').style.fontSize = fontSize + 'px';
+            if (medleySongs.length > 0) renderMedley();
+        }
+
+        // --- INIT ---
+
+        function init() {
+            var saved = localStorage.getItem('worshipapp_musician');
+            if (saved) {
+                musician = JSON.parse(saved);
+                activeInstrument = musician.instrument;
+                var savedSettings = localStorage.getItem('worshipapp_song_settings');
+                if (savedSettings) songSettings = JSON.parse(savedSettings);
+                launchApp();
+            } else {
+                document.getElementById('onboarding-view').style.display = 'flex';
+            }
+        }
+
+        init();
+    </script>
+
+</body>
+</html>
