@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WorshipApp</title>
+    <title>Chord.ph</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -622,7 +622,7 @@
         <button class="drawer-btn btn-today" onclick="applyTodayOnly()">Play as this instrument today</button>
         <button class="drawer-btn btn-save" onclick="saveProfileFromDrawer()">Save Profile</button>
         <hr class="divider-line">
-        <div style="font-size:12px;color:#a0a0b0;text-align:center;">WorshipApp v0.1 · Built for Filipino musicians</div>
+        <div style="font-size:12px;color:#a0a0b0;text-align:center;">Chord.ph v0.1 · Your chords. Your key. Your music.</div>
     </div>
 
     <div class="modal-overlay" id="medley-modal">
@@ -650,8 +650,8 @@
 
     <div id="onboarding-view">
         <div class="app-logo">🎵</div>
-        <div class="app-name">WorshipApp</div>
-        <div class="app-tagline">Built for Filipino worship musicians</div>
+        <div class="app-name">Chord.ph</div>
+        <div class="app-tagline">Your chords. Your key. Your music.</div>
         <div class="onboarding-label">What's your instrument?</div>
         <div class="instrument-grid">
             <button class="instrument-btn" onclick="selectInstrument('Lead Guitar')" id="btn-Lead Guitar"><span class="icon">🎸</span>Lead Guitar</button>
@@ -663,13 +663,13 @@
         </div>
         <div class="onboarding-label">What should we call you?</div>
         <input class="name-input" type="text" id="musician-name" placeholder="Your name" oninput="checkReady()"/>
-        <button class="continue-btn" id="continue-btn" onclick="saveProfile()">Let's Worship 🙏</button>
+        <button class="continue-btn" id="continue-btn" onclick="saveProfile()">Let's Play 🎵</button>
     </div>
 
     <div id="list-view">
         <div class="top-bar">
             <div>
-                <div class="top-bar-title">🎵 WorshipApp</div>
+                <div class="top-bar-title">🎵 Chord.ph</div>
                 <div class="top-bar-sub" id="top-bar-sub"></div>
             </div>
             <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
@@ -748,7 +748,6 @@
             'Vocalist':      'vocalist'
         };
 
-
         var useFlats = false;
         var currentSongIndex = 0;
         var songSettings = {};
@@ -787,43 +786,195 @@
             }
         ];
 
+        // ============================================
+        // CORE ENGINE — single source of truth
+        // ============================================
+
+        function getAppState() {
+            var steps = songSettings[currentSongIndex] || 0;
+            var song = songs[currentSongIndex];
+            var currentKeyIndex = (getNoteIndex(song.key) + steps + 12) % 12;
+            var currentKeyNote = useFlats ? FLATS[currentKeyIndex] : SHARPS[currentKeyIndex];
+            return {
+                song: song,
+                steps: steps,
+                currentKeyIndex: currentKeyIndex,
+                currentKeyNote: currentKeyNote,
+                view: INSTRUMENT_VIEWS[activeInstrument],
+                fontSize: getActiveFontSize()
+            };
+        }
+
+        function getStepsToReach(fromKey, toKeyNote) {
+            var fromIndex = getNoteIndex(fromKey);
+            var toIndex = getNoteIndex(toKeyNote);
+            if (fromIndex === -1 || toIndex === -1) return 0;
+            return (toIndex - fromIndex + 12) % 12;
+        }
+
+        function transposeNoteBySteps(noteStr, steps) {
+            var baseIndex = getNoteIndex(noteStr);
+            if (baseIndex === -1) return noteStr;
+            var newIndex = (baseIndex + steps + 120) % 12;
+            return useFlats ? FLATS[newIndex] : SHARPS[newIndex];
+        }
+
+        function transposeChordText(text, steps) {
+            if (steps === 0 && !useFlats) return text;
+            return text.replace(/\b([A-G]#?)(m|maj|min|sus|add|dim|aug|[0-9])?(?=\s|\[|$)/gm,
+                function(match, root, quality) {
+                    return transposeNoteBySteps(root, steps) + (quality || '');
+                }
+            );
+        }
+
+        function getNoteIndex(note) {
+            var idx = SHARPS.indexOf(note);
+            if (idx !== -1) return idx;
+            return FLATS.indexOf(note);
+        }
+
+        function transposeNoteBySteps(noteStr, steps) {
+            var baseIndex = getNoteIndex(noteStr);
+            if (baseIndex === -1) return noteStr;
+            var newIndex = (baseIndex + steps + 120) % 12;
+            return useFlats ? FLATS[newIndex] : SHARPS[newIndex];
+        }
+
+        function getStepsToReach(fromKey, toKeyNote) {
+            var fromIndex = getNoteIndex(fromKey);
+            var toIndex = getNoteIndex(toKeyNote);
+            if (fromIndex === -1 || toIndex === -1) return 0;
+            return (toIndex - fromIndex + 12) % 12;
+        }
+
         function getActiveFontSize() {
             var saved = localStorage.getItem('worshipapp_fontsize');
             return saved ? parseInt(saved) : 16;
         }
 
-        function getNotes() { return useFlats ? FLATS : SHARPS; }
+        // ============================================
+        // UNIFIED RENDER PIPELINE
+        // ============================================
 
-        function transposeNote(note, steps) {
-            var index = SHARPS.indexOf(note);
-            if (index === -1) return note;
-            return getNotes()[(index + steps + 12) % 12];
+        function renderAll() {
+            var state = getAppState();
+            renderMainChart(state);
+            renderMedleyBlocks(state);
+            renderCapoGrid(state);
+            updateTransposeDisplay(state);
+            updateKeyBadges(state);
         }
 
-        function transposeChart(chart, steps) {
-            if (steps === 0 && !useFlats) return chart;
-            var regex = /\b[A-G]#?(?=[m7sus4dim aug0-9\s\[]|$)/gm;
-            return chart.replace(regex, function(note) {
-                return transposeNote(note, steps);
+        function renderMainChart(state) {
+            var chartEl = document.getElementById('song-chart');
+            chartEl.style.fontSize = state.fontSize + 'px';
+
+            if (state.view === 'drummer') {
+                chartEl.textContent = 'Feel: ' + state.song.feel +
+                    '\nTempo: ' + state.song.tempo + ' BPM\n\n' + state.song.chart;
+            } else {
+                chartEl.textContent = transposeChordText(state.song.chart, state.steps);
+            }
+
+            document.getElementById('song-title').textContent = state.song.title;
+            document.getElementById('song-artist').textContent = state.song.artist;
+            document.getElementById('song-key').textContent = 'Key of ' + state.currentKeyNote;
+
+            var capoSection = document.getElementById('capo-section');
+            capoSection.style.display = state.view === 'guitarist' ? 'block' : 'none';
+        }
+
+        function renderMedleyBlocks(state) {
+            var container = document.getElementById('medley-container');
+            container.innerHTML = '';
+
+            medleySongs.forEach(function(m) {
+                var song = songs[m.index];
+                var medleySteps = 0;
+
+                if (m.keyOption === 'match') {
+                    medleySteps = getStepsToReach(song.key, state.currentKeyNote);
+                }
+
+                var displayKeyIndex = (SHARPS.indexOf(song.key) + medleySteps + 12) % 12;
+                var displayKey = useFlats ? FLATS[displayKeyIndex] : SHARPS[displayKeyIndex];
+
+                var chartContent = state.view === 'drummer'
+                    ? 'Feel: ' + song.feel + '\nTempo: ' + song.tempo + ' BPM\n\n' + song.chart
+                    : transposeChordText(song.chart, medleySteps);
+
+                var block = document.createElement('div');
+                block.className = 'medley-block';
+
+                var removeBtn = document.createElement('button');
+                removeBtn.className = 'medley-remove-btn';
+                removeBtn.textContent = '✕ Remove';
+                removeBtn.onclick = (function(idx) {
+                    return function() {
+                        medleySongs = medleySongs.filter(function(ms) {
+                            return ms.index !== idx;
+                        });
+                        renderAll();
+                    };
+                })(m.index);
+
+                var label = document.createElement('div');
+                label.className = 'medley-label';
+                label.textContent = '⬇ Medley';
+
+                var title = document.createElement('div');
+                title.className = 'medley-song-title';
+                title.textContent = song.title;
+
+                var keyInfo = document.createElement('div');
+                keyInfo.className = 'medley-song-key';
+                keyInfo.textContent = song.artist + ' · Key of ' + displayKey +
+                    (m.keyOption === 'match' ? ' (matched)' : ' (original)');
+
+                var pre = document.createElement('pre');
+                pre.style.fontSize = state.fontSize + 'px';
+                pre.textContent = chartContent;
+
+                block.appendChild(removeBtn);
+                block.appendChild(label);
+                block.appendChild(title);
+                block.appendChild(keyInfo);
+                block.appendChild(pre);
+                container.appendChild(block);
             });
         }
 
-        function transposeKey(key, steps) {
-            return key.replace(/[A-G]#?/g, function(note) {
-                return transposeNote(note, steps);
+        function renderCapoGrid(state) {
+            if (state.view !== 'guitarist') return;
+            var grid = document.getElementById('capo-grid');
+            grid.innerHTML = '';
+            CAPO_SHAPES.forEach(function(item) {
+                var capoFret = (state.currentKeyIndex - item.index + 12) % 12;
+                var card = document.createElement('div');
+                card.className = 'capo-card';
+                card.innerHTML =
+                    '<div class="capo-shape">' + item.shape + '</div>' +
+                    '<div class="capo-fret">Capo <span>' +
+                    (capoFret === 0 ? 'None' : capoFret) + '</span></div>';
+                grid.appendChild(card);
             });
         }
 
-        function getStepsToMatch(fromKey, toKey) {
-            var from = fromKey.replace(/[^A-G#]/g, '');
-            var to = toKey.replace(/[^A-G#]/g, '');
-            var fromIndex = SHARPS.indexOf(from);
-            var toIndex = SHARPS.indexOf(to);
-            if (fromIndex === -1 || toIndex === -1) return 0;
-            return (toIndex - fromIndex + 12) % 12;
+        function updateTransposeDisplay(state) {
+            document.getElementById('transpose-display').textContent =
+                state.steps === 0 ? 'Original Key' :
+                (state.steps > 0 ? '+' : '') + state.steps + ' semitones';
         }
 
-        // --- DRAWER ---
+        function updateKeyBadges(state) {
+            var badge = document.getElementById('list-key-' + currentSongIndex);
+            if (badge) badge.textContent = 'Key of ' + state.currentKeyNote;
+        }
+
+        // ============================================
+        // DRAWER
+        // ============================================
 
         function openDrawer() {
             document.getElementById('drawer').classList.add('open');
@@ -856,7 +1007,7 @@
             activeInstrument = pendingDrawerInstrument;
             updateTopBar();
             closeDrawer();
-            if (document.getElementById('chart-view').style.display === 'block') renderChart();
+            if (document.getElementById('chart-view').style.display === 'block') renderAll();
         }
 
         function saveProfileFromDrawer() {
@@ -868,7 +1019,7 @@
             localStorage.setItem('worshipapp_musician', JSON.stringify(musician));
             updateTopBar();
             closeDrawer();
-            if (document.getElementById('chart-view').style.display === 'block') renderChart();
+            if (document.getElementById('chart-view').style.display === 'block') renderAll();
         }
 
         function updateTopBar() {
@@ -876,18 +1027,16 @@
                 musician.name + ' · ' + activeInstrument;
         }
 
-        // --- MEDLEY SEARCH ---
+        // ============================================
+        // MEDLEY
+        // ============================================
 
         function filterMedleySongs() {
             var query = document.getElementById('medley-search').value.toLowerCase();
-            var options = document.querySelectorAll('.modal-song-option');
-            options.forEach(function(el) {
-                var text = el.textContent.toLowerCase();
-                el.style.display = text.indexOf(query) !== -1 ? 'block' : 'none';
+            document.querySelectorAll('.modal-song-option').forEach(function(el) {
+                el.style.display = el.textContent.toLowerCase().indexOf(query) !== -1 ? 'block' : 'none';
             });
         }
-
-        // --- MEDLEY ---
 
         function openMedleyModal() {
             pendingMedleySongIndex = null;
@@ -935,74 +1084,12 @@
                 keyOption: pendingMedleyKeyOption
             });
             closeMedleyModal();
-            renderMedley();
+            renderAll();
         }
 
-        function renderMedley() {
-            var container = document.getElementById('medley-container');
-            container.innerHTML = '';
-            var steps = songSettings[currentSongIndex] || 0;
-            var currentKeyNote = transposeNote(
-                songs[currentSongIndex].key.replace(/[^A-G#]/g, ''),
-                steps
-            );
-            var fontSize = getActiveFontSize();
-            var view = INSTRUMENT_VIEWS[activeInstrument];
-
-            medleySongs.forEach(function(m) {
-                var song = songs[m.index];
-                var songKeyNote = song.key.replace(/[^A-G#]/g, '');
-                var medleySteps = m.keyOption === 'match'
-                    ? getStepsToMatch(songKeyNote, currentKeyNote)
-                    : 0;
-                var displayKey = transposeNote(songKeyNote, medleySteps);
-
-                var chartContent = view === 'drummer'
-                    ? 'Feel: ' + song.feel + '\nTempo: ' + song.tempo + ' BPM\n\n' + song.chart
-                    : transposeChart(song.chart, medleySteps);
-
-                var block = document.createElement('div');
-                block.className = 'medley-block';
-
-                var removeBtn = document.createElement('button');
-                removeBtn.className = 'medley-remove-btn';
-                removeBtn.textContent = '✕ Remove';
-                removeBtn.onclick = (function(idx) {
-                    return function() {
-                        medleySongs = medleySongs.filter(function(ms) {
-                            return ms.index !== idx;
-                        });
-                        renderMedley();
-                    };
-                })(m.index);
-
-                var label = document.createElement('div');
-                label.className = 'medley-label';
-                label.textContent = '⬇ Medley';
-
-                var title = document.createElement('div');
-                title.className = 'medley-song-title';
-                title.textContent = song.title;
-
-                var keyInfo = document.createElement('div');
-                keyInfo.className = 'medley-song-key';
-                keyInfo.textContent = song.artist + ' · Key of ' + displayKey +
-                    (m.keyOption === 'match' ? ' (matched)' : ' (original)');
-
-                var pre = document.createElement('pre');
-                pre.style.fontSize = fontSize + 'px';
-                pre.textContent = chartContent;
-
-                block.appendChild(removeBtn);
-                block.appendChild(label);
-                block.appendChild(title);
-                block.appendChild(keyInfo);
-                block.appendChild(pre);
-                container.appendChild(block);
-            });
-        }
-
-        // --- ONBOARDING ---
+        // ============================================
+        // ONBOARDING
+        // ============================================
 
         function selectInstrument(instrument) {
             selectedInstrument = instrument;
@@ -1037,71 +1124,18 @@
             document.getElementById('list-view').style.display = 'block';
         }
 
-        // --- CAPO ---
-
-        function renderCapo() {
-            var song = songs[currentSongIndex];
-            var steps = songSettings[currentSongIndex] || 0;
-            var keyNote = song.key.replace(/[^A-G#]/g, '');
-            var keyIndex = SHARPS.indexOf(transposeNote(keyNote, steps));
-            var grid = document.getElementById('capo-grid');
-            grid.innerHTML = '';
-            CAPO_SHAPES.forEach(function(item) {
-                var capoFret = (keyIndex - item.index + 12) % 12;
-                var card = document.createElement('div');
-                card.className = 'capo-card';
-                card.innerHTML =
-                    '<div class="capo-shape">' + item.shape + '</div>' +
-                    '<div class="capo-fret">Capo <span>' +
-                    (capoFret === 0 ? 'None' : capoFret) + '</span></div>';
-                grid.appendChild(card);
-            });
-        }
-
-        // --- CHART RENDER ---
-
-        function renderChart() {
-            var song = songs[currentSongIndex];
-            var steps = songSettings[currentSongIndex] || 0;
-            var newKey = transposeNote(song.key.replace(/[^A-G#]/g, ''), steps);
-            var view = INSTRUMENT_VIEWS[activeInstrument];
-            var fontSize = getActiveFontSize();
-
-            document.getElementById('song-key').textContent = 'Key of ' + newKey;
-            document.getElementById('list-key-' + currentSongIndex).textContent = 'Key of ' + newKey;
-            document.getElementById('transpose-display').textContent =
-                steps === 0 ? 'Original Key' : (steps > 0 ? '+' : '') + steps + ' semitones';
-
-            var capoSection = document.getElementById('capo-section');
-            if (view === 'guitarist') {
-                capoSection.style.display = 'block';
-                renderCapo();
-            } else {
-                capoSection.style.display = 'none';
-            }
-
-            var chartEl = document.getElementById('song-chart');
-            chartEl.style.fontSize = fontSize + 'px';
-            chartEl.textContent = view === 'drummer'
-                ? 'Feel: ' + song.feel + '\nTempo: ' + song.tempo + ' BPM\n\n' + song.chart
-                : transposeChart(song.chart, steps);
-
-            if (medleySongs.length > 0) renderMedley();
-        }
-
-        // --- NAVIGATION ---
+        // ============================================
+        // NAVIGATION
+        // ============================================
 
         function openSong(index) {
             currentSongIndex = index;
             medleySongs = [];
             document.getElementById('medley-container').innerHTML = '';
             if (!(index in songSettings)) songSettings[index] = 0;
-            var song = songs[index];
-            document.getElementById('song-title').textContent = song.title;
-            document.getElementById('song-artist').textContent = song.artist;
             document.getElementById('chart-view').style.display = 'block';
             document.getElementById('list-view').style.display = 'none';
-            renderChart();
+            renderAll();
         }
 
         function goBack() {
@@ -1112,25 +1146,25 @@
         function transpose(direction) {
             songSettings[currentSongIndex] = (songSettings[currentSongIndex] || 0) + direction;
             localStorage.setItem('worshipapp_song_settings', JSON.stringify(songSettings));
-            renderChart();
+            renderAll();
         }
 
         function setNotation(type) {
             useFlats = (type === 'flat');
             document.getElementById('btn-sharp').classList.toggle('active', !useFlats);
             document.getElementById('btn-flat').classList.toggle('active', useFlats);
-            renderChart();
-            if (medleySongs.length > 0) renderMedley();
+            renderAll();
         }
 
         function changeFontSize(amount) {
             var fontSize = getActiveFontSize() + amount;
             localStorage.setItem('worshipapp_fontsize', fontSize);
-            document.getElementById('song-chart').style.fontSize = fontSize + 'px';
-            if (medleySongs.length > 0) renderMedley();
+            renderAll();
         }
 
-        // --- INIT ---
+        // ============================================
+        // INIT
+        // ============================================
 
         function init() {
             var saved = localStorage.getItem('worshipapp_musician');
