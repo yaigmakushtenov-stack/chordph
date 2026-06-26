@@ -361,6 +361,8 @@
         .ctrl-red {
             background-color: #e94560;
             color: #ffffff;
+            min-width: 80px;
+            text-align: center;
         }
 
         .ctrl-outline {
@@ -377,7 +379,7 @@
         .transpose-row {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 6px;
             margin: 10px 0;
             flex-wrap: wrap;
         }
@@ -385,8 +387,9 @@
         #transpose-display {
             color: #a0a0b0;
             font-size: 13px;
-            min-width: 90px;
+            min-width: 36px;
             text-align: center;
+            font-weight: bold;
         }
 
         .capo-section { margin: 12px 0; }
@@ -1038,8 +1041,8 @@
 
         function updateTransposeDisplay(state) {
             document.getElementById('transpose-display').textContent =
-                state.steps === 0 ? 'Original Key' :
-                (state.steps > 0 ? '+' : '') + state.steps + ' semitones';
+                state.steps === 0 ? '0' :
+                (state.steps > 0 ? '+' : '') + state.steps;
         }
 
         function updateKeyBadges(state) {
