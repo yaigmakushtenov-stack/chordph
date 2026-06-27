@@ -725,6 +725,10 @@
         <button class="drawer-btn btn-today" onclick="applyTodayOnly()">Play as this instrument today</button>
         <button class="drawer-btn btn-save" onclick="saveProfileFromDrawer()">Save Profile</button>
         <hr class="divider-line">
+        <hr class="divider-line">
+        <div class="drawer-section-title">⭐ Navigation</div>
+        <button class="drawer-btn btn-today" onclick="showFavorites()">★ My Favorites</button>
+        <button class="drawer-btn btn-today" onclick="showSongList()">♪ All Songs</button>
         <div class="drawer-section-title">📚 Library</div>
         <button class="drawer-btn btn-today" onclick="openAddSongModal()">+ Add New Song</button>
         <div style="font-size:12px;color:#a0a0b0;text-align:center;">Chord.ph v0.1 · Your chords. Your key. Your music.</div>
@@ -813,23 +817,40 @@
     </div>
 
     <div id="onboarding-view">
-        <div class="app-logo">🎵</div>
-        <div class="app-name">Chord.ph</div>
-        <div class="app-tagline">Your chords. Your key. Your music.</div>
-        <div class="onboarding-label">What's your instrument?</div>
-        <div class="instrument-grid">
-            <button class="instrument-btn" onclick="selectInstrument('Lead Guitar')" id="btn-Lead Guitar"><span class="icon">🎸</span>Lead Guitar</button>
-            <button class="instrument-btn" onclick="selectInstrument('Rhythm Guitar')" id="btn-Rhythm Guitar"><span class="icon">🎸</span>Rhythm Guitar</button>
-            <button class="instrument-btn" onclick="selectInstrument('Bass')" id="btn-Bass"><span class="icon">🎸</span>Bass</button>
-            <button class="instrument-btn" onclick="selectInstrument('Keyboard')" id="btn-Keyboard"><span class="icon">🎹</span>Keyboard</button>
-            <button class="instrument-btn" onclick="selectInstrument('Drums')" id="btn-Drums"><span class="icon">🥁</span>Drums</button>
-            <button class="instrument-btn" onclick="selectInstrument('Vocalist')" id="btn-Vocalist"><span class="icon">🎤</span>Vocalist</button>
+            <div class="app-logo">🎵</div>
+            <div class="app-name">Chord.ph</div>
+            <div class="app-tagline">Your chords. Your key. Your music.</div>
+            <div class="onboarding-label">What's your instrument?</div>
+            <div class="instrument-grid">
+                <button class="instrument-btn" onclick="selectInstrument('Lead Guitar')" id="btn-Lead Guitar"><span class="icon">🎸</span>Lead Guitar</button>
+                <button class="instrument-btn" onclick="selectInstrument('Rhythm Guitar')" id="btn-Rhythm Guitar"><span class="icon">🎸</span>Rhythm Guitar</button>
+                <button class="instrument-btn" onclick="selectInstrument('Bass')" id="btn-Bass"><span class="icon">🎸</span>Bass</button>
+                <button class="instrument-btn" onclick="selectInstrument('Keyboard')" id="btn-Keyboard"><span class="icon">🎹</span>Keyboard</button>
+                <button class="instrument-btn" onclick="selectInstrument('Drums')" id="btn-Drums"><span class="icon">🥁</span>Drums</button>
+                <button class="instrument-btn" onclick="selectInstrument('Vocalist')" id="btn-Vocalist"><span class="icon">🎤</span>Vocalist</button>
+            </div>
+            <div class="onboarding-label">What should we call you?</div>
+            <input class="name-input" type="text" id="musician-name" placeholder="Your name" oninput="checkReady()"/>
+            <button class="continue-btn" id="continue-btn" onclick="saveProfile()">Let's Play 🎵</button>
         </div>
-        <div class="onboarding-label">What should we call you?</div>
-        <input class="name-input" type="text" id="musician-name" placeholder="Your name" oninput="checkReady()"/>
-        <button class="continue-btn" id="continue-btn" onclick="saveProfile()">Let's Play 🎵</button>
+        <div id="favorites-view" style="display:none;">
+        <div class="top-bar">
+            <div>
+                <div class="top-bar-title">🎵 Chord.ph</div>
+                <div class="top-bar-sub" id="fav-top-bar-sub"></div>
+            </div>
+            <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
+        </div>
+        <div class="page-content">
+            <div style="font-size:11px;color:#f5c518;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">★ Favorites</div>
+            <div id="favorites-list"></div>
+            <div id="favorites-empty" style="display:none;text-align:center;padding:40px 20px;color:#a0a0b0;">
+                <div style="font-size:40px;margin-bottom:12px;">☆</div>
+                <div style="font-size:16px;margin-bottom:8px;">No favorites yet</div>
+                <div style="font-size:13px;">Tap the star on any song to add it here</div>
+            </div>
+        </div>
     </div>
-
     <div id="list-view">
         <div class="top-bar">
             <div>
@@ -1407,8 +1428,83 @@
                 }
             });
             updateChartStar();
+            updateFavoritesSection();
         }
 
+        function updateFavoritesSection() {
+            var existing = document.getElementById('favorites-section');
+            if (existing) existing.remove();
+        }
+        function showFavorites() {
+            closeDrawer();
+            document.getElementById('list-view').style.display = 'none';
+            document.getElementById('chart-view').style.display = 'none';
+            document.getElementById('favorites-view').style.display = 'block';
+            document.getElementById('fav-top-bar-sub').textContent =
+                musician.name + ' · ' + activeInstrument;
+            renderFavoritesPage();
+        }
+
+        function showSongList() {
+            closeDrawer();
+            document.getElementById('favorites-view').style.display = 'none';
+            document.getElementById('chart-view').style.display = 'none';
+            document.getElementById('list-view').style.display = 'block';
+        }
+
+        function renderFavoritesPage() {
+            var list = document.getElementById('favorites-list');
+            var empty = document.getElementById('favorites-empty');
+            list.innerHTML = '';
+
+            if (favorites.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+
+            favorites.forEach(function(index) {
+                if (!songs[index]) return;
+                var song = songs[index];
+
+                var card = document.createElement('div');
+                card.style.cssText = 'padding:12px;margin-bottom:8px;background-color:#16213e;border-radius:10px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:flex-start;';
+                card.onclick = function() { openSong(index); };
+
+                var top = document.createElement('div');
+                top.style.cssText = 'display:flex;align-items:center;justify-content:space-between;width:100%;';
+
+                var title = document.createElement('span');
+                title.style.cssText = 'font-size:17px;font-weight:bold;color:#ffffff;';
+                title.textContent = song.title;
+
+                var star = document.createElement('button');
+                star.style.cssText = 'background:none;border:none;font-size:20px;cursor:pointer;color:#f5c518;padding:4px;flex-shrink:0;';
+                star.textContent = '★';
+                star.onclick = function(e) {
+                    e.stopPropagation();
+                    toggleFavorite(e, index);
+                    renderFavoritesPage();
+                };
+
+                top.appendChild(title);
+                top.appendChild(star);
+
+                var artist = document.createElement('span');
+                artist.style.cssText = 'font-size:13px;color:#a0a0b0;margin-top:3px;';
+                artist.textContent = song.artist;
+
+                var key = document.createElement('span');
+                key.style.cssText = 'display:inline-block;background-color:#e94560;color:#ffffff;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:bold;margin-top:6px;';
+                key.textContent = 'Key of ' + song.key;
+
+                card.appendChild(top);
+                card.appendChild(artist);
+                card.appendChild(key);
+                list.appendChild(card);
+            });
+        }
         function updateChartStar() {
             var btn = document.getElementById('chart-star');
             if (btn) {
