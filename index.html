@@ -14,6 +14,28 @@
             min-height: 100vh;
         }
 
+        .search-container {
+            margin-bottom: 12px;
+        }
+
+        .song-search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid #2a2a4a;
+            background-color: #16213e;
+            color: #ffffff;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .song-search-input:focus {
+            border-color: #e94560;
+        }
+
+        .song-search-input::placeholder {
+            color: #a0a0b0;
+        }
         .top-bar {
             display: flex;
             justify-content: space-between;
@@ -691,6 +713,16 @@
             <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
         </div>
         <div class="page-content">
+            <div class="search-container">
+                <input
+                    type="text"
+                    id="song-search"
+                    class="song-search-input"
+                    placeholder="🔍 Search songs..."
+                    oninput="filterSongs()"
+                />
+            </div>
+            <ul id="song-list-ul">
             <ul>
                 <li onclick="openSong(0)"><span class="song-title">Glorious</span><span class="song-artist">Victory Worship</span><span class="song-key" id="list-key-0">Key of G</span></li>
                 <li onclick="openSong(1)"><span class="song-title">Way Maker</span><span class="song-artist">Sinach</span><span class="song-key" id="list-key-1">Key of B</span></li>
@@ -1104,7 +1136,16 @@
             document.getElementById('top-bar-sub').textContent =
                 musician.name + ' · ' + activeInstrument;
         }
-
+        function filterSongs() {
+            var query = document.getElementById('song-search').value.toLowerCase();
+            var items = document.querySelectorAll('#song-list-ul li');
+            items.forEach(function(item) {
+                var title = item.querySelector('.song-title').textContent.toLowerCase();
+                var artist = item.querySelector('.song-artist').textContent.toLowerCase();
+                item.style.display = (title.indexOf(query) !== -1 || artist.indexOf(query) !== -1)
+                    ? 'flex' : 'none';
+            });
+        }
         // ============================================
         // MEDLEY
         // ============================================
