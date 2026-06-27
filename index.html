@@ -660,6 +660,8 @@
         <button class="drawer-btn btn-today" onclick="applyTodayOnly()">Play as this instrument today</button>
         <button class="drawer-btn btn-save" onclick="saveProfileFromDrawer()">Save Profile</button>
         <hr class="divider-line">
+        <div class="drawer-section-title">📚 Library</div>
+        <button class="drawer-btn btn-today" onclick="openAddSongModal()">+ Add New Song</button>
         <div style="font-size:12px;color:#a0a0b0;text-align:center;">Chord.ph v0.1 · Your chords. Your key. Your music.</div>
     </div>
 
@@ -682,6 +684,65 @@
             <div class="modal-actions">
                 <button class="modal-cancel" onclick="closeMedleyModal()">Cancel</button>
                 <button class="modal-confirm" onclick="confirmMedley()">Add to chart</button>
+            </div>
+        </div>
+    </div>
+            <div class="modal-overlay" id="add-song-modal" onclick="handleAddSongOverlayClick(event)">
+                <div class="modal" style="max-height:90vh;">
+                    <div class="modal-title">➕ Add New Song</div>
+
+                    <input class="modal-search" type="text" id="new-song-title" placeholder="Song title *"/>
+                    <input class="modal-search" type="text" id="new-song-artist" placeholder="Artist / Band *"/>
+
+                    <div style="display:flex;gap:8px;margin-bottom:12px;">
+                        <select id="new-song-key" style="flex:1;padding:10px;border-radius:8px;border:1px solid #2a2a4a;background:#1a1a2e;color:#ffffff;font-size:14px;outline:none;">
+                            <option value="">Key *</option>
+                            <option>C</option><option>C#</option><option>D</option>
+                            <option>D#</option><option>E</option><option>F</option>
+                            <option>F#</option><option>G</option><option>G#</option>
+                            <option>A</option><option>A#</option><option>B</option>
+                        </select>
+                        <input class="modal-search" type="number" id="new-song-tempo" placeholder="BPM" style="flex:1;margin-bottom:0;"/>
+                    </div>
+
+                    <select id="new-song-feel" style="width:100%;padding:10px;border-radius:8px;border:1px solid #2a2a4a;background:#1a1a2e;color:#ffffff;font-size:14px;outline:none;margin-bottom:12px;">
+                        <option value="">Song Feel</option>
+                        <option>Slow Worship</option>
+                        <option>Moderate Worship</option>
+                        <option>Upbeat Praise</option>
+                        <option>Hymn</option>
+                        <option>Contemporary</option>
+                    </select>
+
+                    <textarea
+                        id="new-song-chart"
+                        placeholder="Chord chart *
+
+            Example:
+            [Intro]
+            G  D  Em  C
+
+            [Verse 1]
+            G              D
+            Your lyrics here
+            Em             C
+            More lyrics here
+
+            [Chorus]
+            G         D
+            Chorus lyrics
+            Em        C
+            More chorus"
+                        style="width:100%;height:200px;padding:12px;border-radius:8px;border:1px solid #2a2a4a;background:#1a1a2e;color:#ffffff;font-size:13px;font-family:monospace;outline:none;resize:vertical;margin-bottom:12px;line-height:1.6;"
+                    ></textarea>
+
+                    <div id="add-song-error" style="color:#e94560;font-size:12px;margin-bottom:8px;display:none;"></div>
+
+                    <div class="modal-actions">
+                        <button class="modal-cancel" onclick="closeAddSongModal()">Cancel</button>
+                        <button class="modal-confirm" onclick="submitNewSong()">Save Song</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1063,10 +1124,33 @@
                 var capoFret = (state.currentKeyIndex - item.index + 12) % 12;
                 var card = document.createElement('div');
                 card.className = 'capo-card';
+                card.style.cursor = 'pointer';
+
+                var stepsToShape = (item.index - getNoteIndex(state.song.key) + 12) % 12;
+                var isActive = (songSettings[currentSongIndex] || 0) === stepsToShape && capoFret !== 0;
+
+                if (isActive) {
+                    card.style.borderColor = '#e94560';
+                    card.style.backgroundColor = '#2a1a2e';
+                }
+
                 card.innerHTML =
                     '<div class="capo-shape">' + item.shape + '</div>' +
                     '<div class="capo-fret">Capo <span>' +
                     (capoFret === 0 ? 'None' : capoFret) + '</span></div>';
+
+                card.onclick = (function(steps, fret) {
+                    return function() {
+                        if (fret === 0) {
+                            songSettings[currentSongIndex] = 0;
+                        } else {
+                            songSettings[currentSongIndex] = steps;
+                        }
+                        localStorage.setItem('worshipapp_song_settings', JSON.stringify(songSettings));
+                        renderAll();
+                    };
+                })(stepsToShape, capoFret);
+
                 grid.appendChild(card);
             });
         }
@@ -1135,6 +1219,72 @@
         function updateTopBar() {
             document.getElementById('top-bar-sub').textContent =
                 musician.name + ' · ' + activeInstrument;
+        }
+
+        function openAddSongModal() {
+            document.getElementById('new-song-title').value = '';
+            document.getElementById('new-song-artist').value = '';
+            document.getElementById('new-song-key').value = '';
+            document.getElementById('new-song-tempo').value = '';
+            document.getElementById('new-song-feel').value = '';
+            document.getElementById('new-song-chart').value = '';
+            document.getElementById('add-song-error').style.display = 'none';
+            closeDrawer();
+            document.getElementById('add-song-modal').classList.add('open');
+        }
+
+        function closeAddSongModal() {
+            document.getElementById('add-song-modal').classList.remove('open');
+        }
+
+        function handleAddSongOverlayClick(event) {
+            if (event.target === document.getElementById('add-song-modal')) {
+                closeAddSongModal();
+            }
+        }
+
+        function submitNewSong() {
+            var title = document.getElementById('new-song-title').value.trim();
+            var artist = document.getElementById('new-song-artist').value.trim();
+            var key = document.getElementById('new-song-key').value;
+            var tempo = parseInt(document.getElementById('new-song-tempo').value) || 0;
+            var feel = document.getElementById('new-song-feel').value || 'Moderate Worship';
+            var chart = document.getElementById('new-song-chart').value.trim();
+            var errorEl = document.getElementById('add-song-error');
+
+            if (!title || !artist || !key || !chart) {
+                errorEl.textContent = 'Please fill in title, artist, key and chord chart.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            var newSong = {
+                title: title,
+                artist: artist,
+                key: key,
+                tempo: tempo,
+                feel: feel,
+                chart: chart.replace(/\\n/g, '\n')
+            };
+
+            songs.push(newSong);
+
+            var ul = document.getElementById('song-list-ul');
+            var newIndex = songs.length - 1;
+            var li = document.createElement('li');
+            li.setAttribute('onclick', 'openSong(' + newIndex + ')');
+            li.innerHTML =
+                '<span class="song-title">' + title + '</span>' +
+                '<span class="song-artist">' + artist + '</span>' +
+                '<span class="song-key" id="list-key-' + newIndex + '">Key of ' + key + '</span>';
+            ul.appendChild(li);
+
+            var savedSongs = localStorage.getItem('worshipapp_custom_songs');
+            var customSongs = savedSongs ? JSON.parse(savedSongs) : [];
+            customSongs.push(newSong);
+            localStorage.setItem('worshipapp_custom_songs', JSON.stringify(customSongs));
+
+            closeAddSongModal();
         }
         function filterSongs() {
             var query = document.getElementById('song-search').value.toLowerCase();
@@ -1348,6 +1498,22 @@
                 launchApp();
             } else {
                 document.getElementById('onboarding-view').style.display = 'flex';
+            }
+            var savedCustomSongs = localStorage.getItem('worshipapp_custom_songs');
+            if (savedCustomSongs) {
+                var customSongs = JSON.parse(savedCustomSongs);
+                var ul = document.getElementById('song-list-ul');
+                customSongs.forEach(function(song) {
+                    songs.push(song);
+                    var newIndex = songs.length - 1;
+                    var li = document.createElement('li');
+                    li.setAttribute('onclick', 'openSong(' + newIndex + ')');
+                    li.innerHTML =
+                        '<span class="song-title">' + song.title + '</span>' +
+                        '<span class="song-artist">' + song.artist + '</span>' +
+                        '<span class="song-key" id="list-key-' + newIndex + '">Key of ' + song.key + '</span>';
+                    ul.appendChild(li);
+                });
             }
         }
 
