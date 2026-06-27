@@ -14,6 +14,44 @@
             min-height: 100vh;
         }
 
+        .star-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #a0a0b0;
+            padding: 4px;
+            line-height: 1;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .star-btn.starred {
+            color: #f5c518;
+        }
+
+        .favorites-section {
+            margin-bottom: 16px;
+        }
+
+        .favorites-label {
+            font-size: 11px;
+            color: #a0a0b0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            padding: 0 2px;
+        }
+
+        .divider-label {
+            font-size: 11px;
+            color: #a0a0b0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 16px 0 8px 0;
+            padding: 0 2px;
+        }
+        
         .search-container {
             margin-bottom: 12px;
         }
@@ -308,6 +346,7 @@
             list-style: none;
             display: flex;
             flex-direction: column;
+            align-items: flex-start;
             position: relative;
             cursor: pointer;
         }
@@ -316,9 +355,34 @@
             font-size: 17px;
             font-weight: bold;
             color: #ffffff;
-            padding-right: 80px;
+            padding-right: 40px;
         }
 
+        .song-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .star-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #a0a0b0;
+            padding: 4px;
+            line-height: 1;
+            z-index: 10;
+        }
+
+        .star-btn.starred {
+            color: #f5c518;
+        }
         .song-artist {
             font-size: 13px;
             color: #a0a0b0;
@@ -326,16 +390,16 @@
         }
 
         .song-key {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
+            display: inline-block;
             background-color: #e94560;
             color: #ffffff;
             padding: 4px 10px;
             border-radius: 12px;
             font-size: 12px;
             font-weight: bold;
+            margin-top: 6px;
+            width: auto;
+            align-self: flex-start;
         }
 
         #chart-view { display: none; }
@@ -344,6 +408,7 @@
             font-size: 22px;
             font-weight: bold;
             margin-bottom: 2px;
+            flex: 1;
         }
 
         .chart-song-artist {
@@ -784,20 +849,110 @@
                 />
             </div>
             <ul id="song-list-ul">
-            <ul>
-                <li onclick="openSong(0)"><span class="song-title">Glorious</span><span class="song-artist">Victory Worship</span><span class="song-key" id="list-key-0">Key of G</span></li>
-                <li onclick="openSong(1)"><span class="song-title">Way Maker</span><span class="song-artist">Sinach</span><span class="song-key" id="list-key-1">Key of B</span></li>
-                <li onclick="openSong(2)"><span class="song-title">Presence</span><span class="song-artist">His Life Music</span><span class="song-key" id="list-key-2">Key of A</span></li>
-                <li onclick="openSong(3)"><span class="song-title">Lilim</span><span class="song-artist">Victory Worship</span><span class="song-key" id="list-key-3">Key of E</span></li>
-                <li onclick="openSong(4)"><span class="song-title">Heart of Worship</span><span class="song-artist">Matt Redman</span><span class="song-key" id="list-key-4">Key of D</span></li>
-                <li onclick="openSong(5)"><span class="song-title">Take It All</span><span class="song-artist">Hillsong Worship</span><span class="song-key" id="list-key-5">Key of B</span></li>
-                <li onclick="openSong(6)"><span class="song-title">God Is Here</span><span class="song-artist">Darlene Zschech</span><span class="song-key" id="list-key-6">Key of D</span></li>
-                <li onclick="openSong(7)"><span class="song-title">Lead Me to the Cross</span><span class="song-artist">Hillsong United</span><span class="song-key" id="list-key-7">Key of D</span></li>
-                <li onclick="openSong(8)"><span class="song-title">Oceans</span><span class="song-artist">Hillsong United</span><span class="song-key" id="list-key-8">Key of D</span></li>
-                <li onclick="openSong(9)"><span class="song-title">Endless Praise</span><span class="song-artist">Planetshakers</span><span class="song-key" id="list-key-9">Key of D</span></li>
-                <li onclick="openSong(10)"><span class="song-title">This Is Our Time</span><span class="song-artist">Planetshakers</span><span class="song-key" id="list-key-10">Key of D</span></li>
-                <li onclick="openSong(11)"><span class="song-title">Turn It Up</span><span class="song-artist">Planetshakers</span><span class="song-key" id="list-key-11">Key of E</span></li>
-                <li onclick="openSong(12)"><span class="song-title">Dance</span><span class="song-artist">Planetshakers</span><span class="song-key" id="list-key-12">Key of E</span></li>
+                <li onclick="openSong(0)">
+                    <div class="song-card-top">
+                        <span class="song-title">Glorious</span>
+                        <button class="star-btn" id="star-0" onclick="toggleFavorite(event, 0)">☆</button>
+                    </div>
+                    <span class="song-artist">Victory Worship</span>
+                    <span class="song-key" id="list-key-0">Key of G</span>
+                </li>
+                <li onclick="openSong(1)">
+                    <div class="song-card-top">
+                        <span class="song-title">Way Maker</span>
+                        <button class="star-btn" id="star-1" onclick="toggleFavorite(event, 1)">☆</button>
+                    </div>
+                    <span class="song-artist">Sinach</span>
+                    <span class="song-key" id="list-key-1">Key of B</span>
+                </li>
+                <li onclick="openSong(2)">
+                    <div class="song-card-top">
+                        <span class="song-title">Presence</span>
+                        <button class="star-btn" id="star-2" onclick="toggleFavorite(event, 2)">☆</button>
+                    </div>
+                    <span class="song-artist">His Life Music</span>
+                    <span class="song-key" id="list-key-2">Key of A</span>
+                </li>
+                <li onclick="openSong(3)">
+                    <div class="song-card-top">
+                        <span class="song-title">Lilim</span>
+                        <button class="star-btn" id="star-3" onclick="toggleFavorite(event, 3)">☆</button>
+                    </div>
+                    <span class="song-artist">Victory Worship</span>
+                    <span class="song-key" id="list-key-3">Key of E</span>
+                </li>
+                <li onclick="openSong(4)">
+                    <div class="song-card-top">
+                        <span class="song-title">Heart of Worship</span>
+                        <button class="star-btn" id="star-4" onclick="toggleFavorite(event, 4)">☆</button>
+                    </div>
+                    <span class="song-artist">Matt Redman</span>
+                    <span class="song-key" id="list-key-4">Key of D</span>
+                </li>
+                <li onclick="openSong(5)">
+                    <div class="song-card-top">
+                        <span class="song-title">Take It All</span>
+                        <button class="star-btn" id="star-5" onclick="toggleFavorite(event, 5)">☆</button>
+                    </div>
+                    <span class="song-artist">Hillsong Worship</span>
+                    <span class="song-key" id="list-key-5">Key of B</span>
+                </li>
+                <li onclick="openSong(6)">
+                    <div class="song-card-top">
+                        <span class="song-title">God Is Here</span>
+                        <button class="star-btn" id="star-6" onclick="toggleFavorite(event, 6)">☆</button>
+                    </div>
+                    <span class="song-artist">Darlene Zschech</span>
+                    <span class="song-key" id="list-key-6">Key of D</span>
+                </li>
+                <li onclick="openSong(7)">
+                    <div class="song-card-top">
+                        <span class="song-title">Lead Me to the Cross</span>
+                        <button class="star-btn" id="star-7" onclick="toggleFavorite(event, 7)">☆</button>
+                    </div>
+                    <span class="song-artist">Hillsong United</span>
+                    <span class="song-key" id="list-key-7">Key of D</span>
+                </li>
+                <li onclick="openSong(8)">
+                    <div class="song-card-top">
+                        <span class="song-title">Oceans</span>
+                        <button class="star-btn" id="star-8" onclick="toggleFavorite(event, 8)">☆</button>
+                    </div>
+                    <span class="song-artist">Hillsong United</span>
+                    <span class="song-key" id="list-key-8">Key of D</span>
+                </li>
+                <li onclick="openSong(9)">
+                    <div class="song-card-top">
+                        <span class="song-title">Endless Praise</span>
+                        <button class="star-btn" id="star-9" onclick="toggleFavorite(event, 9)">☆</button>
+                    </div>
+                    <span class="song-artist">Planetshakers</span>
+                    <span class="song-key" id="list-key-9">Key of D</span>
+                </li>
+                <li onclick="openSong(10)">
+                    <div class="song-card-top">
+                        <span class="song-title">This Is Our Time</span>
+                        <button class="star-btn" id="star-10" onclick="toggleFavorite(event, 10)">☆</button>
+                    </div>
+                    <span class="song-artist">Planetshakers</span>
+                    <span class="song-key" id="list-key-10">Key of D</span>
+                </li>
+                <li onclick="openSong(11)">
+                    <div class="song-card-top">
+                        <span class="song-title">Turn It Up</span>
+                        <button class="star-btn" id="star-11" onclick="toggleFavorite(event, 11)">☆</button>
+                    </div>
+                    <span class="song-artist">Planetshakers</span>
+                    <span class="song-key" id="list-key-11">Key of E</span>
+                </li>
+                <li onclick="openSong(12)">
+                    <div class="song-card-top">
+                        <span class="song-title">Dance</span>
+                        <button class="star-btn" id="star-12" onclick="toggleFavorite(event, 12)">☆</button>
+                    </div>
+                    <span class="song-artist">Planetshakers</span>
+                    <span class="song-key" id="list-key-12">Key of E</span>
+                </li>
             </ul>
         </div>
     </div>
@@ -808,7 +963,10 @@
             <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
         </div>
         <div class="page-content">
-            <div class="chart-song-title" id="song-title"></div>
+            <div style="display:flex;align-items:center;gap:8px;width:fit-content;">
+                <div class="chart-song-title" id="song-title"></div>
+                <button class="star-btn" id="chart-star" onclick="toggleFavoriteFromChart()" style="position:static;transform:none;">☆</button>
+            </div>
             <div class="chart-song-artist" id="song-artist"></div>
             <div class="chart-song-key" id="song-key"></div>
             <hr class="divider">
@@ -1037,6 +1195,7 @@
             renderCapoGrid(state);
             updateTransposeDisplay(state);
             updateKeyBadges(state);
+            updateChartStar();
         }
 
         function renderMainChart(state) {
@@ -1220,7 +1379,43 @@
             document.getElementById('top-bar-sub').textContent =
                 musician.name + ' · ' + activeInstrument;
         }
+        var favorites = JSON.parse(localStorage.getItem('worshipapp_favorites') || '[]');
 
+        function toggleFavorite(event, index) {
+            event.stopPropagation();
+            var pos = favorites.indexOf(index);
+            if (pos === -1) {
+                favorites.push(index);
+            } else {
+                favorites.splice(pos, 1);
+            }
+            localStorage.setItem('worshipapp_favorites', JSON.stringify(favorites));
+            updateStars();
+        }
+
+        function toggleFavoriteFromChart() {
+            toggleFavorite({ stopPropagation: function() {} }, currentSongIndex);
+            updateChartStar();
+        }
+
+        function updateStars() {
+            songs.forEach(function(song, index) {
+                var btn = document.getElementById('star-' + index);
+                if (btn) {
+                    btn.textContent = favorites.indexOf(index) !== -1 ? '★' : '☆';
+                    btn.classList.toggle('starred', favorites.indexOf(index) !== -1);
+                }
+            });
+            updateChartStar();
+        }
+
+        function updateChartStar() {
+            var btn = document.getElementById('chart-star');
+            if (btn) {
+                btn.textContent = favorites.indexOf(currentSongIndex) !== -1 ? '★' : '☆';
+                btn.classList.toggle('starred', favorites.indexOf(currentSongIndex) !== -1);
+            }
+        }
         function openAddSongModal() {
             document.getElementById('new-song-title').value = '';
             document.getElementById('new-song-artist').value = '';
@@ -1435,6 +1630,7 @@
             updateTopBar();
             document.getElementById('onboarding-view').style.display = 'none';
             document.getElementById('list-view').style.display = 'block';
+            updateStars();
         }
 
         // ============================================
@@ -1452,6 +1648,7 @@
             document.getElementById('chart-view').style.display = 'block';
             document.getElementById('list-view').style.display = 'none';
             renderAll();
+            updateChartStar();
         }
 
         function goBack() {
