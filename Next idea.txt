@@ -1,9 +1,0 @@
-Next idea
-
-It works now but it became too crowded, if we could use a dropdown instead of it floating around the top part of the page to make it neat, that's better
-I think we could put this on the top right corner of the mobile page. Like a burger option. There shows the Profile (this is where they could update their profile in which current instrument will they be using) Next option to the burger menu is which instrument are you playing today, this is where the temporary instrument option lives. 
-
-also for the vocalist, its better if they could set their key before hand
-
-Also, what if the band has a different rendition of the song? Are we going to allow them to combine two songs in one page? That's one of the pain that I experienced when playing live. 
-
