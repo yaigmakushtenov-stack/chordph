@@ -25,7 +25,101 @@
             z-index: 10;
             flex-shrink: 0;
         }
+        .left-drawer-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 200;
+        }
 
+        .left-drawer-overlay.open { display: block; }
+
+        .left-drawer {
+            position: fixed;
+            top: 0; left: -280px;
+            width: 260px;
+            height: 100%;
+            background-color: #12122a;
+            border-right: 1px solid #2a2a4a;
+            z-index: 300;
+            padding: 20px;
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .left-drawer.open { left: 0; }
+
+        .left-drawer-logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #e94560;
+            margin-bottom: 4px;
+        }
+
+        .left-drawer-sub {
+            font-size: 12px;
+            color: #a0a0b0;
+            margin-bottom: 24px;
+        }
+
+        .left-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            color: #ffffff;
+            background: none;
+            border: none;
+            width: 100%;
+            text-align: left;
+            margin-bottom: 4px;
+        }
+
+        .left-nav-item:hover {
+            background-color: #1a1a3e;
+        }
+
+        .left-nav-item.active {
+            background-color: #1a1a3e;
+            color: #e94560;
+        }
+
+        .left-nav-icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .left-nav-divider {
+            border: none;
+            border-top: 1px solid #2a2a4a;
+            margin: 12px 0;
+        }
+
+        .left-hamburger-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .left-hamburger-btn span {
+            display: block;
+            width: 24px;
+            height: 2px;
+            background-color: #ffffff;
+            border-radius: 2px;
+        }
         .star-btn.starred {
             color: #f5c518;
         }
@@ -706,7 +800,29 @@
 <body>
 
     <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+    <div class="left-drawer-overlay" id="left-drawer-overlay" onclick="closeLeftDrawer()"></div>
 
+    <div class="left-drawer" id="left-drawer">
+        <div class="left-drawer-logo">🎵 Chord.ph</div>
+        <div class="left-drawer-sub" id="left-drawer-sub"></div>
+
+        <button class="left-nav-item active" id="nav-songs" onclick="navTo('songs')">
+            <span class="left-nav-icon">♪</span> All Songs
+        </button>
+        <button class="left-nav-item" id="nav-favorites" onclick="navTo('favorites')">
+            <span class="left-nav-icon">★</span> Favorites
+        </button>
+        <button class="left-nav-item" id="nav-setlists" onclick="navTo('setlists')">
+            <span class="left-nav-icon">📋</span> Setlists
+            <span style="font-size:10px;color:#a0a0b0;margin-left:auto;">Coming soon</span>
+        </button>
+
+        <hr class="left-nav-divider">
+
+        <button class="left-nav-item" onclick="openAddSongModal(); closeLeftDrawer();">
+            <span class="left-nav-icon">➕</span> Add New Song
+        </button>
+    </div>
     <div class="drawer" id="drawer">
         <div class="drawer-header">
             <div class="drawer-title">⚙️ Settings</div>
@@ -725,10 +841,6 @@
         <button class="drawer-btn btn-today" onclick="applyTodayOnly()">Play as this instrument today</button>
         <button class="drawer-btn btn-save" onclick="saveProfileFromDrawer()">Save Profile</button>
         <hr class="divider-line">
-        <hr class="divider-line">
-        <div class="drawer-section-title">⭐ Navigation</div>
-        <button class="drawer-btn btn-today" onclick="showFavorites()">★ My Favorites</button>
-        <button class="drawer-btn btn-today" onclick="showSongList()">♪ All Songs</button>
         <div class="drawer-section-title">📚 Library</div>
         <button class="drawer-btn btn-today" onclick="openAddSongModal()">+ Add New Song</button>
         <div style="font-size:12px;color:#a0a0b0;text-align:center;">Chord.ph v0.1 · Your chords. Your key. Your music.</div>
@@ -835,7 +947,8 @@
         </div>
         <div id="favorites-view" style="display:none;">
         <div class="top-bar">
-            <div>
+            <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
+            <div style="text-align:center;">
                 <div class="top-bar-title">🎵 Chord.ph</div>
                 <div class="top-bar-sub" id="fav-top-bar-sub"></div>
             </div>
@@ -853,7 +966,8 @@
     </div>
     <div id="list-view">
         <div class="top-bar">
-            <div>
+            <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
+            <div style="text-align:center;">
                 <div class="top-bar-title">🎵 Chord.ph</div>
                 <div class="top-bar-sub" id="top-bar-sub"></div>
             </div>
@@ -980,7 +1094,11 @@
 
     <div id="chart-view">
         <div class="top-bar">
-            <button class="ctrl-btn ctrl-ghost" onclick="goBack()">← Back</button>
+            <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
+            <div style="text-align:center;">
+                <div class="top-bar-title">🎵 Chord.ph</div>
+                <div class="top-bar-sub" id="top-bar-sub"></div>
+            </div>
             <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
         </div>
         <div class="page-content">
@@ -1437,6 +1555,7 @@
         }
         function showFavorites() {
             closeDrawer();
+            closeLeftDrawer();
             document.getElementById('list-view').style.display = 'none';
             document.getElementById('chart-view').style.display = 'none';
             document.getElementById('favorites-view').style.display = 'block';
@@ -1452,6 +1571,34 @@
             document.getElementById('list-view').style.display = 'block';
         }
 
+        function openLeftDrawer() {
+            document.getElementById('left-drawer').classList.add('open');
+            document.getElementById('left-drawer-overlay').classList.add('open');
+            document.getElementById('left-drawer-sub').textContent =
+                musician.name + ' · ' + activeInstrument;
+        }
+
+        function closeLeftDrawer() {
+            document.getElementById('left-drawer').classList.remove('open');
+            document.getElementById('left-drawer-overlay').classList.remove('open');
+        }
+
+        function navTo(page) {
+            closeLeftDrawer();
+            document.querySelectorAll('.left-nav-item').forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+
+            if (page === 'songs') {
+                document.getElementById('nav-songs').classList.add('active');
+                showSongList();
+            } else if (page === 'favorites') {
+                document.getElementById('nav-favorites').classList.add('active');
+                showFavorites();
+            } else if (page === 'setlists') {
+                document.getElementById('nav-setlists').classList.add('active');
+            }
+        }
         function renderFavoritesPage() {
             var list = document.getElementById('favorites-list');
             var empty = document.getElementById('favorites-empty');
