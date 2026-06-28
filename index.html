@@ -795,6 +795,111 @@
             line-height: 1.8;
             color: #ffffff;
         }
+
+        .new-setlist-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #e94560;
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 16px;
+        }
+
+        .setlist-card {
+            padding: 12px;
+            margin-bottom: 8px;
+            background-color: #16213e;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .setlist-card-name {
+            font-size: 17px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .setlist-card-count {
+            font-size: 12px;
+            color: #a0a0b0;
+            margin-top: 3px;
+        }
+
+        .setlist-card-delete {
+            background: none;
+            border: 1px solid #e94560;
+            color: #e94560;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            display: none;
+        }
+
+        .setlist-card.editing .setlist-card-delete {
+            display: block;
+        }
+
+        .setlist-song-card {
+            padding: 12px;
+            margin-bottom: 8px;
+            background-color: #16213e;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .setlist-song-card-info {
+            flex: 1;
+        }
+
+        .setlist-song-card-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .setlist-song-card-artist {
+            font-size: 12px;
+            color: #a0a0b0;
+            margin-top: 2px;
+        }
+
+        .setlist-song-card-key {
+            background-color: #e94560;
+            color: #ffffff;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .setlist-song-remove {
+            background: none;
+            border: 1px solid #e94560;
+            color: #e94560;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            display: none;
+            margin-left: 8px;
+        }
+
+        .setlist-song-card.editing .setlist-song-remove {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -840,9 +945,6 @@
         </div>
         <button class="drawer-btn btn-today" onclick="applyTodayOnly()">Play as this instrument today</button>
         <button class="drawer-btn btn-save" onclick="saveProfileFromDrawer()">Save Profile</button>
-        <hr class="divider-line">
-        <div class="drawer-section-title">📚 Library</div>
-        <button class="drawer-btn btn-today" onclick="openAddSongModal()">+ Add New Song</button>
         <div style="font-size:12px;color:#a0a0b0;text-align:center;">Chord.ph v0.1 · Your chords. Your key. Your music.</div>
     </div>
 
@@ -925,6 +1027,41 @@
                     </div>
                 </div>
             </div>
+            <div class="modal-overlay" id="new-setlist-modal" onclick="handleNewSetlistOverlayClick(event)">
+                <div class="modal">
+                    <div class="modal-title">📋 New Setlist</div>
+                    <input
+                        class="modal-search"
+                        type="text"
+                        id="new-setlist-name"
+                        placeholder="Setlist name e.g. Sunday June 29"
+                    />
+                    <div id="new-setlist-error" style="color:#e94560;font-size:12px;margin-bottom:8px;display:none;"></div>
+                    <div class="modal-actions">
+                        <button class="modal-cancel" onclick="closeNewSetlistModal()">Cancel</button>
+                        <button class="modal-confirm" onclick="createSetlist()">Create</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-overlay" id="add-to-setlist-modal" onclick="handleAddToSetlistOverlayClick(event)">
+                <div class="modal" style="max-height:90vh;">
+                    <div class="modal-title">➕ Add Song to Setlist</div>
+                    <input
+                        class="modal-search"
+                        type="text"
+                        id="setlist-song-search"
+                        placeholder="Search songs..."
+                        oninput="filterSetlistSongs()"
+                    />
+                    <div id="setlist-song-options"></div>
+                    <hr class="divider" style="margin:12px 0;">
+                    <button class="drawer-btn btn-today" onclick="openAddSongFromSetlist()">+ Add New Song</button>
+                    <div class="modal-actions" style="margin-top:8px;">
+                        <button class="modal-cancel" onclick="closeAddToSetlistModal()">Cancel</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -944,6 +1081,49 @@
             <div class="onboarding-label">What should we call you?</div>
             <input class="name-input" type="text" id="musician-name" placeholder="Your name" oninput="checkReady()"/>
             <button class="continue-btn" id="continue-btn" onclick="saveProfile()">Let's Play 🎵</button>
+        </div>
+        <div id="setlists-view" style="display:none;">
+            <div class="top-bar">
+                <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
+                <div style="text-align:center;">
+                    <div class="top-bar-title">🎵 Chord.ph</div>
+                    <div class="top-bar-sub" id="setlists-top-bar-sub"></div>
+                </div>
+                <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
+            </div>
+            <div class="page-content">
+                <button class="new-setlist-btn" onclick="openNewSetlistModal()">+ New Setlist</button>
+                <div id="setlists-list"></div>
+                <div id="setlists-empty" style="display:none;text-align:center;padding:40px 20px;color:#a0a0b0;">
+                    <div style="font-size:40px;margin-bottom:12px;">📋</div>
+                    <div style="font-size:16px;margin-bottom:8px;">No setlists yet</div>
+                    <div style="font-size:13px;">Tap + New Setlist to create one</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="setlist-detail-view" style="display:none;">
+            <div class="top-bar">
+                <button class="ctrl-btn ctrl-ghost" onclick="goBackToSetlists()">← Back</button>
+                <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
+                <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
+            </div>
+            <div class="page-content">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <div>
+                        <div id="setlist-detail-name" style="font-size:20px;font-weight:bold;color:#ffffff;"></div>
+                        <div id="setlist-detail-count" style="font-size:13px;color:#a0a0b0;margin-top:2px;"></div>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="ctrl-btn ctrl-ghost" onclick="toggleSetlistEdit()">✏️ Edit</button>
+                        <button class="ctrl-btn ctrl-red" onclick="openAddToSetlistModal()">+ Song</button>
+                    </div>
+                </div>
+                <div id="setlist-songs-list"></div>
+                <div id="setlist-songs-empty" style="display:none;text-align:center;padding:30px 20px;color:#a0a0b0;">
+                    <div style="font-size:13px;">No songs yet — tap + Song to add one</div>
+                </div>
+            </div>
         </div>
         <div id="favorites-view" style="display:none;">
         <div class="top-bar">
@@ -984,7 +1164,7 @@
                 />
             </div>
             <ul id="song-list-ul">
-                <li onclick="openSong(0)">
+                <li onclick="openSongFromList(0)">
                     <div class="song-card-top">
                         <span class="song-title">Glorious</span>
                         <button class="star-btn" id="star-0" onclick="toggleFavorite(event, 0)">☆</button>
@@ -992,7 +1172,7 @@
                     <span class="song-artist">Victory Worship</span>
                     <span class="song-key" id="list-key-0">Key of G</span>
                 </li>
-                <li onclick="openSong(1)">
+                <li onclick="openSongFromList(1)">
                     <div class="song-card-top">
                         <span class="song-title">Way Maker</span>
                         <button class="star-btn" id="star-1" onclick="toggleFavorite(event, 1)">☆</button>
@@ -1000,7 +1180,7 @@
                     <span class="song-artist">Sinach</span>
                     <span class="song-key" id="list-key-1">Key of B</span>
                 </li>
-                <li onclick="openSong(2)">
+                <li onclick="openSongFromList(2)">
                     <div class="song-card-top">
                         <span class="song-title">Presence</span>
                         <button class="star-btn" id="star-2" onclick="toggleFavorite(event, 2)">☆</button>
@@ -1008,7 +1188,7 @@
                     <span class="song-artist">His Life Music</span>
                     <span class="song-key" id="list-key-2">Key of A</span>
                 </li>
-                <li onclick="openSong(3)">
+                <li onclick="openSongFromList(3)">
                     <div class="song-card-top">
                         <span class="song-title">Lilim</span>
                         <button class="star-btn" id="star-3" onclick="toggleFavorite(event, 3)">☆</button>
@@ -1016,7 +1196,7 @@
                     <span class="song-artist">Victory Worship</span>
                     <span class="song-key" id="list-key-3">Key of E</span>
                 </li>
-                <li onclick="openSong(4)">
+                <li onclick="openSongFromList(4)">
                     <div class="song-card-top">
                         <span class="song-title">Heart of Worship</span>
                         <button class="star-btn" id="star-4" onclick="toggleFavorite(event, 4)">☆</button>
@@ -1024,7 +1204,7 @@
                     <span class="song-artist">Matt Redman</span>
                     <span class="song-key" id="list-key-4">Key of D</span>
                 </li>
-                <li onclick="openSong(5)">
+                <li onclick="openSongFromList(5)">
                     <div class="song-card-top">
                         <span class="song-title">Take It All</span>
                         <button class="star-btn" id="star-5" onclick="toggleFavorite(event, 5)">☆</button>
@@ -1032,7 +1212,7 @@
                     <span class="song-artist">Hillsong Worship</span>
                     <span class="song-key" id="list-key-5">Key of B</span>
                 </li>
-                <li onclick="openSong(6)">
+                <li onclick="openSongFromList(6)">
                     <div class="song-card-top">
                         <span class="song-title">God Is Here</span>
                         <button class="star-btn" id="star-6" onclick="toggleFavorite(event, 6)">☆</button>
@@ -1040,7 +1220,7 @@
                     <span class="song-artist">Darlene Zschech</span>
                     <span class="song-key" id="list-key-6">Key of D</span>
                 </li>
-                <li onclick="openSong(7)">
+                <li onclick="openSongFromList(7)">
                     <div class="song-card-top">
                         <span class="song-title">Lead Me to the Cross</span>
                         <button class="star-btn" id="star-7" onclick="toggleFavorite(event, 7)">☆</button>
@@ -1048,7 +1228,7 @@
                     <span class="song-artist">Hillsong United</span>
                     <span class="song-key" id="list-key-7">Key of D</span>
                 </li>
-                <li onclick="openSong(8)">
+                <li onclick="openSongFromList(8)">
                     <div class="song-card-top">
                         <span class="song-title">Oceans</span>
                         <button class="star-btn" id="star-8" onclick="toggleFavorite(event, 8)">☆</button>
@@ -1056,7 +1236,7 @@
                     <span class="song-artist">Hillsong United</span>
                     <span class="song-key" id="list-key-8">Key of D</span>
                 </li>
-                <li onclick="openSong(9)">
+                <li onclick="openSongFromList(9)">
                     <div class="song-card-top">
                         <span class="song-title">Endless Praise</span>
                         <button class="star-btn" id="star-9" onclick="toggleFavorite(event, 9)">☆</button>
@@ -1064,7 +1244,7 @@
                     <span class="song-artist">Planetshakers</span>
                     <span class="song-key" id="list-key-9">Key of D</span>
                 </li>
-                <li onclick="openSong(10)">
+                <li onclick="openSongFromList(10)">
                     <div class="song-card-top">
                         <span class="song-title">This Is Our Time</span>
                         <button class="star-btn" id="star-10" onclick="toggleFavorite(event, 10)">☆</button>
@@ -1072,7 +1252,7 @@
                     <span class="song-artist">Planetshakers</span>
                     <span class="song-key" id="list-key-10">Key of D</span>
                 </li>
-                <li onclick="openSong(11)">
+                <li onclick="openSongFromList(11)">
                     <div class="song-card-top">
                         <span class="song-title">Turn It Up</span>
                         <button class="star-btn" id="star-11" onclick="toggleFavorite(event, 11)">☆</button>
@@ -1080,7 +1260,7 @@
                     <span class="song-artist">Planetshakers</span>
                     <span class="song-key" id="list-key-11">Key of E</span>
                 </li>
-                <li onclick="openSong(12)">
+                <li onclick="openSongFromList(12)">
                     <div class="song-card-top">
                         <span class="song-title">Dance</span>
                         <button class="star-btn" id="star-12" onclick="toggleFavorite(event, 12)">☆</button>
@@ -1094,14 +1274,13 @@
 
     <div id="chart-view">
         <div class="top-bar">
-            <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
-            <div style="text-align:center;">
-                <div class="top-bar-title">🎵 Chord.ph</div>
-                <div class="top-bar-sub" id="top-bar-sub"></div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
             </div>
             <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
         </div>
         <div class="page-content">
+            <button class="ctrl-btn ctrl-ghost" onclick="goBack()" style="margin-bottom:12px;">← Back</button>
             <div style="display:flex;align-items:center;gap:8px;width:fit-content;">
                 <div class="chart-song-title" id="song-title"></div>
                 <button class="star-btn" id="chart-star" onclick="toggleFavoriteFromChart()" style="position:static;transform:none;">☆</button>
@@ -1564,6 +1743,237 @@
             renderFavoritesPage();
         }
 
+        var setlists = JSON.parse(localStorage.getItem('worshipapp_setlists') || '[]');
+        var currentSetlistIndex = 0;
+        var setlistEditMode = false;
+
+        function saveSetlists() {
+            localStorage.setItem('worshipapp_setlists', JSON.stringify(setlists));
+        }
+
+        function showSetlists() {
+            closeDrawer();
+            closeLeftDrawer();
+            document.getElementById('list-view').style.display = 'none';
+            document.getElementById('chart-view').style.display = 'none';
+            document.getElementById('favorites-view').style.display = 'none';
+            document.getElementById('setlist-detail-view').style.display = 'none';
+            document.getElementById('setlists-view').style.display = 'block';
+            document.getElementById('setlists-top-bar-sub').textContent =
+                musician.name + ' · ' + activeInstrument;
+            renderSetlistsPage();
+        }
+
+        function renderSetlistsPage() {
+            var list = document.getElementById('setlists-list');
+            var empty = document.getElementById('setlists-empty');
+            list.innerHTML = '';
+
+            if (setlists.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+
+            setlists.forEach(function(setlist, index) {
+                var card = document.createElement('div');
+                card.className = 'setlist-card';
+                card.innerHTML =
+                    '<div>' +
+                        '<div class="setlist-card-name">' + setlist.name + '</div>' +
+                        '<div class="setlist-card-count">' + setlist.songs.length + ' song' + (setlist.songs.length !== 1 ? 's' : '') + '</div>' +
+                    '</div>' +
+                    '<button class="setlist-card-delete" onclick="deleteSetlist(event,' + index + ')">Delete</button>';
+
+                card.onclick = function() {
+                    openSetlistDetail(index);
+                };
+
+                list.appendChild(card);
+            });
+        }
+
+        function openNewSetlistModal() {
+            document.getElementById('new-setlist-name').value = '';
+            document.getElementById('new-setlist-error').style.display = 'none';
+            document.getElementById('new-setlist-modal').classList.add('open');
+        }
+
+        function closeNewSetlistModal() {
+            document.getElementById('new-setlist-modal').classList.remove('open');
+        }
+
+        function handleNewSetlistOverlayClick(event) {
+            if (event.target === document.getElementById('new-setlist-modal')) {
+                closeNewSetlistModal();
+            }
+        }
+
+        function createSetlist() {
+            var name = document.getElementById('new-setlist-name').value.trim();
+            var errorEl = document.getElementById('new-setlist-error');
+
+            if (!name) {
+                errorEl.textContent = 'Please enter a setlist name.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            setlists.push({ name: name, songs: [] });
+            saveSetlists();
+            closeNewSetlistModal();
+            renderSetlistsPage();
+        }
+
+        function deleteSetlist(event, index) {
+            event.stopPropagation();
+            if (confirm('Delete "' + setlists[index].name + '"?')) {
+                setlists.splice(index, 1);
+                saveSetlists();
+                renderSetlistsPage();
+            }
+        }
+
+        function openSetlistDetail(index) {
+            currentSetlistIndex = index;
+            setlistEditMode = false;
+            document.getElementById('setlists-view').style.display = 'none';
+            document.getElementById('setlist-detail-view').style.display = 'block';
+            renderSetlistDetail();
+        }
+
+        function goBackToSetlists() {
+            setlistEditMode = false;
+            document.getElementById('setlist-detail-view').style.display = 'none';
+            document.getElementById('setlists-view').style.display = 'block';
+            renderSetlistsPage();
+        }
+
+        function renderSetlistDetail() {
+            var setlist = setlists[currentSetlistIndex];
+            document.getElementById('setlist-detail-name').textContent = setlist.name;
+            document.getElementById('setlist-detail-count').textContent =
+                setlist.songs.length + ' song' + (setlist.songs.length !== 1 ? 's' : '');
+
+            var list = document.getElementById('setlist-songs-list');
+            var empty = document.getElementById('setlist-songs-empty');
+            list.innerHTML = '';
+
+            if (setlist.songs.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+
+            setlist.songs.forEach(function(songIndex, pos) {
+                var song = songs[songIndex];
+                if (!song) return;
+
+                var card = document.createElement('div');
+                card.className = 'setlist-song-card' + (setlistEditMode ? ' editing' : '');
+
+                var info = document.createElement('div');
+                info.className = 'setlist-song-card-info';
+                info.innerHTML =
+                    '<div class="setlist-song-card-title">' + song.title + '</div>' +
+                    '<div class="setlist-song-card-artist">' + song.artist + '</div>';
+
+                var key = document.createElement('span');
+                key.className = 'setlist-song-card-key';
+                key.textContent = song.key;
+
+                var removeBtn = document.createElement('button');
+                removeBtn.className = 'setlist-song-remove';
+                removeBtn.textContent = '✕ Remove';
+                removeBtn.onclick = (function(p) {
+                    return function(e) {
+                        e.stopPropagation();
+                        setlists[currentSetlistIndex].songs.splice(p, 1);
+                        saveSetlists();
+                        renderSetlistDetail();
+                    };
+                })(pos);
+
+                card.appendChild(info);
+                card.appendChild(key);
+                card.appendChild(removeBtn);
+
+                card.onclick = function() {
+                    if (!setlistEditMode) {
+                        previousView = 'setlist';
+                        openSong(songIndex);
+                    }
+                };
+
+                list.appendChild(card);
+            });
+        }
+
+        function toggleSetlistEdit() {
+            setlistEditMode = !setlistEditMode;
+            var btn = document.querySelector('[onclick="toggleSetlistEdit()"]');
+            btn.textContent = setlistEditMode ? '✓ Done' : '✏️ Edit';
+            renderSetlistDetail();
+        }
+
+        function openAddToSetlistModal() {
+            document.getElementById('setlist-song-search').value = '';
+            var optionsList = document.getElementById('setlist-song-options');
+            optionsList.innerHTML = '';
+
+            songs.forEach(function(song, index) {
+                var alreadyAdded = setlists[currentSetlistIndex].songs.indexOf(index) !== -1;
+                var div = document.createElement('div');
+                div.className = 'modal-song-option' + (alreadyAdded ? ' selected' : '');
+                div.setAttribute('data-title', song.title.toLowerCase());
+                div.textContent = song.title + ' — ' + song.key + (alreadyAdded ? ' ✓' : '');
+
+                if (!alreadyAdded) {
+                    div.onclick = function() {
+                        setlists[currentSetlistIndex].songs.push(index);
+                        saveSetlists();
+                        closeAddToSetlistModal();
+                        renderSetlistDetail();
+                    };
+                }
+
+                optionsList.appendChild(div);
+            });
+
+            document.getElementById('add-to-setlist-modal').classList.add('open');
+        }
+
+        function closeAddToSetlistModal() {
+            document.getElementById('add-to-setlist-modal').classList.remove('open');
+        }
+
+        function handleAddToSetlistOverlayClick(event) {
+            if (event.target === document.getElementById('add-to-setlist-modal')) {
+                closeAddToSetlistModal();
+            }
+        }
+
+        function filterSetlistSongs() {
+            var query = document.getElementById('setlist-song-search').value.toLowerCase();
+            document.querySelectorAll('#setlist-song-options .modal-song-option').forEach(function(el) {
+                el.style.display = el.getAttribute('data-title').indexOf(query) !== -1 ? 'block' : 'none';
+            });
+        }
+
+        function openAddSongFromSetlist() {
+            closeAddToSetlistModal();
+            document.getElementById('new-song-title').value = '';
+            document.getElementById('new-song-artist').value = '';
+            document.getElementById('new-song-key').value = '';
+            document.getElementById('new-song-tempo').value = '';
+            document.getElementById('new-song-feel').value = '';
+            document.getElementById('new-song-chart').value = '';
+            document.getElementById('add-song-error').style.display = 'none';
+            document.getElementById('add-song-modal').classList.add('open');
+        }
+
         function showSongList() {
             closeDrawer();
             document.getElementById('favorites-view').style.display = 'none';
@@ -1597,6 +2007,7 @@
                 showFavorites();
             } else if (page === 'setlists') {
                 document.getElementById('nav-setlists').classList.add('active');
+                showSetlists();
             }
         }
         function renderFavoritesPage() {
@@ -1617,7 +2028,10 @@
 
                 var card = document.createElement('div');
                 card.style.cssText = 'padding:12px;margin-bottom:8px;background-color:#16213e;border-radius:10px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:flex-start;';
-                card.onclick = function() { openSong(index); };
+                card.onclick = function() {
+                previousView = 'favorites';
+                openSong(index);
+            };
 
                 var top = document.createElement('div');
                 top.style.cssText = 'display:flex;align-items:center;justify-content:space-between;width:100%;';
@@ -1723,6 +2137,11 @@
             localStorage.setItem('worshipapp_custom_songs', JSON.stringify(customSongs));
 
             closeAddSongModal();
+            if (document.getElementById('setlist-detail-view').style.display === 'block') {
+                setlists[currentSetlistIndex].songs.push(songs.length - 1);
+                saveSetlists();
+                renderSetlistDetail();
+            }
         }
         function filterSongs() {
             var query = document.getElementById('song-search').value.toLowerCase();
@@ -1880,6 +2299,13 @@
         // NAVIGATION
         // ============================================
 
+        var previousView = 'list';
+
+        function openSongFromList(index) {
+            previousView = 'list';
+            openSong(index);
+        }
+
         function openSong(index) {
             currentSongIndex = index;
             recentSongs = recentSongs.filter(function(i) { return i !== index; });
@@ -1888,15 +2314,27 @@
             medleySongs = [];
             document.getElementById('medley-container').innerHTML = '';
             if (!(index in songSettings)) songSettings[index] = 0;
-            document.getElementById('chart-view').style.display = 'block';
+
             document.getElementById('list-view').style.display = 'none';
+            document.getElementById('favorites-view').style.display = 'none';
+            document.getElementById('setlists-view').style.display = 'none';
+            document.getElementById('setlist-detail-view').style.display = 'none';
+            document.getElementById('chart-view').style.display = 'block';
+            window.scrollTo(0, 0);
             renderAll();
-            updateChartStar();
         }
 
         function goBack() {
             document.getElementById('chart-view').style.display = 'none';
-            document.getElementById('list-view').style.display = 'block';
+            if (previousView === 'favorites') {
+                document.getElementById('favorites-view').style.display = 'block';
+                renderFavoritesPage();
+            } else if (previousView === 'setlist') {
+                document.getElementById('setlist-detail-view').style.display = 'block';
+                renderSetlistDetail();
+            } else {
+                document.getElementById('list-view').style.display = 'block';
+            }
         }
 
         function transpose(direction) {
