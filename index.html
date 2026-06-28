@@ -945,6 +945,11 @@
         </div>
         <button class="drawer-btn btn-today" onclick="applyTodayOnly()">Play as this instrument today</button>
         <button class="drawer-btn btn-save" onclick="saveProfileFromDrawer()">Save Profile</button>
+        <hr class="divider-line">
+        <div class="drawer-section-title">📦 Backup</div>
+        <button class="drawer-btn btn-today" onclick="exportBackup()">📤 Export My Data</button>
+        <button class="drawer-btn btn-today" onclick="document.getElementById('import-file-input').click()">📥 Import Data</button>
+        <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importBackup(event)"/>
         <div style="font-size:12px;color:#a0a0b0;text-align:center;">Chord.ph v0.1 · Your chords. Your key. Your music.</div>
     </div>
 
@@ -1693,6 +1698,73 @@
             if (document.getElementById('chart-view').style.display === 'block') renderAll();
         }
 
+        function exportBackup() {
+            var backup = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                musician: JSON.parse(localStorage.getItem('worshipapp_musician') || '{}'),
+                customSongs: JSON.parse(localStorage.getItem('worshipapp_custom_songs') || '[]'),
+                songSettings: JSON.parse(localStorage.getItem('worshipapp_song_settings') || '{}'),
+                favorites: JSON.parse(localStorage.getItem('worshipapp_favorites') || '[]'),
+                fontsize: localStorage.getItem('worshipapp_fontsize') || '16'
+            };
+
+            var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'chordph-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            closeDrawer();
+        }
+
+        function importBackup(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var backup = JSON.parse(e.target.result);
+
+                    if (backup.musician) {
+                        localStorage.setItem('worshipapp_musician', JSON.stringify(backup.musician));
+                        musician = backup.musician;
+                        activeInstrument = musician.instrument;
+                    }
+
+                    if (backup.customSongs) {
+                        localStorage.setItem('worshipapp_custom_songs', JSON.stringify(backup.customSongs));
+                    }
+
+                    if (backup.songSettings) {
+                        localStorage.setItem('worshipapp_song_settings', JSON.stringify(backup.songSettings));
+                        songSettings = backup.songSettings;
+                    }
+
+                    if (backup.favorites) {
+                        localStorage.setItem('worshipapp_favorites', JSON.stringify(backup.favorites));
+                        favorites = backup.favorites;
+                    }
+
+                    if (backup.fontsize) {
+                        localStorage.setItem('worshipapp_fontsize', backup.fontsize);
+                    }
+
+                    closeDrawer();
+                    alert('Backup restored successfully! Reloading app...');
+                    location.reload();
+
+                } catch(err) {
+                    alert('Invalid backup file. Please use a Chord.ph backup file.');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
         function updateTopBar() {
             document.getElementById('top-bar-sub').textContent =
                 musician.name + ' · ' + activeInstrument;
