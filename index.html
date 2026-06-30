@@ -1109,16 +1109,16 @@
 
         <div id="setlist-detail-view" style="display:none;">
             <div class="top-bar">
-                <button class="ctrl-btn ctrl-ghost" onclick="goBackToSetlists()">← Back</button>
                 <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
+                <div style="text-align:center;">
+                    <div id="setlist-detail-name" style="font-size:16px;font-weight:bold;color:#ffffff;"></div>
+                    <div id="setlist-detail-count" style="font-size:11px;color:#a0a0b0;margin-top:2px;"></div>
+                </div>
                 <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
             </div>
             <div class="page-content">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                    <div>
-                        <div id="setlist-detail-name" style="font-size:20px;font-weight:bold;color:#ffffff;"></div>
-                        <div id="setlist-detail-count" style="font-size:13px;color:#a0a0b0;margin-top:2px;"></div>
-                    </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;">
+                    <button class="ctrl-btn ctrl-ghost" onclick="goBackToSetlists()">← Back</button>
                     <div style="display:flex;gap:8px;">
                         <button class="ctrl-btn ctrl-ghost" onclick="toggleSetlistEdit()">✏️ Edit</button>
                         <button class="ctrl-btn ctrl-red" onclick="openAddToSetlistModal()">+ Song</button>
@@ -1128,8 +1128,8 @@
                 <div id="setlist-songs-empty" style="display:none;text-align:center;padding:30px 20px;color:#a0a0b0;">
                     <div style="font-size:13px;">No songs yet — tap + Song to add one</div>
                 </div>
-            </div>
-        </div>
+            </div>      
+        </div>    
         <div id="favorites-view" style="display:none;">
         <div class="top-bar">
             <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
@@ -1809,6 +1809,7 @@
             closeLeftDrawer();
             document.getElementById('list-view').style.display = 'none';
             document.getElementById('chart-view').style.display = 'none';
+            document.getElementById('setlist-detail-view').style.display = 'none';
             document.getElementById('favorites-view').style.display = 'block';
             document.getElementById('fav-top-bar-sub').textContent =
                 musician.name + ' · ' + activeInstrument;
@@ -2048,8 +2049,10 @@
 
         function showSongList() {
             closeDrawer();
+            closeLeftDrawer();
             document.getElementById('favorites-view').style.display = 'none';
             document.getElementById('chart-view').style.display = 'none';
+            document.getElementById('setlist-detail-view').style.display = 'none';
             document.getElementById('list-view').style.display = 'block';
         }
 
