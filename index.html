@@ -1804,17 +1804,31 @@
             var existing = document.getElementById('favorites-section');
             if (existing) existing.remove();
         }
+
+        function hideAllViews() {
+            document.getElementById('list-view').style.display = 'none';
+            document.getElementById('favorites-view').style.display = 'none';
+            document.getElementById('chart-view').style.display = 'none';
+            document.getElementById('setlists-view').style.display = 'none';
+            document.getElementById('setlist-detail-view').style.display = 'none';
+            setTimeout(function() {
+                window.scrollTo(0, 0);
+                document.documentElement.scrollTop = 0;
+                document.body.scrollTop = 0;
+            }, 0);
+        }
+
         function showFavorites() {
             closeDrawer();
             closeLeftDrawer();
-            document.getElementById('list-view').style.display = 'none';
-            document.getElementById('chart-view').style.display = 'none';
-            document.getElementById('setlist-detail-view').style.display = 'none';
-            document.getElementById('setlists-view').style.display = 'none';
+            hideAllViews();
             document.getElementById('favorites-view').style.display = 'block';
             document.getElementById('fav-top-bar-sub').textContent =
                 musician.name + ' · ' + activeInstrument;
             renderFavoritesPage();
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
         }
 
         var setlists = JSON.parse(localStorage.getItem('worshipapp_setlists') || '[]');
@@ -1828,14 +1842,14 @@
         function showSetlists() {
             closeDrawer();
             closeLeftDrawer();
-            document.getElementById('list-view').style.display = 'none';
-            document.getElementById('chart-view').style.display = 'none';
-            document.getElementById('favorites-view').style.display = 'none';
-            document.getElementById('setlist-detail-view').style.display = 'none';
+            hideAllViews();
             document.getElementById('setlists-view').style.display = 'block';
             document.getElementById('setlists-top-bar-sub').textContent =
                 musician.name + ' · ' + activeInstrument;
             renderSetlistsPage();
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
         }
 
         function renderSetlistsPage() {
@@ -1912,16 +1926,22 @@
         function openSetlistDetail(index) {
             currentSetlistIndex = index;
             setlistEditMode = false;
-            document.getElementById('setlists-view').style.display = 'none';
+            hideAllViews();
             document.getElementById('setlist-detail-view').style.display = 'block';
             renderSetlistDetail();
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
         }
 
         function goBackToSetlists() {
             setlistEditMode = false;
-            document.getElementById('setlist-detail-view').style.display = 'none';
+            hideAllViews();
             document.getElementById('setlists-view').style.display = 'block';
             renderSetlistsPage();
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
         }
 
         function renderSetlistDetail() {
@@ -2051,12 +2071,12 @@
         function showSongList() {
             closeDrawer();
             closeLeftDrawer();
-            document.getElementById('favorites-view').style.display = 'none';
-            document.getElementById('chart-view').style.display = 'none';
-            document.getElementById('setlists-view').style.display = 'none';
-            document.getElementById('setlist-detail-view').style.display = 'none';
+            hideAllViews();
             document.getElementById('setlists-view').style.display = 'none';
             document.getElementById('list-view').style.display = 'block';
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
         }
 
         function openLeftDrawer() {
