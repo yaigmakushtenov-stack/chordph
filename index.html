@@ -1285,7 +1285,11 @@
             <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
         </div>
         <div class="page-content">
-            <button class="ctrl-btn ctrl-ghost" onclick="goBack()" style="margin-bottom:12px;">← Back</button>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                <button class="ctrl-btn ctrl-ghost" onclick="goBack()">← Back</button>
+                <button class="ctrl-btn ctrl-ghost" id="btn-prev-song" onclick="navigateSetlistSong(-1)" style="display:none;">‹ Prev</button>
+                <button class="ctrl-btn ctrl-ghost" id="btn-next-song" onclick="navigateSetlistSong(1)" style="display:none;">Next ›</button>
+            </div>
             <div style="display:flex;align-items:center;gap:8px;width:fit-content;">
                 <div class="chart-song-title" id="song-title"></div>
                 <button class="star-btn" id="chart-star" onclick="toggleFavoriteFromChart()" style="position:static;transform:none;">☆</button>
@@ -1833,6 +1837,7 @@
 
         var setlists = JSON.parse(localStorage.getItem('worshipapp_setlists') || '[]');
         var currentSetlistIndex = 0;
+        var currentSetlistSongPosition = 0;
         var setlistEditMode = false;
 
         function saveSetlists() {
@@ -1994,13 +1999,15 @@
                 card.appendChild(key);
                 card.appendChild(removeBtn);
 
-                card.onclick = function() {
-                    if (!setlistEditMode) {
-                        previousView = 'setlist';
-                        openSong(songIndex);
-                    }
-                };
-
+                card.onclick = (function(p) {
+                    return function() {
+                        if (!setlistEditMode) {
+                            previousView = 'setlist';
+                            currentSetlistSongPosition = p;
+                            openSong(setlists[currentSetlistIndex].songs[p]);
+                        }
+                    };
+                })(pos);
                 list.appendChild(card);
             });
         }
@@ -2420,6 +2427,34 @@
             document.getElementById('chart-view').style.display = 'block';
             window.scrollTo(0, 0);
             renderAll();
+            updateSetlistNav();
+        }
+
+        function navigateSetlistSong(direction) {
+            var setlist = setlists[currentSetlistIndex];
+            if (!setlist) return;
+            var newPos = currentSetlistSongPosition + direction;
+            if (newPos < 0 || newPos >= setlist.songs.length) return;
+            var songIndex = setlist.songs[newPos];
+            if (songIndex === undefined || !songs[songIndex]) return;
+            currentSetlistSongPosition = newPos;
+            openSong(songIndex);
+            updateSetlistNav();
+        }
+
+        function updateSetlistNav() {
+            var prevBtn = document.getElementById('btn-prev-song');
+            var nextBtn = document.getElementById('btn-next-song');
+            if (previousView !== 'setlist') {
+                prevBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+                return;
+            }
+            var setlist = setlists[currentSetlistIndex];
+            prevBtn.style.display = 'inline-block';
+            nextBtn.style.display = 'inline-block';
+            prevBtn.disabled = currentSetlistSongPosition === 0;
+            nextBtn.disabled = currentSetlistSongPosition === setlist.songs.length - 1;
         }
 
         function goBack() {
