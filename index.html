@@ -1031,7 +1031,7 @@
 
                     <div class="modal-actions">
                         <button class="modal-cancel" onclick="closeAddSongModal()">Cancel</button>
-                        <button class="modal-confirm" onclick="submitNewSong()">Save Song</button>
+                        <button class="continue-btn" id="add-song-submit-btn" onclick="handleSongFormSubmit()">Save Song</button>
                     </div>
                 </div>
             </div>
@@ -1286,6 +1286,7 @@
                 <button class="left-hamburger-btn" onclick="openLeftDrawer()"><span></span><span></span><span></span></button>
             </div>
             <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
+            <button class="ctrl-btn ctrl-ghost" id="btn-edit-song" onclick="openEditSongModal()" style="display:none;">✏️ Edit</button>
         </div>
         <div class="page-content">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
@@ -2195,12 +2196,73 @@
 
         function closeAddSongModal() {
             document.getElementById('add-song-modal').classList.remove('open');
+            editingSongIndex = null;
+            document.getElementById('add-song-submit-btn').textContent = 'Save Song';
         }
 
         function handleAddSongOverlayClick(event) {
             if (event.target === document.getElementById('add-song-modal')) {
                 closeAddSongModal();
             }
+        }
+
+        var editingSongIndex = null;
+
+        function handleSongFormSubmit() {
+            if (editingSongIndex !== null) {
+                saveEditedSong();
+            } else {
+                submitNewSong();
+            }
+        }
+
+        function openEditSongModal() {
+            var song = songs[currentSongIndex];
+            if (!song || !song.isCustom) return;
+            editingSongIndex = currentSongIndex;
+            document.getElementById('new-song-title').value = song.title;
+            document.getElementById('new-song-artist').value = song.artist;
+            document.getElementById('new-song-key').value = song.key;
+            document.getElementById('new-song-tempo').value = song.tempo || '';
+            document.getElementById('new-song-feel').value = song.feel || 'Moderate Worship';
+            document.getElementById('new-song-chart').value = song.chart;
+            document.getElementById('add-song-submit-btn').textContent = 'Save Changes';
+            document.getElementById('add-song-error').style.display = 'none';
+            document.getElementById('add-song-modal').classList.add('open');
+        }
+
+        function saveEditedSong() {
+            var title = document.getElementById('new-song-title').value.trim();
+            var artist = document.getElementById('new-song-artist').value.trim();
+            var key = document.getElementById('new-song-key').value;
+            var tempo = parseInt(document.getElementById('new-song-tempo').value) || 0;
+            var feel = document.getElementById('new-song-feel').value || 'Moderate Worship';
+            var chart = document.getElementById('new-song-chart').value.trim();
+            var errorEl = document.getElementById('add-song-error');
+
+            if (!title || !artist || !key || !chart) {
+                errorEl.textContent = 'Please fill in title, artist, key and chord chart.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            var song = songs[editingSongIndex];
+            song.title = title;
+            song.artist = artist;
+            song.key = key;
+            song.tempo = tempo;
+            song.feel = feel;
+            song.chart = chart.replace(/\\n/g, '\n');
+
+            var customSongs = JSON.parse(localStorage.getItem('worshipapp_custom_songs') || '[]');
+            var idx = customSongs.findIndex(function(s) { return s.id === song.id; });
+            if (idx !== -1) customSongs[idx] = song;
+            localStorage.setItem('worshipapp_custom_songs', JSON.stringify(customSongs));
+
+            editingSongIndex = null;
+            document.getElementById('add-song-submit-btn').textContent = 'Save Song';
+            closeAddSongModal();
+            renderAll();
         }
 
         function submitNewSong() {
@@ -2219,13 +2281,15 @@
             }
 
             var newSong = {
-                title: title,
-                artist: artist,
-                key: key,
-                tempo: tempo,
-                feel: feel,
-                chart: chart.replace(/\\n/g, '\n')
-            };
+            id: Date.now(),
+            isCustom: true,
+            title: title,
+            artist: artist,
+            key: key,
+            tempo: tempo,
+            feel: feel,
+            chart: chart.replace(/\\n/g, '\n')
+        };
 
             songs.push(newSong);
 
@@ -2416,6 +2480,8 @@
 
         function openSong(index) {
             currentSongIndex = index;
+            var editBtn = document.getElementById('btn-edit-song');
+            if (editBtn) editBtn.style.display = songs[index] && songs[index].isCustom ? 'inline-block' : 'none';
             recentSongs = recentSongs.filter(function(i) { return i !== index; });
             recentSongs.unshift(index);
             if (recentSongs.length > 6) recentSongs.pop();
@@ -2518,6 +2584,7 @@
                 var customSongs = JSON.parse(savedCustomSongs);
                 var ul = document.getElementById('song-list-ul');
                 customSongs.forEach(function(song) {
+                    song.isCustom = true;
                     songs.push(song);
                     var newIndex = songs.length - 1;
                     var li = document.createElement('li');
