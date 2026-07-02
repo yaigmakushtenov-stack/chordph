@@ -1288,10 +1288,12 @@
             <button class="hamburger-btn" onclick="openDrawer()"><span></span><span></span><span></span></button>
         </div>
         <div class="page-content">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-                <button class="ctrl-btn ctrl-ghost" onclick="goBack()">← Back</button>
-                <button class="ctrl-btn ctrl-ghost" id="btn-prev-song" onclick="navigateSetlistSong(-1)" style="display:none;">‹ Prev</button>
-                <button class="ctrl-btn ctrl-ghost" id="btn-next-song" onclick="navigateSetlistSong(1)" style="display:none;">Next ›</button>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button class="ctrl-btn ctrl-ghost" onclick="goBack()">← Back</button>
+                    <button class="ctrl-btn ctrl-ghost" id="btn-prev-song" onclick="navigateSetlistSong(-1)" style="display:none;">‹ Prev</button>
+                    <button class="ctrl-btn ctrl-ghost" id="btn-next-song" onclick="navigateSetlistSong(1)" style="display:none;">Next ›</button>
+                </div>
                 <button class="ctrl-btn ctrl-ghost" id="btn-edit-song" onclick="openEditSongModal()" style="display:none;">✏️ Edit</button>
             </div>
             <div style="display:flex;align-items:center;gap:8px;width:fit-content;">
