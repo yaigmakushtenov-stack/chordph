@@ -1487,7 +1487,6 @@
         }
 
         function transposeChordText(text, steps) {
-            if (steps === 0 && !useFlats) return text;
             return text.replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
                 function(match, root, quality, slashFull, bassNote) {
                     var transposedRoot = transposeNoteBySteps(root, steps);
