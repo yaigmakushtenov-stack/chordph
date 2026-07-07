@@ -1031,6 +1031,7 @@
 
                     <div class="modal-actions">
                         <button class="modal-cancel" onclick="closeAddSongModal()">Cancel</button>
+                        <button class="modal-cancel" id="delete-song-btn" onclick="confirmDeleteSong()" style="display:none;color:#e94560;">Delete Song</button>
                         <button class="continue-btn ready" id="add-song-submit-btn" onclick="handleSongFormSubmit()">Save Song</button>
                     </div>
                 </div>
@@ -1975,20 +1976,9 @@
 
             setlist.songs.forEach(function(songIndex, pos) {
                 var song = songs[songIndex];
-                if (!song) return;
 
                 var card = document.createElement('div');
                 card.className = 'setlist-song-card' + (setlistEditMode ? ' editing' : '');
-
-                var info = document.createElement('div');
-                info.className = 'setlist-song-card-info';
-                info.innerHTML =
-                    '<div class="setlist-song-card-title">' + song.title + '</div>' +
-                    '<div class="setlist-song-card-artist">' + song.artist + '</div>';
-
-                var key = document.createElement('span');
-                key.className = 'setlist-song-card-key';
-                key.textContent = song.key;
 
                 var removeBtn = document.createElement('button');
                 removeBtn.className = 'setlist-song-remove';
@@ -2001,6 +1991,26 @@
                         renderSetlistDetail();
                     };
                 })(pos);
+
+                if (!song || song.deleted) {
+                    var missingInfo = document.createElement('div');
+                    missingInfo.className = 'setlist-song-card-info';
+                    missingInfo.innerHTML = '<div class="setlist-song-card-title" style="color:#888;font-style:italic;">Song removed</div>';
+                    card.appendChild(missingInfo);
+                    card.appendChild(removeBtn);
+                    list.appendChild(card);
+                    return;
+                }
+
+                var info = document.createElement('div');
+                info.className = 'setlist-song-card-info';
+                info.innerHTML =
+                    '<div class="setlist-song-card-title">' + song.title + '</div>' +
+                    '<div class="setlist-song-card-artist">' + song.artist + '</div>';
+
+                var key = document.createElement('span');
+                key.className = 'setlist-song-card-key';
+                key.textContent = song.key;
 
                 card.appendChild(info);
                 card.appendChild(key);
@@ -2017,7 +2027,6 @@
                 })(pos);
                 list.appendChild(card);
             });
-        }
 
         function toggleSetlistEdit() {
             setlistEditMode = !setlistEditMode;
@@ -2201,6 +2210,7 @@
             document.getElementById('add-song-modal').classList.remove('open');
             editingSongIndex = null;
             document.getElementById('add-song-submit-btn').textContent = 'Save Song';
+            document.getElementById('delete-song-btn').style.display = 'none';  
         }
 
         function handleAddSongOverlayClick(event) {
@@ -2231,6 +2241,7 @@
             document.getElementById('new-song-chart').value = song.chart;
             document.getElementById('add-song-submit-btn').textContent = 'Save Changes';
             document.getElementById('add-song-error').style.display = 'none';
+            document.getElementById('delete-song-btn').style.display = 'inline-block';
             document.getElementById('add-song-modal').classList.add('open');
         }
 
@@ -2268,6 +2279,33 @@
             renderAll();
         }
 
+        function confirmDeleteSong() {
+            if (!confirm('Delete this song permanently? This cannot be undone.')) return;
+            deleteCustomSong(editingSongIndex);
+        }
+
+        function deleteCustomSong(index) {
+            var song = songs[index];
+            if (!song || !song.isCustom) return;
+
+            song.deleted = true;
+
+            var customSongs = JSON.parse(localStorage.getItem('worshipapp_custom_songs') || '[]');
+            var idx = customSongs.findIndex(function(s) { return s.id === song.id; });
+            if (idx !== -1) {
+                customSongs[idx].deleted = true;
+                localStorage.setItem('worshipapp_custom_songs', JSON.stringify(customSongs));
+            }
+
+            var li = document.querySelector('[data-song-index="' + index + '"]');
+            if (li) li.remove();
+
+            editingSongIndex = null;
+            document.getElementById('delete-song-btn').style.display = 'none';
+            closeAddSongModal();
+            showSongList();
+        }
+
         function submitNewSong() {
             var title = document.getElementById('new-song-title').value.trim();
             var artist = document.getElementById('new-song-artist').value.trim();
@@ -2300,6 +2338,7 @@
             var newIndex = songs.length - 1;
             var li = document.createElement('li');
             li.setAttribute('onclick', 'openSong(' + newIndex + ')');
+            li.setAttribute('data-song-index', newIndex);
             li.innerHTML =
                 '<span class="song-title">' + title + '</span>' +
                 '<span class="song-artist">' + artist + '</span>' +
@@ -2592,6 +2631,7 @@
                     var newIndex = songs.length - 1;
                     var li = document.createElement('li');
                     li.setAttribute('onclick', 'openSong(' + newIndex + ')');
+                    li.setAttribute('data-song-index', newIndex);
                     li.innerHTML =
                         '<span class="song-title">' + song.title + '</span>' +
                         '<span class="song-artist">' + song.artist + '</span>' +
