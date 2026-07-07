@@ -1865,6 +1865,13 @@
             document.body.scrollTop = 0;
         }
 
+        function getValidSongCount(setlist) {
+            return setlist.songs.filter(function(songIndex) {
+                var song = songs[songIndex];
+                return song && !song.deleted;
+            }).length;
+        }
+
         function renderSetlistsPage() {
             var list = document.getElementById('setlists-list');
             var empty = document.getElementById('setlists-empty');
@@ -1878,15 +1885,15 @@
             empty.style.display = 'none';
 
             setlists.forEach(function(setlist, index) {
+                var validCount = getValidSongCount(setlist);
                 var card = document.createElement('div');
                 card.className = 'setlist-card';
                 card.innerHTML =
                     '<div>' +
                         '<div class="setlist-card-name">' + setlist.name + '</div>' +
-                        '<div class="setlist-card-count">' + setlist.songs.length + ' song' + (setlist.songs.length !== 1 ? 's' : '') + '</div>' +
+                        '<div class="setlist-card-count">' + validCount + ' song' + (validCount !== 1 ? 's' : '') + '</div>' +
                     '</div>' +
                     '<button class="setlist-card-delete" onclick="deleteSetlist(event,' + index + ')">Delete</button>';
-
                 card.onclick = function() {
                     openSetlistDetail(index);
                 };
@@ -1959,15 +1966,16 @@
 
         function renderSetlistDetail() {
             var setlist = setlists[currentSetlistIndex];
+            var validCount = getValidSongCount(setlist);
             document.getElementById('setlist-detail-name').textContent = setlist.name;
             document.getElementById('setlist-detail-count').textContent =
-                setlist.songs.length + ' song' + (setlist.songs.length !== 1 ? 's' : '');
+                validCount + ' song' + (validCount !== 1 ? 's' : '');
 
             var list = document.getElementById('setlist-songs-list');
             var empty = document.getElementById('setlist-songs-empty');
             list.innerHTML = '';
 
-            if (setlist.songs.length === 0) {
+            if (getValidSongCount(setlist) === 0) {
                 empty.style.display = 'block';
                 return;
             }
@@ -2028,7 +2036,7 @@
                 list.appendChild(card);
             });
         }
-        
+
         function toggleSetlistEdit() {
             setlistEditMode = !setlistEditMode;
             var btn = document.querySelector('[onclick="toggleSetlistEdit()"]');
