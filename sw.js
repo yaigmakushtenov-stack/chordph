@@ -1,4 +1,4 @@
-var CACHE_NAME = 'chordph-v5';
+var CACHE_NAME = 'chordph-v6';
 var URLS_TO_CACHE = [
     '/',
     '/index.html'
@@ -25,6 +25,10 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
+    // The analyzer manages its own resources (incl. ~46 MB of ML models) —
+    // keep it out of the PWA cache and let the browser handle it directly
+    if (new URL(event.request.url).pathname.indexOf('/analyzer') === 0) return;
+    if (event.request.method !== 'GET') return;
     event.respondWith(
         fetch(event.request).then(function(response) {
             var responseClone = response.clone();

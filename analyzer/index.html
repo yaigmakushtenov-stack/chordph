@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Key & BPM Analyzer · Chord.ph</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181c26;
+    --panel-2: #1f2432;
+    --text: #e8eaf0;
+    --muted: #8b93a7;
+    --accent: #4f8cff;
+    --accent-2: #9b6bff;
+    --ok: #3ecf8e;
+    --border: #2a3040;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -100px, #1a2030 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-size: 28px; font-weight: 650; letter-spacing: -0.5px; }
+  header h1 .accent { color: var(--accent); }
+  header p { color: var(--muted); margin-top: 6px; font-size: 14px; }
+
+  .card {
+    width: 100%;
+    max-width: 640px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  #dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 56px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  #dropzone:hover, #dropzone.dragover {
+    border-color: var(--accent);
+    background: rgba(79, 140, 255, 0.06);
+  }
+  #dropzone .icon { font-size: 40px; margin-bottom: 12px; }
+  #dropzone .main { font-size: 17px; font-weight: 550; }
+  #dropzone .sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  #fileInput { display: none; }
+
+  #progress { display: none; text-align: center; padding: 40px 0; }
+  #progress .phase { font-size: 15px; color: var(--muted); margin-bottom: 16px; }
+  .bar-track {
+    height: 8px; border-radius: 4px; background: var(--panel-2);
+    overflow: hidden; max-width: 420px; margin: 0 auto;
+  }
+  .bar-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius: 4px; transition: width 0.15s;
+  }
+
+  #results { display: none; }
+  #trackName {
+    font-size: 14px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 14px;
+  }
+  #waveform { width: 100%; height: 64px; display: block; margin-bottom: 22px; border-radius: 8px; background: var(--panel-2); }
+
+  .metrics { display: flex; gap: 16px; }
+  .metric {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; text-align: center;
+  }
+  .metric .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
+  .metric .value { font-size: 44px; font-weight: 700; margin: 8px 0 2px; letter-spacing: -1px; }
+  .metric .unit { font-size: 13px; color: var(--muted); }
+  .camelot {
+    display: inline-block; margin-top: 8px; padding: 3px 12px;
+    border-radius: 999px; font-size: 13px; font-weight: 600;
+    background: rgba(155, 107, 255, 0.15); color: #c4a8ff;
+    border: 1px solid rgba(155, 107, 255, 0.35);
+  }
+  .conf-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 12px; }
+  .conf-row .conf-label { font-size: 11px; color: var(--muted); }
+  .conf-track { width: 90px; height: 5px; border-radius: 3px; background: #12151d; overflow: hidden; }
+  .conf-fill { height: 100%; background: var(--ok); border-radius: 3px; }
+
+  .alts {
+    margin-top: 18px; padding: 14px 16px; background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 12px;
+    font-size: 13px; color: var(--muted); line-height: 1.7;
+  }
+  .alts b { color: var(--text); font-weight: 600; }
+
+  #again {
+    margin-top: 20px; width: 100%; padding: 12px;
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  #again:hover { filter: brightness(1.1); }
+
+  #error {
+    display: none; margin-top: 16px; padding: 12px 16px;
+    background: rgba(255, 92, 92, 0.1); border: 1px solid rgba(255, 92, 92, 0.4);
+    border-radius: 10px; color: #ff9c9c; font-size: 14px;
+  }
+
+  .or-row {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--muted); font-size: 12px; margin: 14px 0 12px;
+  }
+  .or-row::before, .or-row::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  #listenBtn {
+    width: 100%; padding: 12px; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; font-size: 14px; cursor: pointer;
+  }
+  #listenBtn:hover { border-color: var(--accent); }
+  .listen-hint { color: var(--muted); font-size: 12px; margin-top: 8px; text-align: center; line-height: 1.5; }
+  #listening { display: none; text-align: center; padding: 32px 0; }
+  #listening .phase { font-size: 15px; color: var(--muted); margin-bottom: 16px; }
+  #listenStopBtn {
+    margin-top: 18px; padding: 10px 20px; background: var(--accent);
+    border: none; border-radius: 8px; color: #fff; font-weight: 600; cursor: pointer;
+  }
+
+  #sourceRow {
+    display: none; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-top: 12px; padding: 10px 14px; font-size: 13px; color: var(--text);
+    background: rgba(62, 207, 142, 0.08); border: 1px solid rgba(62, 207, 142, 0.35);
+    border-radius: 10px;
+  }
+  .source-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--ok);
+    display: inline-block; flex-shrink: 0;
+  }
+  .src-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 12px;
+  }
+  .src-btn:hover { border-color: var(--accent); color: var(--text); }
+  #sourceRow .src-btn:first-of-type { margin-left: auto; }
+
+  .dur-row {
+    display: flex; align-items: center; gap: 8px; justify-content: center;
+    margin-top: 10px; font-size: 12px; color: var(--muted);
+  }
+  .dur-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 12px;
+  }
+  .dur-btn:hover { border-color: var(--accent); color: var(--text); }
+  .dur-btn.active {
+    border-color: var(--accent); color: var(--text);
+    background: rgba(79, 140, 255, 0.12);
+  }
+
+  .inst-head { font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .inst-head span { color: var(--muted); font-weight: 400; }
+  .inst-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .inst-name { flex: 0 0 150px; color: var(--text); font-size: 13px; }
+  .inst-bar-track { flex: 1; height: 6px; background: #12151d; border-radius: 3px; overflow: hidden; }
+  .inst-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 3px; }
+  .inst-pct { width: 40px; text-align: right; color: var(--muted); font-size: 12px; }
+  .inst-note { color: var(--muted); font-size: 11px; margin-top: 10px; }
+
+  .diag { margin-top: 14px; }
+  .diag summary { color: var(--muted); font-size: 12px; cursor: pointer; }
+  .diag summary:hover { color: var(--text); }
+  .diag pre {
+    margin-top: 8px; font-size: 11px; line-height: 1.8; color: var(--muted);
+    white-space: pre-wrap; word-break: break-word;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+
+  .tap-card { margin-top: 16px; }
+  .tap-head { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+  .tap-sub { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .tap-row { display: flex; align-items: center; gap: 20px; }
+  #tapBtn {
+    width: 84px; height: 84px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid var(--accent); background: rgba(79, 140, 255, 0.12);
+    color: var(--text); font-size: 16px; font-weight: 700; cursor: pointer;
+    user-select: none; touch-action: manipulation;
+  }
+  #tapBtn:active { background: var(--accent); }
+  .tap-readout { flex: 1; }
+  #tapBpm { font-size: 36px; font-weight: 700; }
+  .tap-unit { color: var(--muted); font-size: 13px; margin-left: 6px; }
+  .tap-count { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .tap-reset {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 12px;
+  }
+
+  footer { margin-top: 24px; color: var(--muted); font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="margin-bottom:10px;"><a href="/" style="color:var(--muted);font-size:13px;text-decoration:none;">&larr; &#127925; Chord.ph</a></div>
+  <h1>Key <span class="accent">&amp;</span> BPM Analyzer</h1>
+  <p>Everything runs locally in your browser — your audio never leaves this device.</p>
+</header>
+
+<div class="card">
+  <div id="inputArea">
+    <div id="dropzone">
+      <div class="icon">&#127925;</div>
+      <div class="main">Drop an audio track here</div>
+      <div class="sub">or click to browse &middot; MP3, WAV, FLAC, OGG, M4A</div>
+      <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac">
+    </div>
+    <div class="or-row">or</div>
+    <button id="listenBtn">&#127911; Listen &mdash; analyze what's playing (YouTube, Spotify&hellip;)</button>
+    <div class="dur-row">Capture length:
+      <button class="dur-btn" data-dur="30">30s</button>
+      <button class="dur-btn" data-dur="90">90s</button>
+      <button class="dur-btn" data-dur="0">Until I stop</button>
+    </div>
+    <div class="listen-hint" id="listenHint">Play the track anywhere on this computer, click Listen, then share the tab or screen
+      <b>with audio enabled</b> (&ldquo;Also share tab audio&rdquo; / &ldquo;Share system audio&rdquo;).
+      You'll only be asked once &mdash; later Listens reuse the same source.</div>
+    <div id="sourceRow">
+      <span class="source-dot"></span> Audio source connected &mdash; Listen starts instantly
+      <button id="changeSrcBtn" class="src-btn">Change source</button>
+      <button id="dropSrcBtn" class="src-btn">Disconnect</button>
+    </div>
+  </div>
+
+  <div id="listening">
+    <div class="phase" id="listenText">Listening&hellip;</div>
+    <div class="bar-track"><div class="bar-fill" id="listenBar"></div></div>
+    <button id="listenStopBtn">Stop &amp; analyze now</button>
+    <div class="listen-hint">Stopping within the first 8 seconds cancels instead.</div>
+  </div>
+
+  <div id="progress">
+    <div class="phase" id="phaseText">Decoding audio&hellip;</div>
+    <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+  </div>
+
+  <div id="results">
+    <div id="trackName"></div>
+    <canvas id="waveform" height="64"></canvas>
+    <div class="metrics">
+      <div class="metric">
+        <div class="label">Tempo</div>
+        <div class="value" id="bpmValue">–</div>
+        <div class="unit">BPM</div>
+        <div class="conf-row">
+          <span class="conf-label">confidence</span>
+          <div class="conf-track"><div class="conf-fill" id="bpmConf"></div></div>
+        </div>
+      </div>
+      <div class="metric">
+        <div class="label">Key</div>
+        <div class="value" id="keyValue" style="font-size:34px;">–</div>
+        <div class="unit" id="keyMode"></div>
+        <div><span class="camelot" id="camelot"></span></div>
+        <div class="conf-row">
+          <span class="conf-label">confidence</span>
+          <div class="conf-track"><div class="conf-fill" id="keyConf"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="alts" id="alts"></div>
+    <div class="alts" id="instruments" style="display:none">
+      <div class="inst-head">Prominent instruments <span id="instStatus"></span></div>
+      <div id="instList"></div>
+      <div class="inst-note">Detected locally by neural networks &mdash; a music instrument tagger (MTG-Jamendo /
+        discogs-effnet) for the list, YAMNet for the style. Percentages are model confidence, not loudness.</div>
+    </div>
+    <details class="diag">
+      <summary>Analysis details (for troubleshooting)</summary>
+      <pre id="diagPre"></pre>
+      <pre id="diagInst" style="display:none"></pre>
+    </details>
+    <button id="again">Analyze another track</button>
+  </div>
+
+  <div id="error"></div>
+</div>
+
+<div class="card tap-card">
+  <div class="tap-head">Tap tempo <span class="tap-sub">&mdash; tap along to verify a BPM (button, or press T)</span></div>
+  <div class="tap-row">
+    <button id="tapBtn">TAP</button>
+    <div class="tap-readout">
+      <span id="tapBpm">&ndash;</span><span class="tap-unit">BPM</span>
+      <div class="tap-count" id="tapCount">tap along to the beat</div>
+    </div>
+    <button id="tapReset" class="tap-reset">reset</button>
+  </div>
+</div>
+
+<footer>Tempo via onset autocorrelation &middot; Key via tuning-corrected harmonic chroma + KeyFinder tone profiles<br>
+Instrument tagging: <a href="https://essentia.upf.edu/models.html" style="color:var(--muted);">MTG-Jamendo / Discogs-EffNet models</a>
+by the Music Technology Group, UPF Barcelona (Essentia), CC BY-NC-SA 4.0 &middot;
+Sound classification: <a href="https://github.com/tensorflow/models/tree/master/research/audioset/yamnet" style="color:var(--muted);">YAMNet</a> (Apache 2.0)<br>
+Part of <a href="/" style="color:var(--muted);">Chord.ph</a> &mdash; your chords, your key, your music.</footer>
+
+<script>
+"use strict";
+
+/* ---------------- FFT (iterative radix-2) ---------------- */
+function makeFFT(n) {
+  const levels = Math.log2(n) | 0;
+  if (1 << levels !== n) throw new Error("FFT size must be a power of 2");
+  const rev = new Uint32Array(n);
+  for (let i = 0; i < n; i++) {
+    let x = i, r = 0;
+    for (let j = 0; j < levels; j++) { r = (r << 1) | (x & 1); x >>= 1; }
+    rev[i] = r;
+  }
+  const cos = new Float64Array(n / 2), sin = new Float64Array(n / 2);
+  for (let i = 0; i < n / 2; i++) {
+    cos[i] = Math.cos(2 * Math.PI * i / n);
+    sin[i] = Math.sin(2 * Math.PI * i / n);
+  }
+  return function fft(re, im) {
+    for (let i = 0; i < n; i++) {
+      const r = rev[i];
+      if (r > i) {
+        let t = re[i]; re[i] = re[r]; re[r] = t;
+        t = im[i]; im[i] = im[r]; im[r] = t;
+      }
+    }
+    for (let size = 2; size <= n; size <<= 1) {
+      const half = size >> 1, step = n / size;
+      for (let i = 0; i < n; i += size) {
+        for (let j = i, k = 0; j < i + half; j++, k += step) {
+          const l = j + half;
+          const tre = re[l] * cos[k] + im[l] * sin[k];
+          const tim = im[l] * cos[k] - re[l] * sin[k];
+          re[l] = re[j] - tre; im[l] = im[j] - tim;
+          re[j] += tre; im[j] += tim;
+        }
+      }
+    }
+  };
+}
+
+function hannWindow(n) {
+  const w = new Float64Array(n);
+  for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
+  return w;
+}
+
+// Yield to the event loop without setTimeout — background tabs throttle
+// timers to 1s+, which would stall long analyses when the tab loses focus
+const yieldUI = () => new Promise(r => {
+  const ch = new MessageChannel();
+  ch.port1.onmessage = () => r();
+  ch.port2.postMessage(0);
+});
+
+/* ---------------- Resample to mono 22.05 kHz ---------------- */
+async function toMono22k(buffer) {
+  const rate = 22050;
+  const len = Math.max(1, Math.ceil(buffer.duration * rate));
+  const oc = new OfflineAudioContext(1, len, rate);
+  const src = oc.createBufferSource();
+  src.buffer = buffer;
+  src.connect(oc.destination);
+  src.start();
+  const rendered = await oc.startRendering();
+  return rendered.getChannelData(0);
+}
+
+/* ---------------- Tempo detection ---------------- */
+async function detectTempo(samples, sr, onProgress) {
+  const winSize = 2048, hop = 256;
+  const fft = makeFFT(winSize);
+  const win = hannWindow(winSize);
+  const nFrames = Math.max(0, Math.floor((samples.length - winSize) / hop));
+  if (nFrames < 64) return null;
+
+  const nBins = winSize / 2;
+  const re = new Float64Array(winSize), im = new Float64Array(winSize);
+  let prevMag = new Float64Array(nBins);
+  const curMag = new Float64Array(nBins);
+  const flux = new Float64Array(nFrames);
+
+  for (let t = 0; t < nFrames; t++) {
+    const off = t * hop;
+    for (let i = 0; i < winSize; i++) { re[i] = samples[off + i] * win[i]; im[i] = 0; }
+    fft(re, im);
+    let f = 0;
+    for (let k = 0; k < nBins; k++) {
+      const m = Math.log1p(10 * Math.hypot(re[k], im[k]));
+      curMag[k] = m;
+      const d = m - prevMag[k];
+      if (d > 0) f += d;
+    }
+    flux[t] = f;
+    prevMag.set(curMag);
+    if ((t & 255) === 0) { onProgress(t / nFrames); await yieldUI(); }
+  }
+
+  // Onset envelope: subtract local moving average, half-wave rectify
+  const fps = sr / hop;
+  const smoothN = Math.round(fps * 0.5);
+  const env = new Float64Array(nFrames);
+  let acc = 0;
+  const q = [];
+  for (let t = 0; t < nFrames; t++) {
+    acc += flux[t]; q.push(flux[t]);
+    if (q.length > smoothN) acc -= q.shift();
+    const local = acc / q.length;
+    env[t] = Math.max(0, flux[t] - local);
+  }
+
+  // Autocorrelation over BPM 50–220, extended down to half the fastest beat
+  // lag (subdivision level) and up to 4× the slowest (bar level), so every
+  // candidate can be checked at its subdivision and its 2/3/4-beat periods.
+  const minLag = Math.max(2, Math.floor(60 * fps / 220));
+  const maxLag = Math.min(nFrames - 1, Math.ceil(60 * fps / 50));
+  const loLag = Math.max(2, Math.floor(minLag / 2));
+  const hiLag = Math.min(nFrames - 1, maxLag * 4 + 4);
+  const ac = new Float64Array(hiLag + 1);
+  let ac0 = 0;
+  for (let i = 0; i < nFrames; i++) ac0 += env[i] * env[i];
+  if (ac0 <= 0) return null;
+  for (let lag = loLag; lag <= hiLag; lag++) {
+    let s = 0;
+    for (let i = 0; i + lag < nFrames; i++) s += env[i] * env[i + lag];
+    ac[lag] = (s / (nFrames - lag)) / (ac0 / nFrames);
+  }
+
+  // Mild log-gaussian tempo prior centred on 120 BPM
+  const prior = bpm => Math.exp(-0.5 * Math.pow(Math.log2(bpm / 120) / 0.9, 2));
+
+  // Strongest ac value near a lag (integer rounding drifts at high multiples)
+  const peakAround = (center, radius) => {
+    let best = 0;
+    for (let l = Math.max(2, center - radius); l <= Math.min(hiLag, center + radius); l++)
+      if (ac[l] > best) best = ac[l];
+    return best;
+  };
+
+  // Comb scoring: a genuine beat period shows correlation at ALL of its
+  // integer multiples, while impostor periods — like the dotted-eighth pulse
+  // of a 3-3-2 rhythm, 4/3 of the true tempo — collapse at their 3rd/4th
+  // multiples. The geometric mean across the comb rejects any candidate
+  // with a hole in its evidence.
+  let bestLag = -1, bestScore = -Infinity, bestComb = 0;
+  const candidates = [];
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let logSum = 0, terms = 0;
+    for (let k = 1; k <= 4; k++) {
+      const c = lag * k;
+      if (c + k > hiLag) break;
+      logSum += Math.log(peakAround(c, k) + 1e-6);
+      terms++;
+    }
+    if (terms === 0) continue;
+    const comb = Math.exp(logSum / terms);
+    // Subdivision support: a true beat's half-lag lands on the subdivision
+    // grid (high ac); impostor periods like 1.5× the beat have an off-grid
+    // half-lag (near zero). Separates the beat level from metrical fakes
+    // that the comb alone can't tell apart in subdivision-saturated tracks.
+    const half = Math.round(lag / 2);
+    const sub = half >= loLag ? peakAround(half, 1) : 0;
+    const score = (comb + 0.25 * sub) * prior(60 * fps / lag);
+    candidates.push({ bpm: +(60 * fps / lag).toFixed(1), comb: +comb.toFixed(3), score: +score.toFixed(3) });
+    if (score > bestScore) { bestScore = score; bestLag = lag; bestComb = comb; }
+  }
+  if (bestLag < 0) return null;
+  candidates.sort((a, b) => b.score - a.score);
+
+  // Refine at the highest multiple that fits: the peak position error is
+  // divided by k, giving sub-0.1-BPM precision
+  let kRef = 4;
+  while (kRef > 1 && bestLag * kRef + kRef > hiLag) kRef--;
+  let center = bestLag * kRef, peakIdx = center;
+  for (let l = Math.max(3, center - kRef); l <= Math.min(hiLag - 1, center + kRef); l++)
+    if (ac[l] > ac[peakIdx]) peakIdx = l;
+  let refined = peakIdx;
+  const y0 = ac[peakIdx - 1], y1 = ac[peakIdx], y2 = ac[peakIdx + 1];
+  const denom = y0 - 2 * y1 + y2;
+  if (Math.abs(denom) > 1e-12) {
+    const d = 0.5 * (y0 - y2) / denom;
+    if (Math.abs(d) < 1) refined = peakIdx + d;
+  }
+
+  const bpm = 60 * fps * kRef / refined;
+  const confidence = Math.max(0, Math.min(1, bestComb * 1.6));
+  return { bpm, confidence, candidates: candidates.slice(0, 8) };
+}
+
+/* ---------------- Key detection ---------------- */
+const NOTE_NAMES = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+const CAMELOT_MAJOR = ["8B", "3B", "10B", "5B", "12B", "7B", "2B", "9B", "4B", "11B", "6B", "1B"];
+const CAMELOT_MINOR = ["5A", "12A", "7A", "2A", "9A", "4A", "11A", "6A", "1A", "8A", "3A", "10A"];
+// Tone profiles from libkeyfinder (Sha'ath / Mixxx), tuned on real recordings
+const PROFILE_MAJOR = [7.239, 3.504, 3.584, 2.845, 5.819, 4.559, 2.448, 6.995, 3.391, 4.556, 4.074, 4.459];
+const PROFILE_MINOR = [7.003, 3.144, 4.359, 5.404, 3.672, 4.090, 3.908, 6.200, 3.634, 2.872, 5.355, 3.832];
+
+function pearson(a, b) {
+  const n = a.length;
+  let ma = 0, mb = 0;
+  for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+  ma /= n; mb /= n;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) {
+    const x = a[i] - ma, y = b[i] - mb;
+    num += x * y; da += x * x; db += y * y;
+  }
+  const d = Math.sqrt(da * db);
+  return d > 0 ? num / d : 0;
+}
+
+async function detectKey(samples, sr, onProgress) {
+  const winSize = 8192, hop = 2048;
+  const fft = makeFFT(winSize);
+  const win = hannWindow(winSize);
+  const nFrames = Math.max(0, Math.floor((samples.length - winSize) / hop));
+  if (nFrames < 4) return null;
+
+  const re = new Float64Array(winSize), im = new Float64Array(winSize);
+  const binHz = sr / winSize;
+  const kMin = Math.max(2, Math.ceil(55 / binHz));
+  const kMax = Math.min(winSize / 2 - 2, Math.floor(1760 / binHz));
+  const mags = new Float64Array(kMax + 2);
+
+  // ~10-second segments, scored independently and averaged, so an
+  // atypical intro/outro or a breakdown can't dominate the verdict
+  const segFrames = Math.max(1, Math.ceil(10 * sr / hop));
+  const nSegs = Math.ceil(nFrames / segFrames);
+
+  // Pass 1: collect precise spectral peaks (ignores broadband drum noise)
+  const pkFreq = [], pkW = [], pkSeg = [];
+  for (let t = 0; t < nFrames; t++) {
+    const off = t * hop;
+    for (let i = 0; i < winSize; i++) { re[i] = samples[off + i] * win[i]; im[i] = 0; }
+    fft(re, im);
+    let frameMax = 0;
+    for (let k = kMin - 1; k <= kMax + 1; k++) {
+      mags[k] = Math.hypot(re[k], im[k]);
+      if (mags[k] > frameMax) frameMax = mags[k];
+    }
+    if (frameMax <= 0) continue;
+    const thresh = 0.03 * frameMax;
+    const seg = Math.floor(t / segFrames);
+    for (let k = kMin; k <= kMax; k++) {
+      const m = mags[k];
+      if (m > thresh && m > mags[k - 1] && m >= mags[k + 1]) {
+        // parabolic interpolation on log magnitude for sub-bin frequency
+        const l0 = Math.log(mags[k - 1] + 1e-12), l1 = Math.log(m + 1e-12), l2 = Math.log(mags[k + 1] + 1e-12);
+        const den = l0 - 2 * l1 + l2;
+        let d = 0;
+        if (Math.abs(den) > 1e-12) d = Math.max(-0.5, Math.min(0.5, 0.5 * (l0 - l2) / den));
+        pkFreq.push((k + d) * binHz);
+        pkW.push(Math.sqrt(m));   // compress so loud bass doesn't drown everything
+        pkSeg.push(seg);
+      }
+    }
+    if ((t & 31) === 0) { onProgress(t / nFrames); await yieldUI(); }
+  }
+  if (pkFreq.length === 0) return null;
+
+  // Estimate global tuning offset from A440 (circular mean of each peak's
+  // distance to the nearest equal-tempered semitone), then compensate —
+  // detuned masters otherwise smear every note across two pitch classes
+  let sc = 0, ss = 0;
+  for (let i = 0; i < pkFreq.length; i++) {
+    const midi = 69 + 12 * Math.log2(pkFreq[i] / 440);
+    const ang = 2 * Math.PI * (midi - Math.round(midi));
+    sc += pkW[i] * Math.cos(ang);
+    ss += pkW[i] * Math.sin(ang);
+  }
+  const detune = Math.atan2(ss, sc) / (2 * Math.PI); // in semitones
+
+  // Bass-register chroma (55–185 Hz): basslines anchor the tonic far more
+  // reliably than the full mix, so this breaks ties between keys that share
+  // a note set (relative keys, dorian vs aeolian, tonic vs dominant)
+  const bassChroma = new Float64Array(12);
+  for (let i = 0; i < pkFreq.length; i++) {
+    const f = pkFreq[i];
+    if (f < 55 || f > 185) continue;
+    const midi = 69 + 12 * Math.log2(f / 440) - detune;
+    const nearest = Math.round(midi);
+    const frac = midi - nearest;
+    const cw = Math.cos(Math.PI * frac);
+    bassChroma[((nearest % 12) + 12) % 12] += pkW[i] * cw * cw;
+  }
+  let bassTot = 0;
+  for (let p = 0; p < 12; p++) bassTot += bassChroma[p];
+
+  // Pass 2: per-segment chroma with subharmonic summation — each peak also
+  // votes, with decaying weight, for the fundamentals it could be a harmonic
+  // of, so overtones reinforce the real root instead of polluting the fifth
+  const chroma = [];
+  for (let s = 0; s < nSegs; s++) chroma.push(new Float64Array(12));
+  const global = new Float64Array(12);
+  for (let i = 0; i < pkFreq.length; i++) {
+    for (let h = 1; h <= 4; h++) {
+      const f = pkFreq[i] / h;
+      if (f < 30) break;
+      const midi = 69 + 12 * Math.log2(f / 440) - detune;
+      const nearest = Math.round(midi);
+      const frac = midi - nearest;
+      const cw = Math.cos(Math.PI * frac);
+      const w = pkW[i] * Math.pow(0.55, h - 1) * cw * cw;
+      const pc = ((nearest % 12) + 12) % 12;
+      chroma[pkSeg[i]][pc] += w;
+      global[pc] += w;
+    }
+  }
+
+  const rotated = new Float64Array(12);
+  const keyScore = new Float64Array(24); // 0–11 major tonics, 12–23 minor
+  const segWinners = []; // per-segment best key, in time order
+  let validSegs = 0;
+  for (let s = 0; s < nSegs; s++) {
+    const c = chroma[s];
+    let tot = 0;
+    for (let p = 0; p < 12; p++) tot += c[p];
+    if (tot <= 0) continue;
+    validSegs++;
+    let segBest = -1, segBestR = -Infinity;
+    for (let mode = 0; mode < 2; mode++) {
+      const profile = mode === 0 ? PROFILE_MAJOR : PROFILE_MINOR;
+      for (let tonic = 0; tonic < 12; tonic++) {
+        for (let pc = 0; pc < 12; pc++) rotated[pc] = profile[(pc - tonic + 12) % 12];
+        const r = pearson(c, rotated);
+        keyScore[mode * 12 + tonic] += r;
+        if (r > segBestR) { segBestR = r; segBest = mode * 12 + tonic; }
+      }
+    }
+    segWinners.push(segBest);
+  }
+  if (!validSegs) return null;
+
+  // Transposition detection: if the first and last thirds of the track
+  // consistently vote for keys with different TONICS, the song modulates.
+  // (Relative-key flicker — same notes, different label — is ignored.)
+  let modulation = null;
+  if (segWinners.length >= 4) {
+    const region = Math.max(2, Math.floor(segWinners.length / 3));
+    const modeOf = arr => {
+      const counts = {};
+      let best = -1, bc = 0;
+      for (const x of arr) {
+        counts[x] = (counts[x] || 0) + 1;
+        if (counts[x] > bc) { bc = counts[x]; best = x; }
+      }
+      return { idx: best, count: bc };
+    };
+    const head = modeOf(segWinners.slice(0, region));
+    const tail = modeOf(segWinners.slice(-region));
+    const need = Math.ceil(region * 2 / 3);
+    if (head.count >= need && tail.count >= need && head.idx % 12 !== tail.idx % 12) {
+      modulation = {
+        from: { tonic: head.idx % 12, mode: head.idx < 12 ? "major" : "minor" },
+        to:   { tonic: tail.idx % 12, mode: tail.idx < 12 ? "major" : "minor" }
+      };
+    }
+  }
+
+  // Bass bonus credits the candidate's whole tonic triad in the bass
+  // register — a bassline outlining root/third/fifth is the strongest
+  // tonic evidence there is, strong enough to overrule a small profile
+  // edge (e.g. dorian tracks whose raised 6th makes the relative or
+  // fifth-related key score slightly higher on the full mix)
+  const scores = [];
+  const bassW = 0.75;
+  for (let idx = 0; idx < 24; idx++) {
+    const tonic = idx % 12, isMajor = idx < 12;
+    const third = (tonic + (isMajor ? 4 : 3)) % 12;
+    const fifth = (tonic + 7) % 12;
+    const triad = bassTot > 0
+      ? (bassChroma[tonic] + 0.5 * bassChroma[third] + 0.3 * bassChroma[fifth]) / (1.8 * bassTot)
+      : 0;
+    scores.push({
+      tonic,
+      mode: isMajor ? "major" : "minor",
+      r: keyScore[idx] / validSegs + bassW * triad
+    });
+  }
+  scores.sort((a, b) => b.r - a.r);
+  // A modulating track's global aggregate mixes two note sets and can elect
+  // a key from neither half. Report the dominant end instead — ties go to
+  // the ENDING key, the one a DJ mixes out of — with the other end second.
+  if (modulation) {
+    const idxOf = k => (k.mode === "major" ? 0 : 12) + k.tonic;
+    const fromIdx = idxOf(modulation.from), toIdx = idxOf(modulation.to);
+    let cf = 0, ct = 0;
+    for (const w of segWinners) { if (w === fromIdx) cf++; else if (w === toIdx) ct++; }
+    const mainIdx = ct >= cf ? toIdx : fromIdx;
+    const otherIdx = mainIdx === toIdx ? fromIdx : toIdx;
+    const find = idx => scores.find(s => s.tonic === idx % 12 && s.mode === (idx < 12 ? "major" : "minor"));
+    const mainS = find(mainIdx), otherS = find(otherIdx);
+    if (mainS && otherS) {
+      scores.splice(scores.indexOf(mainS), 1);
+      scores.splice(scores.indexOf(otherS), 1);
+      scores.unshift(mainS, otherS);
+    }
+  }
+  // Hard tie-break: in a close race between different tonics, a bassline
+  // that clearly outlines one finalist's tonic triad settles it — handles
+  // modal tracks (mixolydian/dorian) whose note set matches the other key
+  if (!modulation && bassTot > 0 && scores[0].r - scores[1].r < 0.05 && scores[1].tonic !== scores[0].tonic) {
+    const triadOf = s => {
+      const third = (s.tonic + (s.mode === "major" ? 4 : 3)) % 12;
+      return (bassChroma[s.tonic] + 0.5 * bassChroma[third] + 0.3 * bassChroma[(s.tonic + 7) % 12]) / bassTot;
+    };
+    if (triadOf(scores[1]) > triadOf(scores[0]) * 1.2) {
+      const tmp = scores[0]; scores[0] = scores[1]; scores[1] = tmp;
+    }
+  }
+  const best = scores[0], second = scores[1];
+  const confidence = Math.max(0, Math.min(1, best.r * 0.6 + (best.r - second.r) * 4));
+  return {
+    tonic: best.tonic, mode: best.mode, correlation: best.r, confidence,
+    second: { tonic: second.tonic, mode: second.mode, r: second.r },
+    detuneCents: Math.round(detune * 100),
+    modulation,
+    chroma: Array.from(global),
+    bassChroma: Array.from(bassChroma),
+    top5: scores.slice(0, 5),
+    segWinners
+  };
+}
+
+/* ---------------- Full pipeline ---------------- */
+async function analyzeBuffer(audioBuffer, onPhase, onProgress) {
+  onPhase = onPhase || (() => {});
+  onProgress = onProgress || (() => {});
+  const sr = 22050;
+  const samples = await toMono22k(audioBuffer);
+
+  // Tempo: the middle 90 s is plenty for a stable beat estimate
+  const tempoCap = 90 * sr;
+  let tempoSamples = samples;
+  if (samples.length > tempoCap) {
+    const start = Math.floor((samples.length - tempoCap) / 2);
+    tempoSamples = samples.subarray(start, start + tempoCap);
+  }
+  // Key: the whole track (up to 6 min), so intros, outros and mid-song
+  // transpositions are all visible to the segment voting
+  const keyCap = 360 * sr;
+  let keySamples = samples;
+  if (samples.length > keyCap) {
+    const start = Math.floor((samples.length - keyCap) / 2);
+    keySamples = samples.subarray(start, start + keyCap);
+  }
+
+  onPhase("Analyzing rhythm…");
+  const tempo = await detectTempo(tempoSamples, sr, p => onProgress(p * 0.35));
+
+  // Tempo drift: on long-enough tracks, measure the first and last minute
+  // separately — human performances without a click track speed up or slow
+  // down, and no single BPM honestly describes them
+  if (tempo && samples.length >= 150 * sr) {
+    const win = 60 * sr;
+    const startT = await detectTempo(samples.subarray(0, win), sr, p => onProgress(0.35 + p * 0.05));
+    const endT = await detectTempo(samples.subarray(samples.length - win), sr, p => onProgress(0.40 + p * 0.05));
+    if (startT && endT) {
+      // fold octave aliases onto the main tempo's metrical level
+      const fold = b => {
+        while (b < tempo.bpm / 1.45) b *= 2;
+        while (b > tempo.bpm * 1.45) b /= 2;
+        return b;
+      };
+      const s = fold(startT.bpm), e = fold(endT.bpm);
+      const near = x => Math.abs(x - tempo.bpm) / tempo.bpm < 0.2;
+      if (near(s) && near(e) && Math.abs(e - s) / tempo.bpm >= 0.025) {
+        tempo.drift = { start: s, end: e };
+      }
+    }
+  }
+
+  onPhase("Analyzing harmony…");
+  const key = await detectKey(keySamples, sr, p => onProgress(0.45 + p * 0.55));
+  onProgress(1);
+  return { tempo, key };
+}
+window.__analyzeBuffer = analyzeBuffer; // exposed for testing
+
+/* ---------------- UI wiring ---------------- */
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const progress = document.getElementById("progress");
+const phaseText = document.getElementById("phaseText");
+const barFill = document.getElementById("barFill");
+const results = document.getElementById("results");
+const errorBox = document.getElementById("error");
+const inputArea = document.getElementById("inputArea");
+const listening = document.getElementById("listening");
+
+dropzone.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => {
+  if (fileInput.files.length) handleFile(fileInput.files[0]);
+});
+["dragover", "dragenter"].forEach(ev =>
+  dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add("dragover"); }));
+["dragleave", "drop"].forEach(ev =>
+  dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove("dragover"); }));
+dropzone.addEventListener("drop", e => {
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+document.getElementById("again").addEventListener("click", () => {
+  results.style.display = "none";
+  errorBox.style.display = "none";
+  inputArea.style.display = "block";
+  fileInput.value = "";
+});
+
+function drawWaveform(buffer) {
+  const canvas = document.getElementById("waveform");
+  canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+  const ctx = canvas.getContext("2d");
+  const data = buffer.getChannelData(0);
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(79, 140, 255, 0.75)";
+  const step = Math.max(1, Math.floor(data.length / W));
+  for (let x = 0; x < W; x++) {
+    let min = 1, max = -1;
+    const start = x * step, end = Math.min(start + step, data.length);
+    for (let i = start; i < end; i += 16) {
+      const v = data[i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    const y1 = (1 - max) * 0.5 * H, y2 = (1 - min) * 0.5 * H;
+    ctx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+  }
+}
+
+function fmtBpm(b) {
+  const r = Math.round(b * 10) / 10;
+  return Math.abs(r - Math.round(r)) < 0.05 ? String(Math.round(r)) : r.toFixed(1);
+}
+
+async function handleFile(file) {
+  errorBox.style.display = "none";
+  inputArea.style.display = "none";
+  results.style.display = "none";
+  progress.style.display = "block";
+  phaseText.textContent = "Decoding audio…";
+  barFill.style.width = "0%";
+  try {
+    const arrayBuf = await file.arrayBuffer();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuf);
+    ctx.close();
+    await analyzeAndRender(audioBuffer, file.name + " · " + audioBuffer.duration.toFixed(0) + "s");
+  } catch (err) {
+    progress.style.display = "none";
+    inputArea.style.display = "block";
+    errorBox.style.display = "block";
+    errorBox.textContent = "Could not analyze that file: " + (err && err.message ? err.message : err);
+  }
+}
+
+async function analyzeAndRender(audioBuffer, label) {
+  errorBox.style.display = "none";
+  inputArea.style.display = "none";
+  results.style.display = "none";
+  document.getElementById("instruments").style.display = "none";
+  progress.style.display = "block";
+  try {
+    const { tempo, key } = await analyzeBuffer(
+      audioBuffer,
+      p => { phaseText.textContent = p; },
+      p => { barFill.style.width = (p * 100).toFixed(1) + "%"; }
+    );
+
+    window.__lastAnalysis = { file: label, tempo, key }; // diagnostics
+    window.__history = (window.__history || []).concat([window.__lastAnalysis]);
+
+    progress.style.display = "none";
+    results.style.display = "block";
+    document.getElementById("trackName").textContent = label;
+    drawWaveform(audioBuffer);
+
+    const altLines = [];
+    if (tempo) {
+      document.getElementById("bpmValue").textContent = fmtBpm(tempo.bpm);
+      document.getElementById("bpmConf").style.width = (tempo.confidence * 100).toFixed(0) + "%";
+      altLines.push("Feels slower or faster? Half-time is <b>" + fmtBpm(tempo.bpm / 2) +
+        "</b> BPM, double-time is <b>" + fmtBpm(tempo.bpm * 2) + "</b> BPM.");
+      if (tempo.drift) {
+        const dir = tempo.drift.end > tempo.drift.start ? "speeds up" : "slows down";
+        altLines.push("&#9201;&#65039; Tempo isn't constant: this track " + dir + " from about <b>" +
+          fmtBpm(tempo.drift.start) + "</b> to <b>" + fmtBpm(tempo.drift.end) +
+          "</b> BPM — typical of live performances. The BPM above is the mid-track reading.");
+      }
+    } else {
+      document.getElementById("bpmValue").textContent = "?";
+      document.getElementById("bpmConf").style.width = "0%";
+      altLines.push("Couldn't find a stable tempo — the track may be too short or beatless.");
+    }
+
+    if (key) {
+      const name = NOTE_NAMES[key.tonic];
+      const camelot = key.mode === "major" ? CAMELOT_MAJOR[key.tonic] : CAMELOT_MINOR[key.tonic];
+      document.getElementById("keyValue").textContent = name;
+      document.getElementById("keyMode").textContent = key.mode;
+      document.getElementById("camelot").textContent = "Camelot " + camelot;
+      document.getElementById("keyConf").style.width = (key.confidence * 100).toFixed(0) + "%";
+      if (key.modulation) {
+        const mf = key.modulation.from, mt = key.modulation.to;
+        const camF = mf.mode === "major" ? CAMELOT_MAJOR[mf.tonic] : CAMELOT_MINOR[mf.tonic];
+        const camT = mt.mode === "major" ? CAMELOT_MAJOR[mt.tonic] : CAMELOT_MINOR[mt.tonic];
+        altLines.push("&#128257; This track changes key: starts around <b>" + NOTE_NAMES[mf.tonic] + " " + mf.mode +
+          "</b> (Camelot " + camF + ") and ends around <b>" + NOTE_NAMES[mt.tonic] + " " + mt.mode +
+          "</b> (Camelot " + camT + "). The key above is the overall winner — mix IN using the start key, mix OUT using the end key.");
+      }
+      if (key.second && key.correlation - key.second.r < 0.08) {
+        const sCam = key.second.mode === "major" ? CAMELOT_MAJOR[key.second.tonic] : CAMELOT_MINOR[key.second.tonic];
+        altLines.push("&#9888;&#65039; Detection was close — second guess: <b>" + NOTE_NAMES[key.second.tonic] + " " +
+          key.second.mode + "</b> (Camelot " + sCam + "). Trust your ear between these two.");
+      }
+      const relTonic = key.mode === "major" ? (key.tonic + 9) % 12 : (key.tonic + 3) % 12;
+      const relMode = key.mode === "major" ? "minor" : "major";
+      altLines.push("FYI, the relative " + relMode + " of every " + NOTE_NAMES[key.tonic] + " " + key.mode +
+        " is <b>" + NOTE_NAMES[relTonic] + " " + relMode + "</b> (Camelot " +
+        (relMode === "major" ? CAMELOT_MAJOR[relTonic] : CAMELOT_MINOR[relTonic]) + ") — same notes, mix-compatible.");
+      if (Math.abs(key.detuneCents) >= 15) {
+        altLines.push("Track is tuned about <b>" + (key.detuneCents > 0 ? "+" : "") + key.detuneCents +
+          " cents</b> off A440 (compensated in the analysis).");
+      }
+    } else {
+      document.getElementById("keyValue").textContent = "?";
+      document.getElementById("keyMode").textContent = "";
+      document.getElementById("camelot").textContent = "";
+      document.getElementById("keyConf").style.width = "0%";
+      altLines.push("Couldn't determine a key — the track may be atonal or mostly percussive.");
+    }
+    document.getElementById("alts").innerHTML = altLines.join("<br>");
+
+    // Troubleshooting panel: the raw evidence behind the verdicts
+    const SHORT = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const diag = [];
+    if (tempo) {
+      diag.push("Tempo candidates: " + tempo.candidates.map(c => c.bpm + " (" + c.score.toFixed(2) + ")").join("  "));
+      if (tempo.drift) diag.push("Tempo drift: " + fmtBpm(tempo.drift.start) + " → " + fmtBpm(tempo.drift.end) + " BPM");
+    }
+    if (key) {
+      const kn = i => SHORT[i % 12] + (i < 12 ? "" : "m");
+      diag.push("Key top-5: " + key.top5.map(s => SHORT[s.tonic] + (s.mode === "major" ? "" : "m") + " " + s.r.toFixed(3)).join("  "));
+      const pct = arr => {
+        const t = arr.reduce((a, b) => a + b, 0) || 1;
+        return arr.map((v, i) => SHORT[i] + " " + (v / t * 100).toFixed(1)).join("  ");
+      };
+      diag.push("Chroma %: " + pct(key.chroma));
+      diag.push("Bass %:   " + pct(key.bassChroma));
+      diag.push("Tuning: " + (key.detuneCents > 0 ? "+" : "") + key.detuneCents + " cents off A440");
+      diag.push("10s-segment votes: " + key.segWinners.map(i => (i < 12 ? SHORT[i] : SHORT[i - 12] + "m")).join(" "));
+    }
+    document.getElementById("diagPre").textContent = diag.join("\n");
+    const di = document.getElementById("diagInst");
+    di.style.display = "none";
+    di.textContent = "";
+
+    renderInstruments(audioBuffer); // fills in asynchronously below the results
+  } catch (err) {
+    progress.style.display = "none";
+    inputArea.style.display = "block";
+    errorBox.style.display = "block";
+    errorBox.textContent = "Could not analyze: " + (err && err.message ? err.message : err);
+  }
+}
+
+/* ---------------- Listen mode: analyze audio playing on this device ---------------- */
+const listenText = document.getElementById("listenText");
+const listenBar = document.getElementById("listenBar");
+const listenStopBtn = document.getElementById("listenStopBtn");
+const listenBtn = document.getElementById("listenBtn");
+const sourceRow = document.getElementById("sourceRow");
+const listenHint = document.getElementById("listenHint");
+
+// Capture length: 30 s / 90 s / open-ended (0 = until stopped, 6 min cap)
+let listenDur = parseInt(localStorage.getItem("listenDur") || "30", 10);
+if ([30, 90, 0].indexOf(listenDur) === -1) listenDur = 30;
+const durBtns = document.querySelectorAll(".dur-btn");
+function updateDurUI() {
+  durBtns.forEach(b => b.classList.toggle("active", parseInt(b.dataset.dur, 10) === listenDur));
+}
+durBtns.forEach(b => b.addEventListener("click", () => {
+  listenDur = parseInt(b.dataset.dur, 10);
+  localStorage.setItem("listenDur", String(listenDur));
+  updateDurUI();
+}));
+updateDurUI();
+const fmtTime = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+
+// The share picker only needs to be answered once: the captured audio
+// source is kept alive across analyses and reused until the user
+// disconnects it, changes it, or stops sharing from Chrome's own bar.
+let captureStream = null;
+
+function captureAlive() {
+  return !!captureStream && captureStream.getAudioTracks().some(t => t.readyState === "live");
+}
+function updateSourceUI() {
+  const alive = captureAlive();
+  sourceRow.style.display = alive ? "flex" : "none";
+  listenHint.style.display = alive ? "none" : "block";
+}
+function dropCapture() {
+  if (captureStream) captureStream.getTracks().forEach(t => t.stop());
+  captureStream = null;
+  updateSourceUI();
+}
+async function acquireCapture() {
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: true,
+    audio: true,
+    systemAudio: "include",       // offer "share system audio" for screen picks
+    surfaceSwitching: "include",  // let Chrome's bar switch the shared tab
+    selfBrowserSurface: "exclude"
+  });
+  const audioTracks = stream.getAudioTracks();
+  if (!audioTracks.length) {
+    stream.getTracks().forEach(t => t.stop());
+    return false;
+  }
+  stream.getVideoTracks().forEach(t => t.stop()); // only the audio is needed
+  audioTracks.forEach(t => t.addEventListener("ended", () => { captureStream = null; updateSourceUI(); }));
+  captureStream = new MediaStream(audioTracks);
+  updateSourceUI();
+  return true;
+}
+document.getElementById("changeSrcBtn").addEventListener("click", async () => {
+  const old = captureStream;
+  try {
+    if (await acquireCapture()) { if (old) old.getTracks().forEach(t => t.stop()); }
+  } catch (e) { /* picker cancelled — keep the old source */ }
+  updateSourceUI();
+});
+document.getElementById("dropSrcBtn").addEventListener("click", dropCapture);
+
+listenBtn.addEventListener("click", async () => {
+  errorBox.style.display = "none";
+  if (!captureAlive()) {
+    try {
+      if (!(await acquireCapture())) {
+        errorBox.style.display = "block";
+        errorBox.textContent = "No audio was shared. Pick the tab or screen playing the music and enable " +
+          "“Also share tab audio” (or “Share system audio”), then try again.";
+        return;
+      }
+    } catch (e) {
+      return; // user cancelled the share dialog
+    }
+  }
+  const audioTracks = captureStream.getAudioTracks();
+
+  inputArea.style.display = "none";
+  listening.style.display = "block";
+  listenBar.style.width = "0%";
+  listenText.textContent = "Listening…";
+
+  const openEnded = listenDur === 0;
+  const DUR = openEnded ? 360 : listenDur; // open-ended capture caps at 6 min
+  const chunks = [];
+  let rec = null;
+  const t0 = performance.now();
+  const timer = setInterval(() => {
+    const el = (performance.now() - t0) / 1000;
+    listenText.textContent = openEnded
+      ? "Listening… " + fmtTime(el) + " — stop when the song ends (6:00 max)"
+      : "Listening… " + Math.max(0, DUR - el).toFixed(0) + "s left";
+    listenBar.style.width = Math.min(100, el / DUR * 100) + "%";
+  }, 200);
+
+  // Every exit path must resolve this promise: stop button, timer, the
+  // recorder's own stop/error events, the user ending the share from
+  // Chrome's bar, a recorder that fails to start, plus a hard failsafe —
+  // the UI must never be able to stay stuck on the listening panel.
+  let startError = null;
+  await new Promise(resolve => {
+    const finish = () => {
+      try { if (rec && rec.state !== "inactive") rec.stop(); } catch (e) {}
+      resolve();
+    };
+    listenStopBtn.onclick = finish;
+    audioTracks.forEach(t => { t.onended = finish; });
+    try {
+      rec = new MediaRecorder(new MediaStream(audioTracks));
+      rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = resolve;
+      rec.onerror = resolve;
+      rec.start(250);
+    } catch (e) {
+      startError = e;
+      resolve();
+      return;
+    }
+    setTimeout(finish, DUR * 1000);
+    setTimeout(resolve, DUR * 1000 + 5000); // absolute failsafe
+  });
+  clearInterval(timer);
+  listening.style.display = "none";
+  updateSourceUI(); // tracks stay live for the next Listen
+
+  if (startError) {
+    inputArea.style.display = "block";
+    errorBox.style.display = "block";
+    errorBox.textContent = "Could not start recording: " + (startError.message || startError);
+    return;
+  }
+  const elapsed = (performance.now() - t0) / 1000;
+  if (elapsed < 8 || !chunks.length) {
+    inputArea.style.display = "block"; // early stop = cancel, no fuss
+    return;
+  }
+  try {
+    const blob = new Blob(chunks, { type: (rec && rec.mimeType) || "audio/webm" });
+    const buf = await blob.arrayBuffer();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioBuffer = await ctx.decodeAudioData(buf);
+    ctx.close();
+    await analyzeAndRender(audioBuffer, "Live capture · " + audioBuffer.duration.toFixed(0) + "s");
+  } catch (err) {
+    inputArea.style.display = "block";
+    errorBox.style.display = "block";
+    errorBox.textContent = "Capture failed: " + (err && err.message ? err.message : err);
+  }
+});
+
+/* ---------------- Instrument detection (YAMNet, runs locally) ---------------- */
+let yamnetModel = null, yamnetClasses = null, tfLibLoaded = false, yamnetFailed = false;
+let instRunId = 0;
+
+// AudioSet display names worth reporting, with friendlier labels.
+// Vocal classes are merged into a single "Vocals" row.
+const VOCAL_CLASSES = new Set(["Singing", "Male singing", "Female singing", "Child singing", "Choir", "Rapping"]);
+const INSTRUMENT_LABELS = {
+  "Guitar": "Guitar", "Electric guitar": "Electric guitar", "Bass guitar": "Bass guitar",
+  "Acoustic guitar": "Acoustic guitar", "Steel guitar, slide guitar": "Slide guitar",
+  "Banjo": "Banjo", "Sitar": "Sitar", "Mandolin": "Mandolin", "Ukulele": "Ukulele", "Zither": "Zither",
+  "Piano": "Piano", "Electric piano": "Electric piano", "Harpsichord": "Harpsichord",
+  "Organ": "Organ", "Electronic organ": "Electronic organ", "Hammond organ": "Hammond organ",
+  "Synthesizer": "Synthesizer", "Sampler": "Sampler",
+  "Drum kit": "Drum kit", "Drum machine": "Drum machine", "Drum": "Drums",
+  "Snare drum": "Snare drum", "Bass drum": "Kick drum", "Timpani": "Timpani", "Tabla": "Tabla",
+  "Cymbal": "Cymbals", "Hi-hat": "Hi-hat", "Tambourine": "Tambourine", "Gong": "Gong",
+  "Marimba, xylophone": "Marimba/xylophone", "Glockenspiel": "Glockenspiel", "Vibraphone": "Vibraphone",
+  "Steelpan": "Steelpan", "Tubular bells": "Tubular bells",
+  "Orchestra": "Orchestra", "String section": "String section", "Violin, fiddle": "Violin",
+  "Cello": "Cello", "Double bass": "Double bass", "Pizzicato": "Pizzicato strings",
+  "Brass instrument": "Brass", "French horn": "French horn", "Trumpet": "Trumpet", "Trombone": "Trombone",
+  "Saxophone": "Saxophone", "Clarinet": "Clarinet", "Flute": "Flute",
+  "Wind instrument, woodwind instrument": "Woodwinds",
+  "Harp": "Harp", "Harmonica": "Harmonica", "Accordion": "Accordion", "Bagpipes": "Bagpipes",
+  "Bell": "Bells", "Theremin": "Theremin", "Whistling": "Whistling",
+  "Scratching (performance technique)": "DJ scratching",
+  "Keyboard (musical)": "Keyboard", "Plucked string instrument": "Plucked strings",
+  "Percussion": "Percussion", "Bowed string instrument": "Bowed strings"
+};
+// Genre/style classes — on dense modern masters YAMNet often recognizes the
+// style with more confidence than any single instrument, so report that too
+const GENRE_LABELS = new Set([
+  "Pop music", "Hip hop music", "Beatboxing", "Rock music", "Heavy metal", "Punk rock",
+  "Grunge", "Progressive rock", "Rock and roll", "Psychedelic rock", "Rhythm and blues",
+  "Soul music", "Reggae", "Country", "Swing music", "Bluegrass", "Funk", "Folk music",
+  "Middle Eastern music", "Jazz", "Disco", "Classical music", "Opera", "Electronic music",
+  "House music", "Techno", "Dubstep", "Drum and bass", "Electronica", "Electronic dance music",
+  "Ambient music", "Trance music", "Music of Latin America", "Salsa music", "Flamenco",
+  "Blues", "New-age music", "Vocal music", "A capella", "Music of Africa", "Afrobeat",
+  "Gospel music", "Music of Asia", "Carnatic music", "Music of Bollywood", "Ska",
+  "Traditional music"
+]);
+
+function loadScriptOnce(url) {
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = url; s.onload = res; s.onerror = () => rej(new Error("failed to load " + url));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureYamnet() {
+  if (yamnetModel) return true;
+  if (yamnetFailed) return false;
+  try {
+    if (!tfLibLoaded) { await loadScriptOnce("lib/tf.min.js"); tfLibLoaded = true; }
+    const csv = (await (await fetch("model/yamnet_class_map.csv")).text()).replace(/\r/g, "");
+    yamnetClasses = csv.trim().split("\n").slice(1).map(line => {
+      const m = line.match(/^\d+,[^,]+,(.*)$/);
+      return (m ? m[1] : "").replace(/^"|"$/g, "");
+    });
+    yamnetModel = await tf.loadGraphModel("model/model.json");
+    return true;
+  } catch (e) {
+    yamnetFailed = true;
+    console.warn("Instrument detection unavailable:", e);
+    return false;
+  }
+}
+
+async function toMono16k(buffer) {
+  const rate = 16000;
+  const len = Math.max(1, Math.ceil(buffer.duration * rate));
+  const oc = new OfflineAudioContext(1, len, rate);
+  const src = oc.createBufferSource();
+  src.buffer = buffer;
+  src.connect(oc.destination);
+  src.start();
+  return (await oc.startRendering()).getChannelData(0);
+}
+
+async function detectInstruments(audioBuffer) {
+  if (!(await ensureYamnet())) return null;
+  let samples = await toMono16k(audioBuffer);
+  const maxLen = 60 * 16000; // classify up to the middle 60 s
+  if (samples.length > maxLen) {
+    const start = ((samples.length - maxLen) / 2) | 0;
+    samples = samples.subarray(start, start + maxLen);
+  }
+  const input = tf.tensor1d(samples);
+  let out = yamnetModel.predict(input);
+  if (!Array.isArray(out)) out = [out];
+  const scoresT = out.find(t => t.shape[t.shape.length - 1] === 521);
+  const scores = await scoresT.array(); // [frames, 521]
+  input.dispose();
+  out.forEach(t => t.dispose());
+  const nFrames = scores.length;
+  if (!nFrames) return [];
+
+  // Presence = mean of each class's top-25% frames, so an instrument
+  // playing in only part of the track still registers
+  const topK = Math.max(3, Math.ceil(nFrames * 0.25));
+  // Presence = "audible through much of the track" (mean of top-25% frames);
+  // peak = "clearly audible at least once" (best single frame) — catches
+  // instruments exposed only in intros, breakdowns and fills
+  const statsFor = idx => {
+    const vals = scores.map(f => f[idx]).sort((a, b) => b - a);
+    let s = 0;
+    for (let i = 0; i < topK && i < vals.length; i++) s += vals[i];
+    return { p: s / Math.min(topK, vals.length), peak: vals[0] };
+  };
+
+  const presAll = [];
+  for (let idx = 0; idx < yamnetClasses.length; idx++) {
+    const st = statsFor(idx);
+    presAll.push({ name: yamnetClasses[idx], p: st.p, peak: st.peak });
+  }
+  presAll.sort((a, b) => b.p - a.p);
+  window.__lastInstRaw = presAll.slice(0, 20).map(x =>
+    ({ name: x.name, score: +x.p.toFixed(3), peak: +x.peak.toFixed(2) }));
+
+  const found = [], momentary = [];
+  let vocals = 0, vocalsPeak = 0;
+  for (const { name, p, peak } of presAll) {
+    if (VOCAL_CLASSES.has(name)) {
+      vocals = Math.max(vocals, p);
+      vocalsPeak = Math.max(vocalsPeak, peak);
+    } else if (INSTRUMENT_LABELS[name] !== undefined) {
+      if (p >= 0.05) found.push({ name: INSTRUMENT_LABELS[name], score: p });
+      else if (peak >= 0.25) momentary.push({ name: INSTRUMENT_LABELS[name], score: peak });
+    }
+  }
+  if (vocals >= 0.05) found.push({ name: "Vocals", score: vocals });
+  else if (vocalsPeak >= 0.25) momentary.push({ name: "Vocals", score: vocalsPeak });
+  found.sort((a, b) => b.score - a.score);
+  momentary.sort((a, b) => b.score - a.score);
+  const styles = presAll
+    .filter(x => GENRE_LABELS.has(x.name) && x.p >= 0.04)
+    .slice(0, 4)
+    .map(x => x.name);
+  return { instruments: found.slice(0, 8), momentary: momentary.slice(0, 4), styles };
+}
+
+async function renderInstruments(audioBuffer) {
+  const runId = ++instRunId;
+  const box = document.getElementById("instruments");
+  const list = document.getElementById("instList");
+  const status = document.getElementById("instStatus");
+  box.style.display = "block";
+  list.innerHTML = "";
+  status.textContent = "— analyzing…";
+  try {
+    status.textContent = "— identifying instruments…";
+    let jam = null;
+    try { jam = await detectInstrumentsJamendo(audioBuffer); } catch (e) { console.warn("Jamendo tagger failed:", e); }
+    if (runId !== instRunId) return;
+    status.textContent = "— checking style…";
+    let yam = null;
+    try { yam = await detectInstruments(audioBuffer); } catch (e) { console.warn("YAMNet failed:", e); }
+    if (runId !== instRunId) return;
+    status.textContent = "";
+    if (!jam && !yam) { box.style.display = "none"; return; } // neither model available
+    window.__lastInstruments = { jamendo: jam, yamnet: yam }; // diagnostics
+
+    const di = document.getElementById("diagInst");
+    di.style.display = "block";
+    const diagBits = [];
+    if (window.__lastJamendoRaw) diagBits.push("Instrument tags (Jamendo top 15): " +
+      window.__lastJamendoRaw.map(x => x.tag + " " + x.score.toFixed(2)).join("  "));
+    if (window.__lastInstRaw) diagBits.push("Sound classes (YAMNet top 10, sustained/peak): " +
+      window.__lastInstRaw.slice(0, 10).map(x => x.name + " " + x.score.toFixed(2) + "/" + x.peak.toFixed(2)).join("  "));
+    di.textContent = diagBits.join("\n");
+
+    const styles = (yam && yam.styles) || [];
+    const momentary = (yam && yam.momentary) || [];
+    const rows = (arr, sureAt) => arr.map(f => {
+      const sure = f.score >= sureAt;
+      return '<div class="inst-row"' + (sure ? '' : ' style="opacity:0.55"') +
+        '><div class="inst-name">' + f.name +
+        (sure ? '' : ' <span style="font-size:11px;color:var(--muted)">maybe</span>') + '</div>' +
+        '<div class="inst-bar-track"><div class="inst-bar" style="width:' + Math.min(100, f.score * 100).toFixed(0) + '%"></div></div>' +
+        '<div class="inst-pct">' + (f.score * 100).toFixed(0) + '%</div></div>';
+    }).join("");
+
+    // Vocals fusion: the Jamendo tagger under-reports voice (a known bias of
+    // its training tags), while YAMNet detects singing reliably — trust
+    // whichever is more confident
+    if (jam && yam) {
+      const yamV = (yam.instruments || []).find(i => i.name === "Vocals");
+      if (yamV && yamV.score >= 0.10) {
+        const existing = jam.find(i => i.name === "Vocals");
+        if (!existing) jam.push({ name: "Vocals", score: yamV.score });
+        else existing.score = Math.max(existing.score, yamV.score);
+        jam.sort((a, b) => b.score - a.score);
+      }
+    }
+
+    let html = "";
+    if (jam && jam.length) {
+      html = rows(jam, 0.2); // music-specific tagger — the primary list
+    } else if (yam && yam.instruments.length) {
+      html = rows(yam.instruments, 0.12); // fallback if the tagger is unavailable
+    } else {
+      html = '<div class="inst-note">' + ((styles.length || momentary.length)
+        ? "No instrument was prominent throughout — dense modern masters blur everything into one wall of sound."
+        : "Nothing identified with confidence — very dense or synthetic mixes can hide everything.") + '</div>';
+    }
+    if (!jam && momentary.length) {
+      html += '<div class="inst-note" style="margin-top:10px;color:var(--text)">Heard briefly (intro/breakdown/fills): ' +
+        momentary.map(m => "<b>" + m.name + "</b> (" + (m.score * 100).toFixed(0) + "%)").join(" · ") + '</div>';
+    }
+    if (styles.length) {
+      html += '<div class="inst-note" style="margin-top:12px;color:var(--text)">Style: <b>' + styles.join("</b> · <b>") + '</b></div>';
+    }
+    list.innerHTML = html;
+  } catch (e) {
+    if (runId === instRunId) status.textContent = "— unavailable";
+    console.warn("Instrument detection failed:", e);
+  }
+}
+
+/* ---------------- Instrument tagging (MTG-Jamendo on discogs-effnet, ONNX) ----------------
+   A music-specific tagger trained on full mixed tracks — unlike YAMNet it can
+   name instruments inside dense modern masters. Runs locally via ONNX Runtime. */
+let ortEffnet = null, ortHead = null, jamendoClasses = null, jamendoFailed = false;
+
+const JAMENDO_LABELS = {
+  accordion: "Accordion", acousticbassguitar: "Acoustic bass", acousticguitar: "Acoustic guitar",
+  bass: "Bass", beat: "Programmed beat", bell: "Bells", bongo: "Bongos", brass: "Brass",
+  cello: "Cello", clarinet: "Clarinet", classicalguitar: "Classical guitar",
+  computer: "Computer/electronics", doublebass: "Double bass", drummachine: "Drum machine",
+  drums: "Drums (kit)", electricguitar: "Electric guitar", electricpiano: "Electric piano",
+  flute: "Flute", guitar: "Guitar", harmonica: "Harmonica", harp: "Harp", horn: "Horn",
+  keyboard: "Keyboard", oboe: "Oboe", orchestra: "Orchestra", organ: "Organ", pad: "Synth pad",
+  percussion: "Percussion", piano: "Piano", pipeorgan: "Pipe organ", rhodes: "Rhodes",
+  sampler: "Sampler", saxophone: "Saxophone", strings: "Strings", synthesizer: "Synthesizer",
+  trombone: "Trombone", trumpet: "Trumpet", viola: "Viola", violin: "Violin", voice: "Vocals"
+};
+
+async function ensureJamendo() {
+  if (ortEffnet && ortHead) return true;
+  if (jamendoFailed) return false;
+  try {
+    await loadScriptOnce("lib/ort.min.js");
+    ort.env.wasm.wasmPaths = new URL("lib/", location.href).href; // must be absolute for import()
+    ort.env.wasm.numThreads = 1;
+    const meta = await (await fetch("model/mtg_jamendo_instrument-discogs-effnet-1.json")).json();
+    jamendoClasses = meta.classes;
+    ortEffnet = await ort.InferenceSession.create("model/discogs-effnet-bsdynamic-1.onnx",
+      { executionProviders: ["wasm"] });
+    ortHead = await ort.InferenceSession.create("model/mtg_jamendo_instrument-discogs-effnet-1.onnx",
+      { executionProviders: ["wasm"] });
+    return true;
+  } catch (e) {
+    jamendoFailed = true;
+    console.warn("Jamendo instrument tagger unavailable:", e);
+    return false;
+  }
+}
+
+// Slaney-style mel filterbank (librosa defaults) — matches the MusiCNN
+// frontend these models were trained with
+function melFilterbank(nMels, nFft, sr, fMin, fMax) {
+  const hzToMel = f => f < 1000 ? f / (200 / 3) : 15 + Math.log(f / 1000) / Math.log(6.4) * 27;
+  const melToHz = m => m < 15 ? m * (200 / 3) : 1000 * Math.exp((m - 15) / 27 * Math.log(6.4));
+  const nBins = nFft / 2 + 1;
+  const melLo = hzToMel(fMin), melHi = hzToMel(fMax);
+  const pts = [];
+  for (let i = 0; i < nMels + 2; i++) pts.push(melToHz(melLo + (melHi - melLo) * i / (nMels + 1)));
+  const fb = [];
+  for (let m = 0; m < nMels; m++) {
+    const row = new Float32Array(nBins);
+    const fl = pts[m], fc = pts[m + 1], fr = pts[m + 2];
+    const norm = 2 / (fr - fl); // slaney area normalization
+    for (let k = 0; k < nBins; k++) {
+      const f = k * sr / nFft;
+      let w = 0;
+      if (f >= fl && f <= fc && fc > fl) w = (f - fl) / (fc - fl);
+      else if (f > fc && f <= fr && fr > fc) w = (fr - f) / (fr - fc);
+      row[k] = w * norm;
+    }
+    fb.push(row);
+  }
+  return fb;
+}
+
+async function detectInstrumentsJamendo(audioBuffer) {
+  if (!(await ensureJamendo())) return null;
+  const sr = 16000, nFft = 512, hop = 256, nMels = 96, patchLen = 128;
+  let samples = await toMono16k(audioBuffer);
+  const maxLen = 45 * sr; // middle 45 s
+  if (samples.length > maxLen) {
+    const start = ((samples.length - maxLen) / 2) | 0;
+    samples = samples.subarray(start, start + maxLen);
+  }
+  const nFrames = Math.floor((samples.length - nFft) / hop);
+  if (nFrames < patchLen) return null;
+
+  const fft = makeFFT(nFft);
+  const win = new Float64Array(nFft);
+  for (let i = 0; i < nFft; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / nFft); // periodic hann
+  const fb = melFilterbank(nMels, nFft, sr, 0, sr / 2);
+  const nBins = nFft / 2 + 1;
+  const re = new Float64Array(nFft), im = new Float64Array(nFft);
+  const power = new Float64Array(nBins);
+
+  // Log-mel spectrogram, then non-overlapping 128-frame patches
+  const nPatches = Math.floor(nFrames / patchLen);
+  const mels = new Float32Array(nPatches * patchLen * nMels);
+  for (let t = 0; t < nPatches * patchLen; t++) {
+    const off = t * hop;
+    for (let i = 0; i < nFft; i++) { re[i] = samples[off + i] * win[i]; im[i] = 0; }
+    fft(re, im);
+    for (let k = 0; k < nBins; k++) power[k] = re[k] * re[k] + im[k] * im[k];
+    const base = t * nMels;
+    for (let m = 0; m < nMels; m++) {
+      const row = fb[m];
+      let s = 0;
+      for (let k = 0; k < nBins; k++) s += row[k] * power[k];
+      mels[base + m] = Math.log10(1 + 10000 * s);
+    }
+    if ((t & 255) === 0) await yieldUI();
+  }
+
+  // Stage 1: embeddings; stage 2: instrument sigmoid, averaged over patches
+  const input = new ort.Tensor("float32", mels, [nPatches, patchLen, nMels]);
+  const embOut = await ortEffnet.run({ [ortEffnet.inputNames[0]]: input });
+  let emb = null;
+  for (const name of ortEffnet.outputNames) {
+    const t = embOut[name];
+    if (t.dims[t.dims.length - 1] === 1280) { emb = t; break; }
+  }
+  if (!emb) throw new Error("no 1280-d embedding output found");
+  const headOut = await ortHead.run({ [ortHead.inputNames[0]]: emb });
+  let act = null;
+  for (const name of ortHead.outputNames) {
+    const t = headOut[name];
+    if (t.dims[t.dims.length - 1] === jamendoClasses.length) { act = t; break; }
+  }
+  if (!act) throw new Error("no class-activation output found");
+  const data = act.data, nCls = jamendoClasses.length;
+  // Aggregate as the mean of each tag's strongest half of the track, so an
+  // instrument that sits out the intro or a bridge isn't diluted to nothing
+  const nTop = Math.max(1, Math.ceil(nPatches / 2));
+  const mean = new Float64Array(nCls);
+  const col = new Float64Array(nPatches);
+  for (let c = 0; c < nCls; c++) {
+    for (let p = 0; p < nPatches; p++) col[p] = data[p * nCls + c];
+    col.sort();
+    let s = 0;
+    for (let i = nPatches - nTop; i < nPatches; i++) s += col[i];
+    mean[c] = s / nTop;
+  }
+
+  const tags = jamendoClasses.map((name, i) => ({ tag: name, score: mean[i] }))
+    .sort((a, b) => b.score - a.score);
+  window.__lastJamendoRaw = tags.slice(0, 15).map(x => ({ tag: x.tag, score: +x.score.toFixed(3) }));
+  return tags.filter(x => x.score >= 0.08)
+    .slice(0, 10)
+    .map(x => ({ name: JAMENDO_LABELS[x.tag] || x.tag, score: x.score }));
+}
+
+/* ---------------- Tap tempo ---------------- */
+const tapBtn = document.getElementById("tapBtn");
+const tapBpm = document.getElementById("tapBpm");
+const tapCount = document.getElementById("tapCount");
+let taps = [];
+
+function registerTap() {
+  const now = performance.now();
+  if (taps.length && now - taps[taps.length - 1] > 2500) taps = []; // pause = start over
+  taps.push(now);
+  if (taps.length > 16) taps.shift();
+  if (taps.length >= 3) {
+    const iv = [];
+    for (let i = 1; i < taps.length; i++) iv.push(taps[i] - taps[i - 1]);
+    iv.sort((a, b) => a - b);
+    const mid = iv.length >> 1;
+    const med = iv.length % 2 ? iv[mid] : (iv[mid - 1] + iv[mid]) / 2;
+    tapBpm.textContent = (60000 / med).toFixed(1);
+    tapCount.textContent = taps.length + " taps · median interval";
+  } else {
+    tapCount.textContent = "keep tapping…";
+  }
+}
+tapBtn.addEventListener("pointerdown", e => { e.preventDefault(); registerTap(); });
+document.addEventListener("keydown", e => {
+  if (e.repeat) return;
+  const el = document.activeElement, tag = el ? el.tagName : "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (e.code === "Space" && tag === "BUTTON" && el !== tapBtn) return; // don't hijack button activation
+  if (e.key === "t" || e.key === "T" || e.code === "Space") { e.preventDefault(); registerTap(); }
+});
+document.getElementById("tapReset").addEventListener("click", () => {
+  taps = [];
+  tapBpm.textContent = "–";
+  tapCount.textContent = "tap along to the beat";
+});
+</script>
+</body>
+</html>
