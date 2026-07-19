@@ -925,8 +925,14 @@ async function analyzeAndRender(audioBuffer, label) {
       }
       if (key.second && key.correlation - key.second.r < 0.08) {
         const sCam = key.second.mode === "major" ? CAMELOT_MAJOR[key.second.tonic] : CAMELOT_MINOR[key.second.tonic];
-        altLines.push("&#9888;&#65039; Detection was close — second guess: <b>" + NOTE_NAMES[key.second.tonic] + " " +
-          key.second.mode + "</b> (Camelot " + sCam + "). Trust your ear between these two.");
+        if (key.second.tonic === key.tonic && key.second.mode !== key.mode) {
+          altLines.push("&#9888;&#65039; Close call between modes: same root note, but <b>" +
+            key.second.mode.toUpperCase() + "</b> scored nearly as high (Camelot " + sCam +
+            " — parallel keys sit 3 apart on the wheel). Does the song feel bright (major) or dark (minor)?");
+        } else {
+          altLines.push("&#9888;&#65039; Detection was close — second guess: <b>" + NOTE_NAMES[key.second.tonic] + " " +
+            key.second.mode + "</b> (Camelot " + sCam + "). Trust your ear between these two.");
+        }
       }
       const relTonic = key.mode === "major" ? (key.tonic + 9) % 12 : (key.tonic + 3) % 12;
       const relMode = key.mode === "major" ? "minor" : "major";
