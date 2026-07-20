@@ -541,6 +541,7 @@
     <div class="sheet" id="sheet"></div>
 </div>
 
+<script src="lib/supabase.js"></script>
 <script>
 /* =========================================================
    MUSIC ENGINE (carried over, battle-tested)
@@ -685,17 +686,21 @@ var state = {
     setlistEdit: false,
     medley: [],                 // [{songId, keyOption}]
     openLayer: null,
-    scroll: { playing: false, speed: 3, raf: null }
+    scroll: { playing: false, speed: 3, raf: null },
+    updatedAt: 0                // last local change (ms) — drives sync merge
 };
 var currentSongId = null;
 
 function save() {
+    state.updatedAt = Date.now();
     localStorage.setItem('chordph2_profile', JSON.stringify(state.profile));
     localStorage.setItem('chordph2_customs', JSON.stringify(state.customs));
     localStorage.setItem('chordph2_favorites', JSON.stringify(state.favorites));
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats }));
+    localStorage.setItem('chordph2_updated', String(state.updatedAt));
+    queuePush();
 }
 function load() {
     try {
@@ -707,7 +712,149 @@ function load() {
         var s = JSON.parse(localStorage.getItem('chordph2_settings') || '{}');
         if (s.fontSize) state.fontSize = s.fontSize;
         if (s.useFlats) state.useFlats = s.useFlats;
+        state.updatedAt = parseInt(localStorage.getItem('chordph2_updated') || '0', 10);
     } catch (e) { console.warn('load failed', e); }
+}
+
+/* =========================================================
+   CLOUD SYNC (Supabase, offline-first) — paste credentials below
+   ========================================================= */
+var SUPABASE_CONFIG = {
+    url: '',       // <-- Supabase Project URL
+    anonKey: ''    // <-- Supabase anon public key
+};
+var supa = null, currentUser = null, pushTimer = null;
+
+function syncEnabled() { return !!(SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey && window.supabase); }
+
+function localSnapshot() {
+    return {
+        profile: state.profile,
+        customs: state.customs,
+        favorites: state.favorites,
+        setlists: state.setlists,
+        transpose: state.transpose,
+        settings: { fontSize: state.fontSize, useFlats: state.useFlats },
+        updated_at: state.updatedAt || 0
+    };
+}
+function applySnapshot(snap) {
+    if (snap.profile) state.profile = snap.profile;
+    state.customs = snap.customs || [];
+    state.favorites = snap.favorites || [];
+    state.setlists = snap.setlists || [];
+    state.transpose = snap.transpose || {};
+    if (snap.settings) {
+        state.fontSize = snap.settings.fontSize || 16;
+        state.useFlats = !!snap.settings.useFlats;
+    }
+    state.updatedAt = snap.updated_at || Date.now();
+    // persist without bumping the timestamp or re-queueing a push
+    localStorage.setItem('chordph2_profile', JSON.stringify(state.profile));
+    localStorage.setItem('chordph2_customs', JSON.stringify(state.customs));
+    localStorage.setItem('chordph2_favorites', JSON.stringify(state.favorites));
+    localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
+    localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats }));
+    localStorage.setItem('chordph2_updated', String(state.updatedAt));
+}
+
+/* Union merge: never drops a song/setlist from either side; for the same
+   id, the document with the newer top-level updated_at wins. */
+function mergeData(local, cloud) {
+    if (!cloud) return local;
+    if (!local) return cloud;
+    var localNewer = (local.updated_at || 0) >= (cloud.updated_at || 0);
+    var newer = localNewer ? local : cloud;
+    var older = localNewer ? cloud : local;
+    function mergeById(arrNewer, arrOlder) {
+        var map = {};
+        (arrOlder || []).forEach(function(x) { if (x && x.id) map[x.id] = x; });
+        (arrNewer || []).forEach(function(x) { if (x && x.id) map[x.id] = x; });
+        return Object.keys(map).map(function(k) { return map[k]; });
+    }
+    return {
+        profile: newer.profile || older.profile,
+        customs: mergeById(newer.customs, older.customs),
+        setlists: mergeById(newer.setlists, older.setlists),
+        favorites: Array.from(new Set((local.favorites || []).concat(cloud.favorites || []))),
+        transpose: Object.assign({}, older.transpose, newer.transpose),
+        settings: newer.settings || older.settings,
+        updated_at: Math.max(local.updated_at || 0, cloud.updated_at || 0)
+    };
+}
+
+function initSync() {
+    if (!syncEnabled()) return;
+    try {
+        supa = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+    } catch (e) { console.warn('supabase init failed', e); return; }
+    supa.auth.getSession().then(function(res) {
+        currentUser = res.data.session ? res.data.session.user : null;
+        updateAuthUI();
+        if (currentUser) syncNow();
+    });
+    supa.auth.onAuthStateChange(function(event, session) {
+        currentUser = session ? session.user : null;
+        updateAuthUI();
+        if (event === 'SIGNED_IN') syncNow();
+    });
+}
+async function pullCloud() {
+    var res = await supa.from('user_data').select('data, updated_at').eq('user_id', currentUser.id).maybeSingle();
+    if (res.error) throw res.error;
+    if (!res.data) return null;
+    var d = res.data.data || {};
+    d.updated_at = d.updated_at || new Date(res.data.updated_at).getTime();
+    return d;
+}
+async function pushCloud() {
+    if (!currentUser || !supa) return;
+    var snap = localSnapshot();
+    var res = await supa.from('user_data').upsert({
+        user_id: currentUser.id, data: snap, updated_at: new Date().toISOString()
+    });
+    if (res.error) throw res.error;
+}
+async function syncNow() {
+    if (!currentUser || !supa) return;
+    try {
+        var cloud = await pullCloud();
+        var merged = mergeData(localSnapshot(), cloud);
+        applySnapshot(merged);
+        await pushCloud();
+        rerenderCurrent();
+        updateAuthUI();
+    } catch (e) { console.warn('sync failed', e); }
+}
+function queuePush() {
+    if (!currentUser || !supa) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(function() { pushCloud().catch(function(e) { console.warn('push failed', e); }); }, 1500);
+}
+function rerenderCurrent() {
+    if (document.getElementById('view-songs').classList.contains('active')) renderSongList();
+    else if (document.getElementById('view-favorites').classList.contains('active')) renderFavorites();
+    else if (document.getElementById('view-setlists').classList.contains('active')) renderSetlists();
+    else if (document.getElementById('view-setlist').classList.contains('active')) renderSetlistDetail();
+    else if (document.getElementById('view-chart').classList.contains('active')) renderChart();
+    updateProfileRow();
+}
+async function sendMagicLink(email) {
+    if (!supa || !email) return;
+    var res = await supa.auth.signInWithOtp({ email: email, options: { emailRedirectTo: location.href } });
+    return res.error ? res.error.message : null;
+}
+async function signOut() {
+    if (!supa) return;
+    await supa.auth.signOut();
+    currentUser = null;
+    updateAuthUI();
+}
+function updateAuthUI() {
+    var el = document.getElementById('sync-status');
+    if (!el) return;
+    el.innerHTML = renderSyncSection();
 }
 
 /* One-time migration from the index-based v1 (worshipapp_*) data */
@@ -1401,6 +1548,7 @@ function openSettings() {
         '<div class="section-label" style="margin-top:4px;">Profile</div>' +
         '<input class="field" id="sh-profile-name" placeholder="Your name" value="' + esc(p.name) + '" autocomplete="off">' +
         '<div class="chip-row" id="sh-instruments">' + chips + '</div>' +
+        (syncEnabled() ? '<div class="section-label">Sync</div><div id="sync-status">' + renderSyncSection() + '</div>' : '') +
         '<div class="section-label">Backup</div>' +
         '<div style="display:flex;gap:24px;">' +
         '<button class="tap" onclick="exportBackup()">Export data</button>' +
@@ -1410,6 +1558,29 @@ function openSettings() {
         '<button class="tap primary" onclick="saveSettings()">Save</button></div>'
     );
     window.__pickedInstrument = p.instrument;
+}
+function renderSyncSection() {
+    if (!syncEnabled()) return '';
+    if (currentUser) {
+        return '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Signed in as <b style="color:var(--text);">' +
+            esc(currentUser.email || 'you') + '</b> &middot; synced across your devices.</div>' +
+            '<div style="display:flex;gap:24px;"><button class="tap" onclick="syncNow()">Sync now</button>' +
+            '<button class="tap danger" onclick="signOut()">Sign out</button></div>';
+    }
+    return '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Sign in to sync your songs and setlists across phone and PC. We\'ll email you a one-tap link.</div>' +
+        '<input class="field" id="sh-sync-email" type="email" placeholder="you@email.com" autocomplete="email">' +
+        '<div id="sh-sync-msg" style="font-size:12px;color:var(--accent);margin:2px 0 6px;"></div>' +
+        '<button class="tap primary" onclick="submitMagicLink()">Send sign-in link</button>';
+}
+async function submitMagicLink() {
+    var email = (document.getElementById('sh-sync-email').value || '').trim();
+    var msg = document.getElementById('sh-sync-msg');
+    if (!email) { msg.style.color = 'var(--danger)'; msg.textContent = 'Enter your email.'; return; }
+    msg.style.color = 'var(--muted)';
+    msg.textContent = 'Sending…';
+    var err = await sendMagicLink(email);
+    if (err) { msg.style.color = 'var(--danger)'; msg.textContent = err; }
+    else { msg.style.color = 'var(--accent)'; msg.textContent = 'Check your email for the sign-in link.'; }
 }
 function pickInstrument(el, ins) {
     window.__pickedInstrument = ins;
@@ -1499,6 +1670,7 @@ function init() {
     load();
     if (state.profile && state.profile.name) go('songs');
     else renderOnboarding();
+    initSync();
 }
 init();
 </script>
