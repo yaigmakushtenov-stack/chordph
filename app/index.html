@@ -220,12 +220,32 @@
             flex-direction: column;
         }
         .drawer.open { left: 0; }
-        .drawer .wordmark { font-size: 20px; margin-bottom: 2px; }
-        .drawer-sub { font-size: 12px; color: var(--faint); margin-bottom: 28px; }
+        .drawer .wordmark { font-size: 20px; margin-bottom: 28px; }
         .drawer-nav { display: flex; flex-direction: column; gap: 4px; }
         .drawer-nav .tap { font-size: 16px; padding: 10px 0; text-align: left; }
         .drawer-hr { border: none; border-top: 1px solid var(--hairline); margin: 14px 0; }
-        .drawer-foot { margin-top: auto; font-size: 11px; color: var(--faint); }
+
+        /* profile row = the settings entrance (bottom of the menu) */
+        .drawer-profile {
+            margin-top: auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 12px 10px;
+            background: none;
+            border: none;
+            border-top: 1px solid var(--hairline);
+            cursor: pointer;
+            text-align: left;
+            transition: background .15s;
+        }
+        .drawer-profile:hover { background: rgba(255, 255, 255, 0.03); }
+        .dp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .dp-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dp-instrument { font-size: 12px; color: var(--faint); margin-top: 1px; }
+        .dp-gear { font-size: 17px; color: var(--muted); flex-shrink: 0; transition: color .2s, transform .3s; }
+        .drawer-profile:hover .dp-gear { color: var(--accent); transform: rotate(40deg); }
 
         /* ---- bottom sheet: modals without boxes-in-boxes ---- */
         .sheet-scrim {
@@ -349,16 +369,20 @@
 
 <nav class="drawer" id="drawer">
     <div class="wordmark">Chord.ph</div>
-    <div class="drawer-sub" id="drawer-sub"></div>
     <div class="drawer-nav">
         <button class="tap" id="nav-songs" onclick="go('songs')">Songs</button>
         <button class="tap" id="nav-favorites" onclick="go('favorites')">Favorites</button>
         <button class="tap" id="nav-setlists" onclick="go('setlists')">Setlists</button>
         <hr class="drawer-hr">
         <button class="tap" onclick="location.href='/analyzer/'">Key &amp; BPM Analyzer</button>
-        <button class="tap" onclick="openSettings()">Settings</button>
     </div>
-    <div class="drawer-foot">Your chords. Your key. Your music.</div>
+    <button class="drawer-profile" onclick="openSettings()">
+        <span class="dp-text">
+            <span class="dp-name" id="profile-name"></span>
+            <span class="dp-instrument" id="profile-instrument"></span>
+        </span>
+        <span class="dp-gear">&#9881;</span>
+    </button>
 </nav>
 
 <div id="view-onboarding">
@@ -699,12 +723,15 @@ function show(viewId) {
     document.getElementById('view-' + viewId).classList.add('active');
     window.scrollTo(0, 0);
 }
+function updateProfileRow() {
+    document.getElementById('profile-name').textContent = state.profile ? state.profile.name : 'Set up profile';
+    document.getElementById('profile-instrument').textContent = state.profile ? state.profile.instrument : 'Tap to begin';
+}
 function go(view) {
     closeDrawer();
     document.body.classList.remove('pre-app');
     state.view = view;
-    document.getElementById('drawer-sub').textContent =
-        state.profile ? state.profile.name + ' · ' + state.profile.instrument : '';
+    updateProfileRow();
     ['songs', 'favorites', 'setlists'].forEach(function(v) {
         var el = document.getElementById('nav-' + v);
         if (el) el.classList.toggle('on', v === view);
@@ -716,7 +743,7 @@ function go(view) {
 function openDrawer() {
     document.getElementById('drawer').classList.add('open');
     document.getElementById('scrim').classList.add('open');
-    document.getElementById('drawer-sub').textContent = state.profile ? state.profile.name + ' · ' + state.profile.instrument : '';
+    updateProfileRow();
 }
 function closeDrawer() {
     document.getElementById('drawer').classList.remove('open');
@@ -1258,7 +1285,7 @@ function saveSettings() {
     var name = document.getElementById('sh-profile-name').value.trim();
     if (!name || !window.__pickedInstrument) return;
     state.profile = { name: name, instrument: window.__pickedInstrument };
-    save(); closeSheet();
+    save(); closeSheet(); updateProfileRow();
     if (document.getElementById('view-chart').classList.contains('active')) renderChart();
 }
 function exportBackup() {
