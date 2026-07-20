@@ -1594,6 +1594,7 @@ function renderMedleyList() {
     box.innerHTML = '';
     allSongs().filter(function(s) {
         if (s.id === currentSongId) return false;
+        if (state.medley.some(function(m) { return m.songId === s.id; })) return false;
         return !q || s.title.toLowerCase().indexOf(q) !== -1 || s.artist.toLowerCase().indexOf(q) !== -1;
     }).forEach(function(s) {
         var row = document.createElement('div');
@@ -1795,7 +1796,7 @@ function exportBackup() {
     var blob = new Blob([JSON.stringify({
         version: '2.0', exportDate: new Date().toISOString(),
         profile: state.profile, customs: state.customs, favorites: state.favorites,
-        setlists: state.setlists, transpose: state.transpose,
+        setlists: state.setlists, transpose: state.transpose, medleys: state.medleys,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats }
     }, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
@@ -1817,6 +1818,7 @@ function importBackup(event) {
                 if (b.favorites) state.favorites = b.favorites;
                 if (b.setlists) state.setlists = b.setlists;
                 if (b.transpose) state.transpose = b.transpose;
+                if (b.medleys) state.medleys = b.medleys;
                 if (b.settings) {
                     state.fontSize = b.settings.fontSize || 16;
                     state.useFlats = !!b.settings.useFlats;
