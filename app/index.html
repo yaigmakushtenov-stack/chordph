@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0f1117">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Chord.ph</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --text: #e8eaf0;
+            --muted: #8b93a7;
+            --faint: #566072;
+            --accent: #4f8cff;
+            --accent-2: #9b6bff;
+            --danger: #e94560;
+            --gold: #f5c518;
+            --hairline: rgba(255, 255, 255, 0.07);
+            --grad: linear-gradient(90deg, var(--accent), var(--accent-2));
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background: radial-gradient(1000px 480px at 50% -140px, #171c28 0%, var(--bg) 60%);
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        ::selection { background: rgba(79, 140, 255, 0.35); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #232a38; border-radius: 4px; }
+
+        .wrap { max-width: 640px; margin: 0 auto; padding: 0 20px 80px; }
+
+        /* ---- tappable words: the core control idiom ---- */
+        .tap {
+            display: inline-block;
+            color: var(--muted);
+            cursor: pointer;
+            user-select: none;
+            padding: 8px 2px;
+            transition: color .15s;
+            background: none; border: none; font: inherit;
+        }
+        .tap:hover { color: var(--text); }
+        .tap.on { color: var(--accent); }
+        .tap.primary { color: var(--accent); font-weight: 600; }
+        .tap.primary:hover { color: #7caaff; }
+        .tap.danger { color: var(--danger); }
+        .tap.big { font-size: 17px; padding: 10px 4px; }
+        .tap:disabled { color: var(--faint); cursor: default; }
+
+        .glyph { font-size: 18px; padding: 8px 10px; }
+
+        .wordmark {
+            font-weight: 750;
+            letter-spacing: -0.3px;
+            background: var(--grad);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            width: fit-content;
+        }
+
+        /* ---- top bar: quiet ---- */
+        .bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 0 8px;
+            position: sticky;
+            top: 0;
+            background: rgba(15, 17, 23, 0.88);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 50;
+        }
+        .bar .wordmark { font-size: 17px; }
+        .bar-side { min-width: 64px; }
+        .bar-side.right { text-align: right; }
+
+        /* ---- search: a hairline, not a box ---- */
+        .search {
+            width: 100%;
+            background: none;
+            border: none;
+            border-bottom: 1px solid var(--hairline);
+            color: var(--text);
+            font-size: 16px;
+            padding: 10px 2px;
+            outline: none;
+            margin: 6px 0 4px;
+            transition: border-color .2s;
+        }
+        .search:focus { border-bottom-color: var(--accent); }
+        .search::placeholder { color: var(--faint); }
+
+        /* ---- song list: rows, hairlines, air ---- */
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 2px;
+            border-bottom: 1px solid var(--hairline);
+            cursor: pointer;
+        }
+        .row-main { flex: 1; min-width: 0; }
+        .row-title { font-size: 16px; font-weight: 600; }
+        .row-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+        .row-sub .key { color: var(--accent); font-weight: 600; }
+        .row .star { font-size: 18px; color: var(--faint); padding: 8px 2px 8px 14px; background: none; border: none; cursor: pointer; }
+        .row .star.on { color: var(--gold); }
+        .row-action { color: var(--danger); font-size: 13px; padding: 8px 0 8px 14px; background: none; border: none; cursor: pointer; }
+
+        .empty { color: var(--faint); text-align: center; padding: 48px 0; font-size: 14px; line-height: 1.7; }
+
+        .section-label {
+            font-size: 11px;
+            color: var(--faint);
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            margin: 22px 0 4px;
+        }
+
+        /* ---- chart view ---- */
+        .chart-head { margin-top: 6px; }
+        .chart-title { font-size: 24px; font-weight: 750; letter-spacing: -0.4px; }
+        .chart-meta { font-size: 14px; color: var(--muted); margin-top: 3px; }
+        .chart-meta .key { color: var(--accent); font-weight: 650; cursor: pointer; }
+
+        .controls {
+            display: flex;
+            gap: 18px;
+            flex-wrap: wrap;
+            margin: 14px 0 0;
+            padding: 6px 0;
+            border-top: 1px solid var(--hairline);
+            border-bottom: 1px solid var(--hairline);
+            font-size: 14px;
+        }
+
+        /* ---- disclosure layer: appears under the control words ---- */
+        .layer {
+            display: none;
+            padding: 10px 0 12px;
+            border-bottom: 1px solid var(--hairline);
+            font-size: 15px;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            animation: fadeIn .18s ease;
+        }
+        .layer.open { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+        .layer .val { color: var(--text); font-weight: 650; min-width: 30px; text-align: center; display: inline-block; }
+        .layer .lbl { color: var(--faint); font-size: 12px; }
+        .capo-opt { padding: 8px 4px; }
+        .capo-opt b { color: var(--text); font-weight: 650; }
+        .capo-opt.on b { color: var(--accent); }
+        .capo-opt span { color: var(--faint); font-size: 12px; }
+
+        /* ---- the chart itself: the hero, no box ---- */
+        pre.chart {
+            font-family: "Cascadia Mono", Consolas, "Roboto Mono", monospace;
+            font-size: 16px;
+            line-height: 1.9;
+            white-space: pre-wrap;
+            color: var(--text);
+            padding: 18px 0 10px;
+        }
+        pre.chart .chord-line { color: var(--accent); font-weight: 700; }
+        pre.chart .sec-head {
+            color: var(--accent-2);
+            font-weight: 700;
+            font-size: 0.82em;
+            letter-spacing: 1.6px;
+            text-transform: uppercase;
+        }
+
+        .medley-sep {
+            border-top: 1px dashed rgba(155, 107, 255, 0.4);
+            margin-top: 10px;
+            padding-top: 14px;
+        }
+        .medley-tag { font-size: 11px; color: var(--accent-2); text-transform: uppercase; letter-spacing: 1.4px; }
+        .medley-head { display: flex; justify-content: space-between; align-items: baseline; }
+        .medley-title { font-size: 17px; font-weight: 700; margin-top: 4px; }
+        .medley-sub { font-size: 12px; color: var(--muted); }
+
+        /* ---- drawer: minimal sheet of words ---- */
+        .scrim {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(5, 7, 12, 0.6);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            z-index: 200;
+        }
+        .scrim.open { display: block; }
+
+        .drawer {
+            position: fixed;
+            top: 0; left: -280px;
+            width: 250px;
+            height: 100%;
+            background: rgba(18, 21, 30, 0.97);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-right: 1px solid var(--hairline);
+            z-index: 300;
+            padding: 26px 24px;
+            transition: left .26s cubic-bezier(.2, .8, .2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        .drawer.open { left: 0; }
+        .drawer .wordmark { font-size: 20px; margin-bottom: 2px; }
+        .drawer-sub { font-size: 12px; color: var(--faint); margin-bottom: 28px; }
+        .drawer-nav { display: flex; flex-direction: column; gap: 4px; }
+        .drawer-nav .tap { font-size: 16px; padding: 10px 0; text-align: left; }
+        .drawer-hr { border: none; border-top: 1px solid var(--hairline); margin: 14px 0; }
+        .drawer-foot { margin-top: auto; font-size: 11px; color: var(--faint); }
+
+        /* ---- bottom sheet: modals without boxes-in-boxes ---- */
+        .sheet-scrim {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(5, 7, 12, 0.65);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            z-index: 400;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .sheet-scrim.open { display: flex; }
+        .sheet {
+            width: 100%;
+            max-width: 640px;
+            max-height: 86vh;
+            overflow-y: auto;
+            background: #141821;
+            border-top: 1px solid var(--hairline);
+            border-radius: 18px 18px 0 0;
+            padding: 20px 24px 34px;
+            animation: sheetUp .22s cubic-bezier(.2, .8, .2, 1);
+        }
+        @keyframes sheetUp { from { transform: translateY(40px); opacity: .5; } to { transform: none; opacity: 1; } }
+        .sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+        .sheet-actions { display: flex; justify-content: flex-end; gap: 22px; margin-top: 18px; }
+
+        .field {
+            width: 100%;
+            background: none;
+            border: none;
+            border-bottom: 1px solid var(--hairline);
+            color: var(--text);
+            font-size: 15px;
+            padding: 11px 2px;
+            outline: none;
+            margin-bottom: 6px;
+            transition: border-color .2s;
+        }
+        .field:focus { border-bottom-color: var(--accent); }
+        .field::placeholder { color: var(--faint); }
+        select.field { color: var(--text); background-color: #141821; }
+        select.field:invalid, select.field option[value=""] { color: var(--faint); }
+        textarea.field {
+            font-family: "Cascadia Mono", Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            min-height: 180px;
+            resize: vertical;
+            border: 1px solid var(--hairline);
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+        .field-row { display: flex; gap: 18px; }
+        .field-row .field { flex: 1; }
+        .form-error { color: var(--danger); font-size: 12px; margin-top: 6px; display: none; }
+
+        .chip-row { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 6px 0 10px; }
+        .chip { color: var(--muted); cursor: pointer; padding: 8px 2px; font-size: 15px; background: none; border: none; }
+        .chip.on { color: var(--accent); font-weight: 650; }
+
+        /* ---- onboarding ---- */
+        #view-onboarding {
+            min-height: 100vh;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+        }
+        #view-onboarding .wordmark { font-size: 38px; margin: 0 auto; }
+        .ob-tagline { color: var(--muted); font-size: 14px; margin: 8px 0 44px; }
+        .ob-label { font-size: 15px; font-weight: 650; margin-bottom: 6px; }
+        #view-onboarding .chip-row { justify-content: center; margin-bottom: 30px; }
+        #view-onboarding .field { max-width: 280px; text-align: center; margin-bottom: 34px; }
+
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* =========================================================
+           DESKTOP: persistent sidebar, centered reading column
+           ========================================================= */
+        @media (min-width: 980px) {
+            .scrim { display: none !important; }
+            .drawer {
+                left: 0;
+                transition: none;
+                box-shadow: none;
+                background: rgba(15, 17, 23, 0.6);
+            }
+            .drawer .drawer-nav .tap { font-size: 15px; padding: 9px 0; }
+            .menu-btn { display: none !important; }
+            .bar .wordmark { display: none; }
+            .bar {
+                background: none;
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+                border-bottom: 1px solid var(--hairline);
+                padding: 18px 0 10px;
+            }
+            .wrap {
+                margin-left: max(250px, calc((100vw - 800px) / 2));
+                margin-right: auto;
+                max-width: 800px;
+                padding: 0 40px 100px;
+            }
+            /* onboarding + logged-out: no sidebar */
+            body.pre-app .drawer { display: none; }
+            pre.chart { font-size: 17px; }
+            .row { padding: 15px 2px; }
+            .row:hover .row-title { color: var(--accent); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+
+<nav class="drawer" id="drawer">
+    <div class="wordmark">Chord.ph</div>
+    <div class="drawer-sub" id="drawer-sub"></div>
+    <div class="drawer-nav">
+        <button class="tap" id="nav-songs" onclick="go('songs')">Songs</button>
+        <button class="tap" id="nav-favorites" onclick="go('favorites')">Favorites</button>
+        <button class="tap" id="nav-setlists" onclick="go('setlists')">Setlists</button>
+        <hr class="drawer-hr">
+        <button class="tap" onclick="location.href='/analyzer/'">Key &amp; BPM Analyzer</button>
+        <button class="tap" onclick="openSettings()">Settings</button>
+    </div>
+    <div class="drawer-foot">Your chords. Your key. Your music.</div>
+</nav>
+
+<div id="view-onboarding">
+    <div class="wordmark">Chord.ph</div>
+    <div class="ob-tagline">Your chords. Your key. Your music.</div>
+    <div class="ob-label">What do you play?</div>
+    <div class="chip-row" id="ob-instruments"></div>
+    <div class="ob-label">What should we call you?</div>
+    <input class="field" id="ob-name" placeholder="Your name" autocomplete="off">
+    <button class="tap primary big" id="ob-go" onclick="finishOnboarding()">Let's play &rarr;</button>
+</div>
+
+<div class="view" id="view-songs">
+    <div class="wrap">
+        <div class="bar">
+            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()">&#9776;</button></span>
+            <span class="wordmark">Chord.ph</span>
+            <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()">+</button></span>
+        </div>
+        <input class="search" id="search" placeholder="Search songs&hellip;" oninput="renderSongList()" autocomplete="off">
+        <div id="song-list"></div>
+    </div>
+</div>
+
+<div class="view" id="view-favorites">
+    <div class="wrap">
+        <div class="bar">
+            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()">&#9776;</button></span>
+            <span class="wordmark">Favorites</span>
+            <span class="bar-side right"></span>
+        </div>
+        <div id="favorites-list"></div>
+    </div>
+</div>
+
+<div class="view" id="view-setlists">
+    <div class="wrap">
+        <div class="bar">
+            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()">&#9776;</button></span>
+            <span class="wordmark">Setlists</span>
+            <span class="bar-side right"><button class="tap glyph" onclick="openNewSetlistSheet()">+</button></span>
+        </div>
+        <div id="setlists-list"></div>
+    </div>
+</div>
+
+<div class="view" id="view-setlist">
+    <div class="wrap">
+        <div class="bar">
+            <span class="bar-side"><button class="tap" onclick="go('setlists')">&lsaquo; Setlists</button></span>
+            <span></span>
+            <span class="bar-side right">
+                <button class="tap" id="setlist-edit-btn" onclick="toggleSetlistEdit()">Edit</button>
+            </span>
+        </div>
+        <div class="chart-head">
+            <div class="chart-title" id="setlist-name"></div>
+            <div class="chart-meta" id="setlist-count"></div>
+        </div>
+        <div style="padding:10px 0 0;">
+            <button class="tap primary" onclick="openAddToSetlistSheet()">+ Add song</button>
+        </div>
+        <div id="setlist-songs"></div>
+    </div>
+</div>
+
+<div class="view" id="view-chart">
+    <div class="wrap">
+        <div class="bar">
+            <span class="bar-side"><button class="tap" id="chart-back" onclick="chartBack()">&lsaquo; Songs</button></span>
+            <span style="display:flex;gap:14px;">
+                <button class="tap" id="chart-prev" onclick="setlistStep(-1)" style="display:none;">&larr;</button>
+                <button class="tap" id="chart-next" onclick="setlistStep(1)" style="display:none;">&rarr;</button>
+            </span>
+            <span class="bar-side right">
+                <button class="tap" id="chart-edit" onclick="openSongSheet(currentSongId)" style="display:none;">Edit</button>
+                <button class="tap glyph star-toggle" id="chart-star" onclick="toggleFav(currentSongId); renderChart();">&#9734;</button>
+            </span>
+        </div>
+        <div class="chart-head">
+            <div class="chart-title" id="chart-title"></div>
+            <div class="chart-meta" id="chart-meta"></div>
+        </div>
+
+        <div class="controls" id="chart-controls">
+            <button class="tap" id="ctl-transpose" onclick="toggleLayer('transpose')">Transpose</button>
+            <button class="tap" id="ctl-capo" onclick="toggleLayer('capo')">Capo</button>
+            <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
+            <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
+        </div>
+
+        <div class="layer" id="layer-transpose">
+            <button class="tap glyph" onclick="transposeBy(-1)">&minus;</button>
+            <span class="val" id="transpose-val">0</span>
+            <button class="tap glyph" onclick="transposeBy(1)">+</button>
+            <span class="lbl">&nbsp;</span>
+            <button class="tap" id="notation-sharp" onclick="setNotation(false)">&#9839;</button>
+            <button class="tap" id="notation-flat" onclick="setNotation(true)">&#9837;</button>
+            <span class="lbl">&nbsp;</span>
+            <button class="tap" onclick="resetTranspose()">Reset</button>
+        </div>
+
+        <div class="layer" id="layer-capo"></div>
+
+        <div class="layer" id="layer-text">
+            <button class="tap glyph" onclick="fontBy(-2)">A&minus;</button>
+            <span class="val" id="font-val">16</span>
+            <button class="tap glyph" onclick="fontBy(2)">A+</button>
+        </div>
+
+        <div class="layer" id="layer-scroll">
+            <button class="tap primary" id="scroll-toggle" onclick="toggleScroll()">&#9654; Play</button>
+            <span class="lbl">speed</span>
+            <button class="tap glyph" onclick="scrollSpeedBy(-1)">&minus;</button>
+            <span class="val" id="scroll-val">3</span>
+            <button class="tap glyph" onclick="scrollSpeedBy(1)">+</button>
+        </div>
+
+        <pre class="chart" id="chart-body"></pre>
+        <div id="medley-blocks"></div>
+        <div style="padding: 6px 0 20px;">
+            <button class="tap" onclick="openMedleySheet()">+ Medley</button>
+        </div>
+    </div>
+</div>
+
+<div class="sheet-scrim" id="sheet-scrim" onclick="if (event.target === this) closeSheet()">
+    <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+/* =========================================================
+   MUSIC ENGINE (carried over, battle-tested)
+   ========================================================= */
+var SHARPS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+var FLATS  = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+var CAPO_SHAPES = [
+    { shape: 'E', index: 4 }, { shape: 'D', index: 2 }, { shape: 'C', index: 0 },
+    { shape: 'A', index: 9 }, { shape: 'G', index: 7 }
+];
+var INSTRUMENTS = ['Lead Guitar', 'Rhythm Guitar', 'Bass', 'Keyboard', 'Drums', 'Vocalist'];
+var INSTRUMENT_VIEWS = {
+    'Lead Guitar': 'guitarist', 'Rhythm Guitar': 'guitarist', 'Bass': 'bassist',
+    'Keyboard': 'keys', 'Drums': 'drummer', 'Vocalist': 'vocalist'
+};
+
+function getNoteIndex(note) {
+    var idx = SHARPS.indexOf(note);
+    if (idx !== -1) return idx;
+    return FLATS.indexOf(note);
+}
+function noteName(index) { return state.useFlats ? FLATS[index] : SHARPS[index]; }
+function transposeNoteBySteps(noteStr, steps) {
+    var baseIndex = getNoteIndex(noteStr);
+    if (baseIndex === -1) return noteStr;
+    return noteName((baseIndex + steps + 120) % 12);
+}
+function transposeChordText(text, steps) {
+    return text.replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
+        function(match, root, quality, slashFull, bassNote) {
+            var transposedRoot = transposeNoteBySteps(root, steps);
+            var transposedBass = bassNote ? '/' + transposeNoteBySteps(bassNote, steps) : '';
+            return transposedRoot + (quality || '') + transposedBass;
+        });
+}
+function getStepsToReach(fromKey, toKeyNote) {
+    var fromIndex = getNoteIndex(fromKey);
+    var toIndex = getNoteIndex(toKeyNote);
+    if (fromIndex === -1 || toIndex === -1) return 0;
+    return (toIndex - fromIndex + 12) % 12;
+}
+
+function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function isChordLine(line) {
+    var tokens = line.trim().split(/\s+/).filter(Boolean);
+    if (!tokens.length) return false;
+    var chordRe = /^\(?[A-G][b#]?(?:m|maj|min|sus|add|dim|aug|[0-9])*(?:\/[A-G][b#]?)?\)?[,.]?$/;
+    var hits = 0;
+    tokens.forEach(function(t) {
+        if (chordRe.test(t) || t === '|' || t === '-' || t === 'N.C.' || t === 'x2' || t === 'x4') hits++;
+    });
+    return hits / tokens.length >= 0.7;
+}
+function formatChart(text) {
+    return text.split('\n').map(function(line) {
+        var e = esc(line);
+        if (/^\s*\[.*\]\s*$/.test(line)) return '<span class="sec-head">' + e + '</span>';
+        if (isChordLine(line)) return '<span class="chord-line">' + e + '</span>';
+        return e;
+    }).join('\n');
+}
+
+/* =========================================================
+   BUILT-IN LIBRARY (ids are permanent — never renumber)
+   ========================================================= */
+var BUILTIN_IDS = ['glorious','way-maker','presence','lilim','heart-of-worship','take-it-all','god-is-here','lead-me-to-the-cross','oceans','endless-praise','this-is-our-time','turn-it-up','dance'];
+var BUILTINS = [
+    { id: 'glorious', title: "Glorious", artist: "Victory Worship", key: "G", tempo: 72, feel: "Moderate Worship",
+      chart: "[Intro]\nG  D  Em  C\n\n[Verse 1]\nG              D\nYou are glorious, Lord\nEm             C\nWorthy of all praise\n\n[Chorus]\nG         D\nGlorious, glorious\nEm        C\nYou are glorious" },
+    { id: 'way-maker', title: "Way Maker", artist: "Sinach", key: "B", tempo: 68, feel: "Slow Worship",
+      chart: "[Intro]\nB  F#  G#m  E\n\n[Verse 1]\nB                F#\nYou are the way maker\nG#m              E\nMiracle worker, promise keeper\n\n[Chorus]\nB          F#\nWay maker, miracle worker\nG#m        E\nThat is who you are" },
+    { id: 'presence', title: "Presence", artist: "His Life Music", key: "A", tempo: 65, feel: "Slow Worship",
+      chart: "[Intro]\nA  E  F#m  D\n\n[Verse 1]\nA              E\nIn your presence Lord\nF#m            D\nI find everything I need\n\n[Chorus]\nA         E\nYour presence, your presence\nF#m       D\nIs all I need" },
+    { id: 'lilim', title: "Lilim", artist: "Victory Worship", key: "E", tempo: 70, feel: "Slow Worship",
+      chart: "[Intro]\nE  G#m  A  C#m  B\n\n[Verse 1]\nE           G#m       A\nPanginoon ang nais ko\nC#m        B        E\nKagandahan Mo ay pagmasdan\nG#m              A\nAng pag-ibig Mo saki'y tugon\nC#m       B      F#m\nKailanma'y 'di pababayaan\n\n[Pre-Chorus]\nG#m      A      F#m\nSa 'Yo lamang matatagpuan\nG#m      A      B\nSa 'Yo lamang\n\n[Chorus]\nE          G#m\nMananatili sa Iyong lilim\nA          C#m       B\nAt sasambahin ka sa dakong lihim\nE          G#m\nMananatili sa Iyong lilim\nA          C#m       B\nNang masumpungan ka sa dakong lihim\n\n[Bridge]\nA       B       C#m\nAng pagpuri ko ay tanging sa 'Yo\nE     G#m    A\nSa 'Yo lamang iniaalay\nB       C#m\nO Panginoon ang puso ko'y\nE\nSa 'Yo magpakailanman" },
+    { id: 'heart-of-worship', title: "Heart of Worship", artist: "Matt Redman", key: "D", tempo: 74, feel: "Slow Worship",
+      chart: "[Verse 1]\nD              A\nWhen the music fades\nEm                  A\nAll is stripped away and I simply come\nD              A\nLonging just to bring\nEm             A\nSomething that's of worth that will bless Your heart\n\n[Pre-Chorus]\nEm      D       A\nI'll bring You more than a song\nEm      D       A\nFor a song in itself is not what You have required\n\n[Chorus]\nD              A\nI'm coming back to the heart of worship\nEm             G    A    D\nAnd it's all about You it's all about You Jesus\nD              A\nI'm sorry Lord for the thing I've made it\nEm             G    A    D\nWhen it's all about You all about You Jesus\n\n[Verse 2]\nD              A\nKing of endless worth\nEm                  A\nNo one could express how much You deserve\nD              A\nThough I'm weak and poor\nEm             A\nAll I have is Yours every single breath" },
+    { id: 'take-it-all', title: "Take It All", artist: "Hillsong Worship", key: "B", tempo: 140, feel: "Upbeat Praise",
+      chart: "[Intro]\nB\n\n[Verse 1]\nB\nSearching the world the lost will be found\nIn freedom we live as one we cry out\nYou carried the cross You died and rose again\nMy God I'll only ever give my all\n\n[Verse 2]\nB                    G#m\nYou sent Your Son from heaven to earth\n                     E\nYou delivered us all it's eternally heard\nB\nI searched for truth and all I found was You\nMy God I'll only ever give my all\n\n[Chorus]\nB           F#\nJesus we're livin' for Your name\nG#m              E\nWe'll never be ashamed of You\nB           F#\nOur praise and all we are today\nC#m\nTake take take it all take take take it all\n\n[Bridge]\nC#m   G#m   F#   E\nRunning to the One who heals the blind\nC#m   G#m   F#\nFollowing the shining light\nC#m   G#m   F#   E\nIn Your hands the power to save the world\nB\nAnd my life" },
+    { id: 'god-is-here', title: "God Is Here", artist: "Darlene Zschech", key: "D", tempo: 80, feel: "Moderate Worship",
+      chart: "[Intro]\nD\n\n[Verse 1]\nD       G    D\nOpen our eyes Lord we want to see You\nA       G    Em\nOpen our hearts Lord we want to know You\nD       G    D\nOpen our ears Lord we need to hear You\nA       G    D\nJesus be revealed Jesus be revealed\n\n[Chorus]\nD    A    Bm   D\nGod is here God is here God is here He is able\nD    G    Bm   A\nWe draw near to see Jesus face to face\nD    A    Bm   D\nGod is here God is here God is here He is faithful\nF#m  Bm   G    D\nWe draw near to see Jesus Oh Jesus be revealed\n\n[Verse 2]\nD       G    D\nOpen the gates Lord reveal Your glory\nA       G    Em\nOpen the nations establish Your Kingdom\nD       G    D\nOpen the Heavens pour out Your Spirit\nA       G    D\nJesus be revealed Jesus be revealed\n\n[Bridge]\nG    Bm\nHoly we cry holy\nEm   G    A\nHallelujah God is here\nG    Bm\nHoly we cry holy\nEm   D\nHallelujah God is here" },
+    { id: 'lead-me-to-the-cross', title: "Lead Me to the Cross", artist: "Hillsong United", key: "D", tempo: 70, feel: "Slow Worship",
+      chart: "[Intro]\nBm  A  G  D  A\n\n[Verse 1]\nBm    A      G\nSavior I come quiet my soul\nD       A\nRemember redemption's hill\nBm    A      G\nWhere Your blood was spilled\nD       A\nFor my ransom\n\n[Pre-Chorus]\nEm        A\nEverything I once held dear\nBm    A      G\nI count it all as loss\n\n[Chorus]\nG       D    A\nLead me to the cross where Your love poured out\nG       D    A\nBring me to my knees Lord I lay me down\nBm    G       D    A\nRid me of myself I belong to You\nEm\nOh lead me\nG    A    Bm\nLead me to the cross\n\n[Verse 2]\nBm    A      G\nYou were as I tempted and tried human\nD       A\nThe Word became flesh\nBm    A      G\nBore my sin and death\nD       A\nNow You're risen\n\n[Bridge]\nD    G    A\nTo Your heart\nD    G    A\nTo Your heart\nD    G    A\nLead me to Your heart\nD    G    A\nLead me to Your heart" },
+    { id: 'oceans', title: "Oceans", artist: "Hillsong United", key: "D", tempo: 71, feel: "Slow Worship",
+      chart: "[Intro]\nBm  A  D  A  G\n\n[Verse 1]\nBm      A       D\nYou call me out upon the waters\nA              G\nThe great unknown where feet may fail\nBm      A       D\nAnd there I find You in the mystery\nA              G\nIn oceans deep my faith will stand\n\n[Chorus]\nG       D    A\nI will call upon Your Name\nG       D    A\nAnd keep my eyes above the waves\nBm   G\nWhen oceans rise\nD       A\nMy soul will rest in Your embrace\nG    A    Bm\nFor I am Yours and You are mine\n\n[Verse 2]\nBm      A       D\nYour grace abounds in deepest waters\nA              G\nYour sovereign hand will be my guide\nBm      A       D\nWhere feet may fail and fear surrounds me\nA              G\nYou've never failed and You won't start now\n\n[Bridge]\nBm          G\nSpirit lead me where my trust is without borders\nD\nLet me walk upon the waters\nA\nWherever You would call me\nBm          G\nTake me deeper than my feet could ever wander\nD\nAnd my faith will be made stronger\nA\nIn the presence of my Saviour" },
+    { id: 'endless-praise', title: "Endless Praise", artist: "Planetshakers", key: "D", tempo: 130, feel: "Upbeat Praise",
+      chart: "[Intro]\nBm  D  A  G\n\n[Verse 1]\nBm      D    A      G\nYou are God and we lift You up\nBm      D    A      G\nWe keep singing we keep praising\nBm      D    A      G\nWe won't stop giving all we got\nBm      D    A      G\nCause You're worthy of all glory\n\n[Pre-Chorus]\nA    Bm   G    D\nOh there is no other You are forever Lord over all\nBm   G    D\nThere's nobody like You no one beside You\n\n[Chorus]\nD    G    A    Bm\nTo You let endless praise resound\nD    G    A    D\nEvery night and day and with no delay\nD    G    A    D\nLet endless praise resound\n\n[Bridge]\nG\nWe lift You up up up\nBm\nWe are giving You our love love love\nG\nFor everything You've done done done\nBm\nWe give You all the praise" },
+    { id: 'this-is-our-time', title: "This Is Our Time", artist: "Planetshakers", key: "D", tempo: 130, feel: "Upbeat Praise",
+      chart: "[Hook]\nA  E  F#m  D\n\n[Verse]\nF#m\nHere and now making loud at the top of our lungs\nThere's a sound breaking out Lord for all that you've done\n\n[Pre-Chorus]\nA         E\nAnd now we're turning our\nD\nTurning our hearts to You\nA         E\nAnd no we'll never stop\nD\nNever stop loving You\n\n[Chorus]\nA    E    F#m  D\nThis is our time this is our season\nA    E    F#m  D\nWe lift our voice we give You all the glory\nA    E    F#m  D\nEvery heart and every nation\nA    E    F#m  D\nWe are Yours forever\n\n[Bridge]\nF#m  E    A    D\nWe are the generation that will seek Your face\nF#m  E    A    D\nWe are the generation we will take our place" },
+    { id: 'turn-it-up', title: "Turn It Up", artist: "Planetshakers", key: "E", tempo: 126, feel: "Upbeat Praise",
+      chart: "[Intro]\nE  A  C#m  B\n\n[Verse 1]\nE       A      C#m   B\nYou are here as we lift You up\nE       B\nYou are riding on our praise\nE       A      C#m   B\nBe enthroned over everything\nE       B\nYou are seated in our praise\n\n[Pre-Chorus]\nC#m          B\nThis is prophetic I can feel it in the air\nA                    B\nWe lift our praise and You change the atmosphere\nC#m          B\nWith hearts open now everybody singing out\nA\nI am free\n\n[Chorus]\nE       B\nTurn it up this sound of praise\nA\nMake it louder than any other\nE       B    C#m  A  B\nLift Him up and shout His name over all\n\n[Verse 2]\nE       A      C#m   B\nAs we praise I can feel the change\nE       B\nAs Your presence now invades\nE       A      C#m   B\nHear the sound of the broken chains\nE       B\nPrison doors are giving way\n\n[Bridge]\nE\nOur praise goes up\nA\nYour rain comes down\nC#m      B    E    A\nWith shouts of praise we celebrate\nC#m      B\nYou are riding on our praise\nA\nOh Lord" },
+    { id: 'dance', title: "Dance", artist: "Planetshakers", key: "E", tempo: 128, feel: "Upbeat Praise",
+      chart: "[Intro]\nC#m  B  E  A\n\n[Verse 1]\nC#m  B    E     A\nI'm alive cause Jesus gave me life\nC#m  B    E     A\nHe opened up my eyes\nC#m  B    E     A\nI can see clearly now\n\n[Pre-Chorus]\nC#m  B    E     A\nOh everybody dance now oh\n\n[Chorus]\nC#m  B    E     A\nEverybody give it up for Jesus\nC#m  B    E     A\nGive Him glory for He has redeemed us\nC#m  B    E     A\nEverybody give it up for Jesus\nC#m  B    E     A\nPraise His Name\n\n[Verse 2]\nC#m  B    E     A\nMy desire is to lift You higher\nC#m  B    E     A\nIt's only burning brighter\nC#m  B    E     A\nThis passion inside of me\n\n[Bridge]\nC#m  B    E     A\nThis praise is bursting out\nC#m  B    E     A\nI can't contain it now\nC#m  B    E     A\nThis praise is bursting out\nC#m  B\nOut out out" }
+];
+
+/* =========================================================
+   STATE + STORAGE (id-based, v2 namespace)
+   ========================================================= */
+var state = {
+    profile: null,              // { name, instrument }
+    customs: [],                // custom songs [{id:'c...', ...}]
+    favorites: [],              // [songId]
+    setlists: [],               // [{id, name, songIds:[]}]
+    transpose: {},              // { songId: steps }
+    fontSize: 16,
+    useFlats: false,
+    view: 'songs',
+    chartFrom: 'songs',         // where Back returns to
+    currentSetlistId: null,
+    setlistPos: 0,
+    setlistEdit: false,
+    medley: [],                 // [{songId, keyOption}]
+    openLayer: null,
+    scroll: { playing: false, speed: 3, raf: null }
+};
+var currentSongId = null;
+
+function save() {
+    localStorage.setItem('chordph2_profile', JSON.stringify(state.profile));
+    localStorage.setItem('chordph2_customs', JSON.stringify(state.customs));
+    localStorage.setItem('chordph2_favorites', JSON.stringify(state.favorites));
+    localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
+    localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats }));
+}
+function load() {
+    try {
+        state.profile = JSON.parse(localStorage.getItem('chordph2_profile') || 'null');
+        state.customs = JSON.parse(localStorage.getItem('chordph2_customs') || '[]');
+        state.favorites = JSON.parse(localStorage.getItem('chordph2_favorites') || '[]');
+        state.setlists = JSON.parse(localStorage.getItem('chordph2_setlists') || '[]');
+        state.transpose = JSON.parse(localStorage.getItem('chordph2_transpose') || '{}');
+        var s = JSON.parse(localStorage.getItem('chordph2_settings') || '{}');
+        if (s.fontSize) state.fontSize = s.fontSize;
+        if (s.useFlats) state.useFlats = s.useFlats;
+    } catch (e) { console.warn('load failed', e); }
+}
+
+/* One-time migration from the index-based v1 (worshipapp_*) data */
+function migrate() {
+    if (localStorage.getItem('chordph2_migrated')) return;
+    try {
+        var oldMus = JSON.parse(localStorage.getItem('worshipapp_musician') || 'null');
+        var oldCustoms = JSON.parse(localStorage.getItem('worshipapp_custom_songs') || '[]');
+        var oldFavs = JSON.parse(localStorage.getItem('worshipapp_favorites') || '[]');
+        var oldSetlists = JSON.parse(localStorage.getItem('worshipapp_setlists') || '[]');
+        var oldSteps = JSON.parse(localStorage.getItem('worshipapp_song_settings') || '{}');
+        var oldFont = localStorage.getItem('worshipapp_fontsize');
+
+        // v1 song index -> v2 id (customs were appended after the 13 builtins,
+        // in stored order, INCLUDING soft-deleted ones)
+        function idForIndex(i) {
+            i = parseInt(i, 10);
+            if (i >= 0 && i < BUILTIN_IDS.length) return BUILTIN_IDS[i];
+            var c = oldCustoms[i - BUILTIN_IDS.length];
+            if (c && !c.deleted) return 'c' + c.id;
+            return null;
+        }
+
+        if (oldMus && oldMus.name) state.profile = { name: oldMus.name, instrument: oldMus.instrument || 'Vocalist' };
+        state.customs = oldCustoms.filter(function(c) { return !c.deleted; }).map(function(c) {
+            return { id: 'c' + c.id, title: c.title, artist: c.artist, key: c.key,
+                     tempo: c.tempo || 0, feel: c.feel || '', chart: c.chart, custom: true };
+        });
+        state.favorites = oldFavs.map(idForIndex).filter(Boolean);
+        state.setlists = oldSetlists.map(function(sl, n) {
+            return { id: 's' + (Date.now() + n), name: sl.name, songIds: (sl.songs || []).map(idForIndex).filter(Boolean) };
+        });
+        Object.keys(oldSteps).forEach(function(k) {
+            var id = idForIndex(k);
+            if (id && oldSteps[k]) state.transpose[id] = oldSteps[k];
+        });
+        if (oldFont) state.fontSize = parseInt(oldFont, 10) || 16;
+        save();
+    } catch (e) { console.warn('migration failed', e); }
+    localStorage.setItem('chordph2_migrated', '1');
+}
+
+/* =========================================================
+   SONG ACCESS
+   ========================================================= */
+function allSongs() { return BUILTINS.concat(state.customs); }
+function songById(id) {
+    for (var i = 0; i < BUILTINS.length; i++) if (BUILTINS[i].id === id) return BUILTINS[i];
+    for (var j = 0; j < state.customs.length; j++) if (state.customs[j].id === id) return state.customs[j];
+    return null;
+}
+function currentKeyIndex(song) {
+    return (getNoteIndex(song.key) + (state.transpose[song.id] || 0) + 120) % 12;
+}
+function isFav(id) { return state.favorites.indexOf(id) !== -1; }
+function toggleFav(id) {
+    var p = state.favorites.indexOf(id);
+    if (p === -1) state.favorites.push(id); else state.favorites.splice(p, 1);
+    save();
+    if (state.view === 'songs') renderSongList();
+    if (state.view === 'favorites') renderFavorites();
+}
+
+/* =========================================================
+   VIEWS + NAV
+   ========================================================= */
+function show(viewId) {
+    stopScroll();
+    document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+    document.getElementById('view-' + viewId).classList.add('active');
+    window.scrollTo(0, 0);
+}
+function go(view) {
+    closeDrawer();
+    document.body.classList.remove('pre-app');
+    state.view = view;
+    document.getElementById('drawer-sub').textContent =
+        state.profile ? state.profile.name + ' · ' + state.profile.instrument : '';
+    ['songs', 'favorites', 'setlists'].forEach(function(v) {
+        var el = document.getElementById('nav-' + v);
+        if (el) el.classList.toggle('on', v === view);
+    });
+    if (view === 'songs') { renderSongList(); show('songs'); }
+    if (view === 'favorites') { renderFavorites(); show('favorites'); }
+    if (view === 'setlists') { state.setlistEdit = false; renderSetlists(); show('setlists'); }
+}
+function openDrawer() {
+    document.getElementById('drawer').classList.add('open');
+    document.getElementById('scrim').classList.add('open');
+    document.getElementById('drawer-sub').textContent = state.profile ? state.profile.name + ' · ' + state.profile.instrument : '';
+}
+function closeDrawer() {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('scrim').classList.remove('open');
+}
+
+/* =========================================================
+   SONG LIST / FAVORITES
+   ========================================================= */
+function songRow(song, opts) {
+    opts = opts || {};
+    var row = document.createElement('div');
+    row.className = 'row';
+    var main = document.createElement('div');
+    main.className = 'row-main';
+    var t = document.createElement('div');
+    t.className = 'row-title';
+    t.textContent = song.title;
+    var sub = document.createElement('div');
+    sub.className = 'row-sub';
+    sub.innerHTML = esc(song.artist) + ' &middot; <span class="key">' + esc(noteName(currentKeyIndex(song))) + '</span>';
+    main.appendChild(t); main.appendChild(sub);
+    row.appendChild(main);
+    if (opts.action) {
+        var act = document.createElement('button');
+        act.className = 'row-action';
+        act.textContent = opts.action;
+        act.onclick = function(e) { e.stopPropagation(); opts.onAction(song); };
+        row.appendChild(act);
+    } else {
+        var star = document.createElement('button');
+        star.className = 'star' + (isFav(song.id) ? ' on' : '');
+        star.innerHTML = isFav(song.id) ? '&#9733;' : '&#9734;';
+        star.onclick = function(e) { e.stopPropagation(); toggleFav(song.id); };
+        row.appendChild(star);
+    }
+    row.onclick = function() { if (opts.onOpen) opts.onOpen(song); else openChart(song.id, 'songs'); };
+    return row;
+}
+
+function renderSongList() {
+    var q = (document.getElementById('search').value || '').toLowerCase();
+    var box = document.getElementById('song-list');
+    box.innerHTML = '';
+    var list = allSongs().filter(function(s) {
+        return !q || s.title.toLowerCase().indexOf(q) !== -1 || s.artist.toLowerCase().indexOf(q) !== -1;
+    });
+    if (!list.length) {
+        box.innerHTML = '<div class="empty">No songs match.</div>';
+        return;
+    }
+    list.forEach(function(s) { box.appendChild(songRow(s)); });
+}
+
+function renderFavorites() {
+    var box = document.getElementById('favorites-list');
+    box.innerHTML = '';
+    var list = state.favorites.map(songById).filter(Boolean);
+    if (!list.length) {
+        box.innerHTML = '<div class="empty">No favorites yet.<br>Tap the &#9734; on any song.</div>';
+        return;
+    }
+    list.forEach(function(s) {
+        box.appendChild(songRow(s, { onOpen: function(song) { openChart(song.id, 'favorites'); } }));
+    });
+}
+
+/* =========================================================
+   CHART VIEW
+   ========================================================= */
+function openChart(songId, from) {
+    currentSongId = songId;
+    state.chartFrom = from || 'songs';
+    state.medley = [];
+    state.openLayer = null;
+    renderChart();
+    show('chart');
+}
+function chartBack() {
+    if (state.chartFrom === 'setlist') { openSetlist(state.currentSetlistId); }
+    else go(state.chartFrom);
+}
+function viewFor() { return INSTRUMENT_VIEWS[state.profile ? state.profile.instrument : 'Vocalist'] || 'vocalist'; }
+
+function renderChart() {
+    var song = songById(currentSongId);
+    if (!song) { go('songs'); return; }
+    var steps = state.transpose[song.id] || 0;
+    var keyIdx = currentKeyIndex(song);
+    var view = viewFor();
+
+    document.getElementById('chart-back').innerHTML =
+        state.chartFrom === 'setlist' ? '&lsaquo; Setlist' :
+        state.chartFrom === 'favorites' ? '&lsaquo; Favorites' : '&lsaquo; Songs';
+    document.getElementById('chart-title').textContent = song.title;
+    var meta = esc(song.artist) + ' &middot; Key of <span class="key" onclick="toggleLayer(\'transpose\')">' + esc(noteName(keyIdx)) + '</span>';
+    if (song.tempo) meta += ' &middot; ' + song.tempo + ' BPM';
+    document.getElementById('chart-meta').innerHTML = meta;
+
+    var star = document.getElementById('chart-star');
+    star.innerHTML = isFav(song.id) ? '&#9733;' : '&#9734;';
+    star.style.color = isFav(song.id) ? 'var(--gold)' : '';
+    document.getElementById('chart-edit').style.display = song.custom ? 'inline-block' : 'none';
+
+    // setlist prev/next
+    var inSetlist = state.chartFrom === 'setlist';
+    var prev = document.getElementById('chart-prev'), next = document.getElementById('chart-next');
+    prev.style.display = next.style.display = inSetlist ? 'inline-block' : 'none';
+    if (inSetlist) {
+        var sl = setlistById(state.currentSetlistId);
+        prev.disabled = state.setlistPos <= 0;
+        next.disabled = !sl || state.setlistPos >= sl.songIds.length - 1;
+    }
+
+    // controls: capo only for guitarists
+    document.getElementById('ctl-capo').style.display = view === 'guitarist' ? 'inline-block' : 'none';
+    if (view !== 'guitarist' && state.openLayer === 'capo') state.openLayer = null;
+
+    // layers
+    document.getElementById('transpose-val').textContent = steps === 0 ? '0' : (steps > 0 ? '+' + steps : steps);
+    document.getElementById('notation-sharp').classList.toggle('on', !state.useFlats);
+    document.getElementById('notation-flat').classList.toggle('on', state.useFlats);
+    document.getElementById('font-val').textContent = state.fontSize;
+    document.getElementById('scroll-val').textContent = state.scroll.speed;
+    renderCapoLayer(song, keyIdx);
+    ['transpose', 'capo', 'text', 'scroll'].forEach(function(l) {
+        document.getElementById('layer-' + l).classList.toggle('open', state.openLayer === l);
+        document.getElementById('ctl-' + l).classList.toggle('on', state.openLayer === l);
+    });
+
+    // body
+    var body = document.getElementById('chart-body');
+    body.style.fontSize = state.fontSize + 'px';
+    if (view === 'drummer') {
+        body.innerHTML = formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo ? song.tempo + ' BPM' : '—') + '\n\n' + song.chart);
+    } else {
+        body.innerHTML = formatChart(transposeChordText(song.chart, steps));
+    }
+    renderMedley(song, keyIdx);
+}
+
+function renderCapoLayer(song, keyIdx) {
+    var layer = document.getElementById('layer-capo');
+    layer.innerHTML = '';
+    CAPO_SHAPES.forEach(function(item) {
+        var capoFret = (keyIdx - item.index + 12) % 12;
+        var stepsToShape = (item.index - getNoteIndex(song.key) + 12) % 12;
+        var isActive = (state.transpose[song.id] || 0) === stepsToShape && capoFret !== 0;
+        var b = document.createElement('button');
+        b.className = 'tap capo-opt' + (isActive ? ' on' : '');
+        b.innerHTML = '<b>' + item.shape + '</b> <span>capo ' + (capoFret === 0 ? '–' : capoFret) + '</span>';
+        b.onclick = function() {
+            state.transpose[song.id] = capoFret === 0 ? 0 : stepsToShape;
+            save(); renderChart();
+        };
+        layer.appendChild(b);
+    });
+}
+
+function toggleLayer(name) {
+    state.openLayer = state.openLayer === name ? null : name;
+    renderChart();
+}
+function transposeBy(d) {
+    state.transpose[currentSongId] = (state.transpose[currentSongId] || 0) + d;
+    save(); renderChart();
+}
+function resetTranspose() {
+    state.transpose[currentSongId] = 0;
+    save(); renderChart();
+}
+function setNotation(flats) {
+    state.useFlats = flats;
+    save(); renderChart();
+}
+function fontBy(d) {
+    state.fontSize = Math.max(12, Math.min(28, state.fontSize + d));
+    save(); renderChart();
+}
+
+/* ---- autoscroll ---- */
+function toggleScroll() {
+    if (state.scroll.playing) stopScroll();
+    else {
+        state.scroll.playing = true;
+        document.getElementById('scroll-toggle').innerHTML = '&#10074;&#10074; Pause';
+        var acc = 0;
+        function step() {
+            if (!state.scroll.playing) return;
+            acc += state.scroll.speed * 0.35;
+            if (acc >= 1) {
+                var px = Math.floor(acc); acc -= px;
+                window.scrollBy(0, px);
+                if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2) { stopScroll(); return; }
+            }
+            state.scroll.raf = requestAnimationFrame(step);
+        }
+        state.scroll.raf = requestAnimationFrame(step);
+    }
+}
+function stopScroll() {
+    state.scroll.playing = false;
+    if (state.scroll.raf) cancelAnimationFrame(state.scroll.raf);
+    var b = document.getElementById('scroll-toggle');
+    if (b) b.innerHTML = '&#9654; Play';
+}
+function scrollSpeedBy(d) {
+    state.scroll.speed = Math.max(1, Math.min(8, state.scroll.speed + d));
+    document.getElementById('scroll-val').textContent = state.scroll.speed;
+}
+
+/* ---- medley ---- */
+function renderMedley(mainSong, keyIdx) {
+    var box = document.getElementById('medley-blocks');
+    box.innerHTML = '';
+    var view = viewFor();
+    state.medley.forEach(function(m, i) {
+        var song = songById(m.songId);
+        if (!song) return;
+        var steps = m.keyOption === 'match' ? getStepsToReach(song.key, noteName(keyIdx)) : 0;
+        var dispKey = noteName((getNoteIndex(song.key) + steps + 12) % 12);
+        var block = document.createElement('div');
+        block.className = 'medley-sep';
+        var head = document.createElement('div');
+        head.className = 'medley-head';
+        head.innerHTML = '<span class="medley-tag">&darr; Medley</span>';
+        var rm = document.createElement('button');
+        rm.className = 'tap danger';
+        rm.style.fontSize = '12px';
+        rm.textContent = 'Remove';
+        rm.onclick = function() { state.medley.splice(i, 1); renderChart(); };
+        head.appendChild(rm);
+        var title = document.createElement('div');
+        title.className = 'medley-title';
+        title.textContent = song.title;
+        var sub = document.createElement('div');
+        sub.className = 'medley-sub';
+        sub.textContent = song.artist + ' · Key of ' + dispKey + (m.keyOption === 'match' ? ' (matched)' : ' (original)');
+        var pre = document.createElement('pre');
+        pre.className = 'chart';
+        pre.style.fontSize = state.fontSize + 'px';
+        pre.innerHTML = view === 'drummer'
+            ? formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo || '—') + ' BPM\n\n' + song.chart)
+            : formatChart(transposeChordText(song.chart, steps));
+        block.appendChild(head); block.appendChild(title); block.appendChild(sub); block.appendChild(pre);
+        box.appendChild(block);
+    });
+}
+
+/* =========================================================
+   SETLISTS (id-based)
+   ========================================================= */
+function setlistById(id) {
+    for (var i = 0; i < state.setlists.length; i++) if (state.setlists[i].id === id) return state.setlists[i];
+    return null;
+}
+function renderSetlists() {
+    var box = document.getElementById('setlists-list');
+    box.innerHTML = '';
+    if (!state.setlists.length) {
+        box.innerHTML = '<div class="empty">No setlists yet.<br>Tap + to create one.</div>';
+        return;
+    }
+    state.setlists.forEach(function(sl) {
+        var row = document.createElement('div');
+        row.className = 'row';
+        var main = document.createElement('div');
+        main.className = 'row-main';
+        var t = document.createElement('div');
+        t.className = 'row-title';
+        t.textContent = sl.name;
+        var sub = document.createElement('div');
+        sub.className = 'row-sub';
+        var n = sl.songIds.filter(songById).length;
+        sub.textContent = n + ' song' + (n !== 1 ? 's' : '');
+        main.appendChild(t); main.appendChild(sub);
+        row.appendChild(main);
+        var del = document.createElement('button');
+        del.className = 'row-action';
+        del.textContent = 'Delete';
+        del.onclick = function(e) {
+            e.stopPropagation();
+            if (confirm('Delete "' + sl.name + '"?')) {
+                state.setlists = state.setlists.filter(function(x) { return x.id !== sl.id; });
+                save(); renderSetlists();
+            }
+        };
+        row.appendChild(del);
+        row.onclick = function() { openSetlist(sl.id); };
+        box.appendChild(row);
+    });
+}
+function openSetlist(id) {
+    state.currentSetlistId = id;
+    state.setlistEdit = false;
+    renderSetlistDetail();
+    show('setlist');
+}
+function renderSetlistDetail() {
+    var sl = setlistById(state.currentSetlistId);
+    if (!sl) { go('setlists'); return; }
+    document.getElementById('setlist-name').textContent = sl.name;
+    var valid = sl.songIds.map(songById).filter(Boolean);
+    document.getElementById('setlist-count').textContent = valid.length + ' song' + (valid.length !== 1 ? 's' : '');
+    document.getElementById('setlist-edit-btn').textContent = state.setlistEdit ? 'Done' : 'Edit';
+    document.getElementById('setlist-edit-btn').classList.toggle('on', state.setlistEdit);
+    var box = document.getElementById('setlist-songs');
+    box.innerHTML = '';
+    if (!valid.length) {
+        box.innerHTML = '<div class="empty">No songs yet — tap + Add song.</div>';
+        return;
+    }
+    sl.songIds.forEach(function(songId, pos) {
+        var song = songById(songId);
+        if (!song) return;
+        var opts = state.setlistEdit
+            ? { action: 'Remove', onAction: function() { sl.songIds.splice(pos, 1); save(); renderSetlistDetail(); } }
+            : { onOpen: function(s) { state.setlistPos = pos; openChart(s.id, 'setlist'); } };
+        box.appendChild(songRow(song, opts));
+    });
+}
+function toggleSetlistEdit() {
+    state.setlistEdit = !state.setlistEdit;
+    renderSetlistDetail();
+}
+function setlistStep(dir) {
+    var sl = setlistById(state.currentSetlistId);
+    if (!sl) return;
+    var pos = state.setlistPos + dir;
+    while (pos >= 0 && pos < sl.songIds.length && !songById(sl.songIds[pos])) pos += dir;
+    if (pos < 0 || pos >= sl.songIds.length) return;
+    state.setlistPos = pos;
+    openChart(sl.songIds[pos], 'setlist');
+}
+
+/* =========================================================
+   SHEETS (bottom-sheet modals)
+   ========================================================= */
+function openSheet(html) {
+    document.getElementById('sheet').innerHTML = html;
+    document.getElementById('sheet-scrim').classList.add('open');
+}
+function closeSheet() {
+    document.getElementById('sheet-scrim').classList.remove('open');
+}
+
+/* ---- new setlist ---- */
+function openNewSetlistSheet() {
+    openSheet(
+        '<div class="sheet-title">New setlist</div>' +
+        '<input class="field" id="sh-setlist-name" placeholder="Name — e.g. Sunday July 20" autocomplete="off">' +
+        '<div class="form-error" id="sh-setlist-err"></div>' +
+        '<div class="sheet-actions">' +
+        '<button class="tap" onclick="closeSheet()">Cancel</button>' +
+        '<button class="tap primary" onclick="createSetlist()">Create</button></div>'
+    );
+    document.getElementById('sh-setlist-name').focus();
+}
+function createSetlist() {
+    var name = document.getElementById('sh-setlist-name').value.trim();
+    var err = document.getElementById('sh-setlist-err');
+    if (!name) { err.textContent = 'Give it a name.'; err.style.display = 'block'; return; }
+    state.setlists.push({ id: 's' + Date.now(), name: name, songIds: [] });
+    save(); closeSheet(); renderSetlists();
+}
+
+/* ---- add song(s) to setlist ---- */
+function openAddToSetlistSheet() {
+    var sl = setlistById(state.currentSetlistId);
+    if (!sl) return;
+    var html = '<div class="sheet-title">Add to ' + esc(sl.name) + '</div>' +
+        '<input class="field" id="sh-add-search" placeholder="Search songs&hellip;" oninput="filterAddList()" autocomplete="off">' +
+        '<div id="sh-add-list"></div>' +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Done</button></div>';
+    openSheet(html);
+    renderAddList();
+}
+function renderAddList() {
+    var sl = setlistById(state.currentSetlistId);
+    var q = (document.getElementById('sh-add-search').value || '').toLowerCase();
+    var box = document.getElementById('sh-add-list');
+    box.innerHTML = '';
+    allSongs().filter(function(s) {
+        return !q || s.title.toLowerCase().indexOf(q) !== -1 || s.artist.toLowerCase().indexOf(q) !== -1;
+    }).forEach(function(s) {
+        var added = sl.songIds.indexOf(s.id) !== -1;
+        var row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = '<div class="row-main"><div class="row-title" style="font-weight:500;' + (added ? 'color:var(--faint);' : '') + '">' +
+            esc(s.title) + ' <span style="color:var(--faint);font-size:12px;">' + esc(s.key) + '</span></div></div>' +
+            '<span class="tap' + (added ? '' : ' primary') + '" style="font-size:13px;">' + (added ? 'Added ✓' : '+ Add') + '</span>';
+        if (!added) {
+            row.onclick = function() {
+                sl.songIds.push(s.id);
+                save(); renderAddList(); renderSetlistDetail();
+            };
+        }
+        box.appendChild(row);
+    });
+}
+function filterAddList() { renderAddList(); }
+
+/* ---- medley picker ---- */
+function openMedleySheet() {
+    var html = '<div class="sheet-title">Add to medley</div>' +
+        '<input class="field" id="sh-medley-search" placeholder="Search songs&hellip;" oninput="renderMedleyList()" autocomplete="off">' +
+        '<div class="chip-row">' +
+        '<button class="chip on" id="mk-same" onclick="medleyKeyOpt(\'same\')">Keep its key</button>' +
+        '<button class="chip" id="mk-match" onclick="medleyKeyOpt(\'match\')">Match current key</button></div>' +
+        '<div id="sh-medley-list"></div>' +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button></div>';
+    openSheet(html);
+    window.__medleyKeyOpt = 'same';
+    renderMedleyList();
+}
+function medleyKeyOpt(opt) {
+    window.__medleyKeyOpt = opt;
+    document.getElementById('mk-same').classList.toggle('on', opt === 'same');
+    document.getElementById('mk-match').classList.toggle('on', opt === 'match');
+}
+function renderMedleyList() {
+    var q = (document.getElementById('sh-medley-search').value || '').toLowerCase();
+    var box = document.getElementById('sh-medley-list');
+    box.innerHTML = '';
+    allSongs().filter(function(s) {
+        if (s.id === currentSongId) return false;
+        if (state.medley.some(function(m) { return m.songId === s.id; })) return false;
+        return !q || s.title.toLowerCase().indexOf(q) !== -1 || s.artist.toLowerCase().indexOf(q) !== -1;
+    }).forEach(function(s) {
+        var row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = '<div class="row-main"><div class="row-title" style="font-weight:500;">' + esc(s.title) +
+            ' <span style="color:var(--faint);font-size:12px;">' + esc(s.key) + '</span></div></div>';
+        row.onclick = function() {
+            state.medley.push({ songId: s.id, keyOption: window.__medleyKeyOpt });
+            closeSheet(); renderChart();
+        };
+        box.appendChild(row);
+    });
+}
+
+/* ---- add / edit song ---- */
+var editingSongId = null;
+function openSongSheet(songId) {
+    var song = songId ? songById(songId) : null;
+    if (song && !song.custom) return;
+    editingSongId = song ? song.id : null;
+    var keyOpts = SHARPS.map(function(k) {
+        return '<option' + (song && song.key === k ? ' selected' : '') + '>' + k + '</option>';
+    }).join('');
+    var feels = ['Slow Worship', 'Moderate Worship', 'Upbeat Praise', 'Hymn', 'Contemporary'].map(function(f) {
+        return '<option' + (song && song.feel === f ? ' selected' : '') + '>' + f + '</option>';
+    }).join('');
+    openSheet(
+        '<div class="sheet-title">' + (song ? 'Edit song' : 'Add song') + '</div>' +
+        '<input class="field" id="sh-song-title" placeholder="Song title *" value="' + (song ? esc(song.title) : '') + '" autocomplete="off">' +
+        '<input class="field" id="sh-song-artist" placeholder="Artist / band *" value="' + (song ? esc(song.artist) : '') + '" autocomplete="off">' +
+        '<div class="field-row">' +
+        '<select class="field" id="sh-song-key"><option value="">Key *</option>' + keyOpts + '</select>' +
+        '<input class="field" id="sh-song-tempo" type="number" placeholder="BPM" value="' + (song && song.tempo ? song.tempo : '') + '">' +
+        '</div>' +
+        '<select class="field" id="sh-song-feel"><option value="">Song feel</option>' + feels + '</select>' +
+        '<textarea class="field" id="sh-song-chart" placeholder="Chord chart *&#10;&#10;[Verse 1]&#10;G              D&#10;Your lyrics here">' + (song ? esc(song.chart) : '') + '</textarea>' +
+        '<div class="form-error" id="sh-song-err"></div>' +
+        '<div class="sheet-actions">' +
+        (song ? '<button class="tap danger" onclick="deleteSong()">Delete</button>' : '') +
+        '<button class="tap" onclick="closeSheet()">Cancel</button>' +
+        '<button class="tap primary" onclick="saveSong()">Save</button></div>'
+    );
+}
+function saveSong() {
+    var title = document.getElementById('sh-song-title').value.trim();
+    var artist = document.getElementById('sh-song-artist').value.trim();
+    var key = document.getElementById('sh-song-key').value;
+    var tempo = parseInt(document.getElementById('sh-song-tempo').value, 10) || 0;
+    var feel = document.getElementById('sh-song-feel').value;
+    var chart = document.getElementById('sh-song-chart').value.trim();
+    var err = document.getElementById('sh-song-err');
+    if (!title || !artist || !key || !chart) {
+        err.textContent = 'Title, artist, key and chart are required.';
+        err.style.display = 'block';
+        return;
+    }
+    if (editingSongId) {
+        var song = songById(editingSongId);
+        song.title = title; song.artist = artist; song.key = key;
+        song.tempo = tempo; song.feel = feel; song.chart = chart;
+    } else {
+        state.customs.push({ id: 'c' + Date.now(), title: title, artist: artist, key: key,
+                             tempo: tempo, feel: feel, chart: chart, custom: true });
+    }
+    save(); closeSheet();
+    if (state.view === 'songs') renderSongList();
+    if (document.getElementById('view-chart').classList.contains('active')) renderChart();
+    if (document.getElementById('view-setlist').classList.contains('active')) renderSetlistDetail();
+}
+function deleteSong() {
+    if (!editingSongId || !confirm('Delete this song permanently?')) return;
+    var id = editingSongId;
+    state.customs = state.customs.filter(function(c) { return c.id !== id; });
+    state.favorites = state.favorites.filter(function(f) { return f !== id; });
+    state.setlists.forEach(function(sl) {
+        sl.songIds = sl.songIds.filter(function(s) { return s !== id; });
+    });
+    delete state.transpose[id];
+    save(); closeSheet();
+    editingSongId = null;
+    go('songs');
+}
+
+/* ---- settings ---- */
+function openSettings() {
+    closeDrawer();
+    var p = state.profile || { name: '', instrument: '' };
+    var chips = INSTRUMENTS.map(function(ins) {
+        return '<button class="chip' + (p.instrument === ins ? ' on' : '') + '" onclick="pickInstrument(this, \'' + ins + '\')">' + ins + '</button>';
+    }).join('');
+    openSheet(
+        '<div class="sheet-title">Settings</div>' +
+        '<div class="section-label" style="margin-top:4px;">Profile</div>' +
+        '<input class="field" id="sh-profile-name" placeholder="Your name" value="' + esc(p.name) + '" autocomplete="off">' +
+        '<div class="chip-row" id="sh-instruments">' + chips + '</div>' +
+        '<div class="section-label">Backup</div>' +
+        '<div style="display:flex;gap:24px;">' +
+        '<button class="tap" onclick="exportBackup()">Export data</button>' +
+        '<button class="tap" onclick="document.getElementById(\'import-input\').click()">Import data</button></div>' +
+        '<div class="sheet-actions">' +
+        '<button class="tap" onclick="closeSheet()">Cancel</button>' +
+        '<button class="tap primary" onclick="saveSettings()">Save</button></div>'
+    );
+    window.__pickedInstrument = p.instrument;
+}
+function pickInstrument(el, ins) {
+    window.__pickedInstrument = ins;
+    document.querySelectorAll('#sh-instruments .chip').forEach(function(c) { c.classList.remove('on'); });
+    el.classList.add('on');
+}
+function saveSettings() {
+    var name = document.getElementById('sh-profile-name').value.trim();
+    if (!name || !window.__pickedInstrument) return;
+    state.profile = { name: name, instrument: window.__pickedInstrument };
+    save(); closeSheet();
+    if (document.getElementById('view-chart').classList.contains('active')) renderChart();
+}
+function exportBackup() {
+    var blob = new Blob([JSON.stringify({
+        version: '2.0', exportDate: new Date().toISOString(),
+        profile: state.profile, customs: state.customs, favorites: state.favorites,
+        setlists: state.setlists, transpose: state.transpose,
+        settings: { fontSize: state.fontSize, useFlats: state.useFlats }
+    }, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'chordph-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+}
+function importBackup(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var b = JSON.parse(e.target.result);
+            if (b.version === '2.0') {
+                if (b.profile) state.profile = b.profile;
+                if (b.customs) state.customs = b.customs;
+                if (b.favorites) state.favorites = b.favorites;
+                if (b.setlists) state.setlists = b.setlists;
+                if (b.transpose) state.transpose = b.transpose;
+                if (b.settings) {
+                    state.fontSize = b.settings.fontSize || 16;
+                    state.useFlats = !!b.settings.useFlats;
+                }
+                save();
+                alert('Backup restored.');
+                location.reload();
+            } else {
+                alert('This looks like an old-format backup. Import it in the classic app first, then revisit this page to migrate.');
+            }
+        } catch (err) { alert('Not a valid Chord.ph backup file.'); }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+/* =========================================================
+   ONBOARDING + INIT
+   ========================================================= */
+function renderOnboarding() {
+    var box = document.getElementById('ob-instruments');
+    box.innerHTML = '';
+    INSTRUMENTS.forEach(function(ins) {
+        var b = document.createElement('button');
+        b.className = 'chip';
+        b.textContent = ins;
+        b.onclick = function() {
+            window.__obInstrument = ins;
+            box.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('on'); });
+            b.classList.add('on');
+        };
+        box.appendChild(b);
+    });
+    document.body.classList.add('pre-app');
+    document.getElementById('view-onboarding').style.display = 'flex';
+}
+function finishOnboarding() {
+    var name = document.getElementById('ob-name').value.trim();
+    if (!name || !window.__obInstrument) return;
+    state.profile = { name: name, instrument: window.__obInstrument };
+    save();
+    document.getElementById('view-onboarding').style.display = 'none';
+    go('songs');
+}
+
+function init() {
+    migrate();
+    load();
+    if (state.profile && state.profile.name) go('songs');
+    else renderOnboarding();
+}
+init();
+</script>
+<input type="file" id="import-input" accept=".json" style="display:none;" onchange="importBackup(event)">
+</body>
+</html>
