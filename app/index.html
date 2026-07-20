@@ -118,10 +118,33 @@
         .row .star.on { color: var(--gold); }
         .row-action { color: var(--danger); font-size: 13px; padding: 8px 0 8px 14px; background: none; border: none; cursor: pointer; }
         .row-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-        .row-action.move { color: var(--muted); font-size: 18px; padding: 8px 8px; line-height: 1; }
-        .row-action.move:hover:not(:disabled) { color: var(--accent); }
-        .row-action.move:disabled { color: var(--faint); opacity: 0.4; cursor: default; }
         .row-action.danger { color: var(--danger); }
+
+        /* drag-to-reorder */
+        .setlist-drag-row { touch-action: pan-y; }
+        .setlist-drag-row .row-main { cursor: grab; }
+        #setlist-songs { position: relative; }
+        .drag-clone {
+            position: fixed;
+            z-index: 500;
+            margin: 0;
+            pointer-events: none;
+            background: #1b2130;
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+            padding: 0 12px;
+            opacity: 0.96;
+        }
+        .drop-indicator {
+            position: absolute;
+            left: 0; right: 0;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 2px;
+            box-shadow: 0 0 8px rgba(79, 140, 255, 0.6);
+            pointer-events: none;
+        }
 
         .empty { color: var(--faint); text-align: center; padding: 48px 0; font-size: 14px; line-height: 1.7; }
 
@@ -458,7 +481,7 @@
             <span class="bar-side"><button class="tap" onclick="go('setlists')">&lsaquo; Setlists</button></span>
             <span></span>
             <span class="bar-side right">
-                <button class="tap" id="setlist-edit-btn" onclick="toggleSetlistEdit()">Edit</button>
+                <button class="tap glyph" id="setlist-menu-btn" onclick="onSetlistMenuBtn()">&#8943;</button>
             </span>
         </div>
         <div class="chart-head">
@@ -1270,41 +1293,152 @@ function renderSetlistDetail() {
     if (!sl) { go('setlists'); return; }
     document.getElementById('setlist-name').textContent = sl.name;
     var valid = sl.songIds.map(songById).filter(Boolean);
-    document.getElementById('setlist-count').textContent = valid.length + ' song' + (valid.length !== 1 ? 's' : '');
-    document.getElementById('setlist-edit-btn').textContent = state.setlistEdit ? 'Done' : 'Edit';
-    document.getElementById('setlist-edit-btn').classList.toggle('on', state.setlistEdit);
+    var editing = state.setlistEdit;
+    document.getElementById('setlist-count').textContent =
+        (editing ? 'Hold & drag to reorder · ' : '') + valid.length + ' song' + (valid.length !== 1 ? 's' : '');
+    var menuBtn = document.getElementById('setlist-menu-btn');
+    menuBtn.innerHTML = editing ? 'Done' : '&#8943;';
+    menuBtn.classList.remove('glyph');
+    if (editing) menuBtn.classList.add('primary'); else menuBtn.classList.remove('primary');
     var box = document.getElementById('setlist-songs');
     box.innerHTML = '';
     if (!valid.length) {
         box.innerHTML = '<div class="empty">No songs yet — tap + Add song.</div>';
         return;
     }
-    var lastIdx = sl.songIds.length - 1;
     sl.songIds.forEach(function(songId, pos) {
         var song = songById(songId);
         if (!song) return;
-        var opts = state.setlistEdit
-            ? { actions: [
-                { html: '&uarr;', cls: 'move', disabled: pos === 0, onClick: function() { moveSetlistSong(pos, -1); } },
-                { html: '&darr;', cls: 'move', disabled: pos === lastIdx, onClick: function() { moveSetlistSong(pos, 1); } },
+        if (editing) {
+            var row = songRow(song, { actions: [
                 { html: 'Remove', cls: 'danger', onClick: function() { sl.songIds.splice(pos, 1); save(); renderSetlistDetail(); } }
-              ] }
-            : { onOpen: function(s) { state.setlistPos = pos; openChart(s.id, 'setlist'); } };
-        box.appendChild(songRow(song, opts));
+            ] });
+            row.classList.add('setlist-drag-row');
+            row.dataset.pos = pos;
+            row.addEventListener('pointerdown', function(e) { setlistRowPointerDown(e, row, pos); });
+            box.appendChild(row);
+        } else {
+            box.appendChild(songRow(song, { onOpen: function(s) { state.setlistPos = pos; openChart(s.id, 'setlist'); } }));
+        }
     });
-}
-function moveSetlistSong(pos, dir) {
-    var sl = setlistById(state.currentSetlistId);
-    if (!sl) return;
-    var np = pos + dir;
-    if (np < 0 || np >= sl.songIds.length) return;
-    var tmp = sl.songIds[pos];
-    sl.songIds[pos] = sl.songIds[np];
-    sl.songIds[np] = tmp;
-    save(); renderSetlistDetail();
 }
 function toggleSetlistEdit() {
     state.setlistEdit = !state.setlistEdit;
+    renderSetlistDetail();
+}
+function onSetlistMenuBtn() {
+    if (state.setlistEdit) { state.setlistEdit = false; renderSetlistDetail(); }
+    else openSetlistMenu();
+}
+function openSetlistMenu() {
+    var sl = setlistById(state.currentSetlistId);
+    openSheet(
+        '<div class="sheet-title">' + esc(sl.name) + '</div>' +
+        '<div style="display:flex;flex-direction:column;">' +
+        '<button class="tap" style="text-align:left;padding:13px 0;font-size:15px;" onclick="closeSheet(); enterSetlistEdit();">&#8645;&nbsp; Reorder &amp; edit songs</button>' +
+        '<button class="tap" style="text-align:left;padding:13px 0;font-size:15px;" onclick="renameSetlistPrompt()">&#9998;&nbsp; Rename setlist</button>' +
+        '<button class="tap danger" style="text-align:left;padding:13px 0;font-size:15px;" onclick="deleteSetlistFromDetail()">&#128465;&nbsp; Delete setlist</button>' +
+        '</div>' +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button></div>'
+    );
+}
+function enterSetlistEdit() { state.setlistEdit = true; renderSetlistDetail(); }
+function renameSetlistPrompt() {
+    var sl = setlistById(state.currentSetlistId);
+    openSheet(
+        '<div class="sheet-title">Rename setlist</div>' +
+        '<input class="field" id="sh-rename" value="' + esc(sl.name) + '" autocomplete="off">' +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button>' +
+        '<button class="tap primary" onclick="doRenameSetlist()">Save</button></div>'
+    );
+    setTimeout(function() { var el = document.getElementById('sh-rename'); if (el) { el.focus(); el.select(); } }, 60);
+}
+function doRenameSetlist() {
+    var sl = setlistById(state.currentSetlistId);
+    var name = document.getElementById('sh-rename').value.trim();
+    if (!name) return;
+    sl.name = name; save(); closeSheet(); renderSetlistDetail();
+}
+function deleteSetlistFromDetail() {
+    var sl = setlistById(state.currentSetlistId);
+    if (!confirm('Delete "' + sl.name + '"?')) return;
+    state.setlists = state.setlists.filter(function(x) { return x.id !== sl.id; });
+    save(); closeSheet(); go('setlists');
+}
+
+/* ---- drag-to-reorder (long-press to lift, pointer events) ---- */
+var slDrag = null;
+function setlistRowPointerDown(e, row, pos) {
+    if (e.target.closest('.row-action')) return;   // Remove button, not a drag
+    var startY = e.clientY;
+    var timer = setTimeout(function() { cleanup(); startSetlistDrag(row, pos, startY); }, 300);
+    function move(ev) { if (Math.abs(ev.clientY - startY) > 12) cleanup(); }  // scrolling, not holding
+    function up() { cleanup(); }
+    function cleanup() {
+        clearTimeout(timer);
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+    }
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+}
+function startSetlistDrag(row, pos, startY) {
+    var container = document.getElementById('setlist-songs');
+    var rows = Array.prototype.slice.call(container.querySelectorAll('.setlist-drag-row'));
+    var rect = row.getBoundingClientRect();
+    var clone = row.cloneNode(true);
+    clone.classList.add('drag-clone');
+    clone.style.left = rect.left + 'px';
+    clone.style.top = rect.top + 'px';
+    clone.style.width = rect.width + 'px';
+    document.body.appendChild(clone);
+    row.style.opacity = '0.25';
+    var indicator = document.createElement('div');
+    indicator.className = 'drop-indicator';
+    container.appendChild(indicator);
+    slDrag = { row: row, pos: pos, clone: clone, indicator: indicator, rows: rows,
+               container: container, grabDy: startY - rect.top, target: pos };
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+    document.addEventListener('pointermove', onSetlistDragMove, { passive: false });
+    document.addEventListener('pointerup', onSetlistDragEnd);
+    positionDropIndicator(startY);
+}
+function positionDropIndicator(clientY) {
+    var d = slDrag;
+    var contTop = d.container.getBoundingClientRect().top;
+    var target = d.rows.length;
+    for (var i = 0; i < d.rows.length; i++) {
+        var r = d.rows[i].getBoundingClientRect();
+        if (clientY < r.top + r.height / 2) { target = i; break; }
+    }
+    d.target = target;
+    var y;
+    if (target >= d.rows.length) { var last = d.rows[d.rows.length - 1].getBoundingClientRect(); y = last.bottom - contTop; }
+    else { y = d.rows[target].getBoundingClientRect().top - contTop; }
+    d.indicator.style.top = y + 'px';
+}
+function onSetlistDragMove(e) {
+    if (!slDrag) return;
+    e.preventDefault();
+    slDrag.clone.style.top = (e.clientY - slDrag.grabDy) + 'px';
+    positionDropIndicator(e.clientY);
+}
+function onSetlistDragEnd() {
+    if (!slDrag) return;
+    document.removeEventListener('pointermove', onSetlistDragMove, { passive: false });
+    document.removeEventListener('pointerup', onSetlistDragEnd);
+    var from = slDrag.pos, to = slDrag.target;
+    slDrag.clone.remove();
+    slDrag.indicator.remove();
+    slDrag.row.style.opacity = '';
+    var sl = setlistById(state.currentSetlistId);
+    if (sl && from !== to) {
+        var id = sl.songIds.splice(from, 1)[0];
+        if (to > from) to--;
+        sl.songIds.splice(to, 0, id);
+        save();
+    }
+    slDrag = null;
     renderSetlistDetail();
 }
 function setlistStep(dir) {
