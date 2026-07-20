@@ -319,6 +319,35 @@
         @keyframes sheetUp { from { transform: translateY(40px); opacity: .5; } to { transform: none; opacity: 1; } }
         .sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
         .sheet-actions { display: flex; justify-content: flex-end; gap: 22px; margin-top: 18px; }
+        /* sticky header inside a scrolling sheet (long lists keep Done in reach) */
+        .sheet-head {
+            position: sticky; top: 0; z-index: 5;
+            background: #141821;
+            margin: -20px -24px 4px; padding: 16px 24px 8px;
+            border-bottom: 1px solid var(--hairline);
+        }
+        .sheet-head .sheet-title { margin: 0; }
+
+        /* dropdown menu anchored under a top-bar button (⋯) */
+        .menu-scrim { display: none; position: fixed; inset: 0; z-index: 420; }
+        .menu-scrim.open { display: block; }
+        .menu-pop {
+            position: fixed; min-width: 210px; max-width: 82vw;
+            background: #141821; border: 1px solid var(--hairline);
+            border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+            padding: 6px; transform-origin: top right;
+            animation: menuDrop .15s cubic-bezier(.2, .8, .2, 1);
+        }
+        @keyframes menuDrop { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: none; } }
+        .menu-item {
+            display: flex; align-items: center; gap: 11px; width: 100%;
+            padding: 12px 12px; background: none; border: none; color: var(--text);
+            font-size: 15px; text-align: left; cursor: pointer; border-radius: 8px;
+        }
+        .menu-item:hover { background: rgba(255, 255, 255, 0.05); }
+        .menu-item.danger { color: var(--danger); }
+        .menu-item .mi-ico { width: 18px; text-align: center; flex-shrink: 0; color: var(--muted); }
+        .menu-item.danger .mi-ico { color: var(--danger); }
 
         .field {
             width: 100%;
@@ -565,6 +594,10 @@
     <div class="sheet" id="sheet"></div>
 </div>
 
+<div class="menu-scrim" id="menu-scrim" onclick="if (event.target === this) closeMenu()">
+    <div class="menu-pop" id="menu-pop"></div>
+</div>
+
 <script src="lib/supabase.js"></script>
 <script>
 /* =========================================================
@@ -700,7 +733,8 @@ var state = {
     customs: [],                // custom songs [{id:'c...', ...}]
     favorites: [],              // [songId]
     setlists: [],               // [{id, name, songIds:[]}]
-    transpose: {},              // { songId: steps }
+    transpose: {},              // { songId: steps } — sounding key change (for the singer)
+    capo: {},                   // { songId: fret } — guitarist fingering; sounding key unchanged
     fontSize: 16,
     useFlats: false,
     view: 'songs',
@@ -725,6 +759,7 @@ function save() {
     localStorage.setItem('chordph2_favorites', JSON.stringify(state.favorites));
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
+    localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
@@ -742,6 +777,7 @@ function load() {
         state.favorites = JSON.parse(localStorage.getItem('chordph2_favorites') || '[]');
         state.setlists = JSON.parse(localStorage.getItem('chordph2_setlists') || '[]');
         state.transpose = JSON.parse(localStorage.getItem('chordph2_transpose') || '{}');
+        state.capo = JSON.parse(localStorage.getItem('chordph2_capo') || '{}');
         state.medleys = JSON.parse(localStorage.getItem('chordph2_medleys') || '{}');
         var s = JSON.parse(localStorage.getItem('chordph2_settings') || '{}');
         if (s.fontSize) state.fontSize = s.fontSize;
@@ -768,6 +804,7 @@ function localSnapshot() {
         favorites: state.favorites,
         setlists: state.setlists,
         transpose: state.transpose,
+        capo: state.capo,
         medleys: state.medleys,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats },
         updated_at: state.updatedAt || 0
@@ -779,6 +816,7 @@ function applySnapshot(snap) {
     state.favorites = snap.favorites || [];
     state.setlists = snap.setlists || [];
     state.transpose = snap.transpose || {};
+    state.capo = snap.capo || {};
     state.medleys = snap.medleys || {};
     if (snap.settings) {
         state.fontSize = snap.settings.fontSize || 16;
@@ -791,6 +829,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_favorites', JSON.stringify(state.favorites));
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
+    localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
@@ -816,6 +855,7 @@ function mergeData(local, cloud) {
         setlists: mergeById(newer.setlists, older.setlists),
         favorites: Array.from(new Set((local.favorites || []).concat(cloud.favorites || []))),
         transpose: Object.assign({}, older.transpose, newer.transpose),
+        capo: Object.assign({}, older.capo, newer.capo),
         medleys: Object.assign({}, older.medleys, newer.medleys),
         settings: newer.settings || older.settings,
         updated_at: Math.max(local.updated_at || 0, cloud.updated_at || 0)
@@ -1092,8 +1132,12 @@ function renderChart() {
     var song = songById(currentSongId);
     if (!song) { go('songs'); return; }
     var steps = state.transpose[song.id] || 0;
-    var keyIdx = currentKeyIndex(song);
+    var keyIdx = currentKeyIndex(song);       // sounding key (what the singer hears)
     var view = viewFor();
+    var isGuitar = view === 'guitarist';
+    var capo = isGuitar ? (state.capo[song.id] || 0) : 0;  // capo only applies to guitar fingering
+    var displaySteps = steps - capo;          // chords the guitarist actually fingers
+    var fingeredKeyIdx = ((keyIdx - capo) % 12 + 12) % 12;
 
     document.getElementById('chart-back').innerHTML =
         state.chartFrom === 'setlist' ? '&lsaquo; Setlist' :
@@ -1101,6 +1145,8 @@ function renderChart() {
     document.getElementById('chart-title').textContent = song.title;
     var meta = esc(song.artist) + ' &middot; Key of <span class="key" onclick="toggleLayer(\'transpose\')">' + esc(noteName(keyIdx)) + '</span>';
     if (song.tempo) meta += ' &middot; ' + song.tempo + ' BPM';
+    if (capo > 0) meta += ' &middot; <span class="key" onclick="toggleLayer(\'capo\')">Capo ' + capo +
+        ' &rarr; ' + esc(noteName(fingeredKeyIdx)) + ' shapes</span>';
     document.getElementById('chart-meta').innerHTML = meta;
 
     var star = document.getElementById('chart-star');
@@ -1141,25 +1187,33 @@ function renderChart() {
     if (view === 'drummer') {
         body.innerHTML = formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo ? song.tempo + ' BPM' : '—') + '\n\n' + song.chart);
     } else {
-        body.innerHTML = formatChart(transposeChordText(song.chart, steps));
+        body.innerHTML = formatChart(transposeChordText(song.chart, displaySteps));
     }
-    renderMedley(song, keyIdx);
+    renderMedley(song, keyIdx, capo);
 }
 
+/* Capo picker. keyIdx = sounding key. Capo keeps the sounding key; it only
+   changes which open-chord SHAPE the guitarist fingers. Tapping a shape sets
+   the capo fret that makes that shape sound in the current key. */
 function renderCapoLayer(song, keyIdx) {
     var layer = document.getElementById('layer-capo');
     layer.innerHTML = '';
+    var capo = state.capo[song.id] || 0;
+
+    var none = document.createElement('button');
+    none.className = 'tap capo-opt' + (capo === 0 ? ' on' : '');
+    none.innerHTML = '<b>No capo</b>';
+    none.onclick = function() { state.capo[song.id] = 0; save(); renderChart(); };
+    layer.appendChild(none);
+
     CAPO_SHAPES.forEach(function(item) {
-        var capoFret = (keyIdx - item.index + 12) % 12;
-        var stepsToShape = (item.index - getNoteIndex(song.key) + 12) % 12;
-        var isActive = (state.transpose[song.id] || 0) === stepsToShape && capoFret !== 0;
+        var capoFret = (keyIdx - item.index + 12) % 12;   // fret to sound in the current key
+        if (capoFret === 0) return;                        // that's "No capo" — already shown
+        var isActive = capo === capoFret;
         var b = document.createElement('button');
         b.className = 'tap capo-opt' + (isActive ? ' on' : '');
-        b.innerHTML = '<b>' + item.shape + '</b> <span>capo ' + (capoFret === 0 ? '–' : capoFret) + '</span>';
-        b.onclick = function() {
-            state.transpose[song.id] = capoFret === 0 ? 0 : stepsToShape;
-            save(); renderChart();
-        };
+        b.innerHTML = '<b>' + item.shape + '</b> <span>capo ' + capoFret + '</span>';
+        b.onclick = function() { state.capo[song.id] = capoFret; save(); renderChart(); };
         layer.appendChild(b);
     });
 }
@@ -1220,7 +1274,8 @@ function scrollSpeedBy(d) {
 }
 
 /* ---- medley ---- */
-function renderMedley(mainSong, keyIdx) {
+function renderMedley(mainSong, keyIdx, capo) {
+    capo = capo || 0;
     var box = document.getElementById('medley-blocks');
     box.innerHTML = '';
     var view = viewFor();
@@ -1261,7 +1316,7 @@ function renderMedley(mainSong, keyIdx) {
         pre.style.fontSize = state.fontSize + 'px';
         pre.innerHTML = view === 'drummer'
             ? formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo || '—') + ' BPM\n\n' + chartText)
-            : formatChart(transposeChordText(chartText, steps));
+            : formatChart(transposeChordText(chartText, steps - capo));
         block.appendChild(head); block.appendChild(title); block.appendChild(sub); block.appendChild(pre);
         box.appendChild(block);
     });
@@ -1335,14 +1390,9 @@ function onSetlistsMenuBtn() {
     else openSetlistsMenu();
 }
 function openSetlistsMenu() {
-    openSheet(
-        '<div class="sheet-title">Setlists</div>' +
-        '<div style="display:flex;flex-direction:column;">' +
-        '<button class="tap primary" style="text-align:left;padding:13px 0;font-size:15px;" onclick="closeSheet(); openNewSetlistSheet();">+&nbsp; New setlist</button>' +
-        (state.setlists.length ? '<button class="tap" style="text-align:left;padding:13px 0;font-size:15px;" onclick="closeSheet(); enterSetlistsEdit();">&#8645;&nbsp; Reorder &amp; edit</button>' : '') +
-        '</div>' +
-        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button></div>'
-    );
+    var items = [{ label: 'New setlist', icon: '+', onClick: openNewSetlistSheet }];
+    if (state.setlists.length) items.push({ label: 'Reorder & edit', icon: '⇅', onClick: enterSetlistsEdit });
+    openMenu(items, document.getElementById('setlists-menu-btn'));
 }
 function enterSetlistsEdit() { state.setlistsEdit = true; renderSetlists(); }
 function openSetlist(id) {
@@ -1401,16 +1451,11 @@ function onSetlistMenuBtn() {
     else openSetlistMenu();
 }
 function openSetlistMenu() {
-    var sl = setlistById(state.currentSetlistId);
-    openSheet(
-        '<div class="sheet-title">' + esc(sl.name) + '</div>' +
-        '<div style="display:flex;flex-direction:column;">' +
-        '<button class="tap" style="text-align:left;padding:13px 0;font-size:15px;" onclick="closeSheet(); enterSetlistEdit();">&#8645;&nbsp; Reorder &amp; edit songs</button>' +
-        '<button class="tap" style="text-align:left;padding:13px 0;font-size:15px;" onclick="renameSetlistPrompt()">&#9998;&nbsp; Rename setlist</button>' +
-        '<button class="tap danger" style="text-align:left;padding:13px 0;font-size:15px;" onclick="deleteSetlistFromDetail()">&#128465;&nbsp; Delete setlist</button>' +
-        '</div>' +
-        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button></div>'
-    );
+    openMenu([
+        { label: 'Reorder & edit songs', icon: '⇅', onClick: enterSetlistEdit },
+        { label: 'Rename setlist', icon: '✎', onClick: renameSetlistPrompt },
+        { label: 'Delete setlist', icon: '🗑', danger: true, onClick: deleteSetlistFromDetail }
+    ], document.getElementById('setlist-menu-btn'));
 }
 function enterSetlistEdit() { state.setlistEdit = true; renderSetlistDetail(); }
 function renameSetlistPrompt() {
@@ -1533,6 +1578,28 @@ function closeSheet() {
     document.getElementById('sheet-scrim').classList.remove('open');
 }
 
+/* dropdown menu anchored under a top-bar button (⋯). items:
+   [{ label, onClick, icon, danger }] */
+function openMenu(items, anchorEl) {
+    var pop = document.getElementById('menu-pop');
+    pop.innerHTML = items.map(function(it, i) {
+        return '<button class="menu-item' + (it.danger ? ' danger' : '') + '" data-i="' + i + '">' +
+            (it.icon ? '<span class="mi-ico">' + it.icon + '</span>' : '') + esc(it.label) + '</button>';
+    }).join('');
+    Array.prototype.forEach.call(pop.querySelectorAll('.menu-item'), function(b) {
+        b.onclick = function() { var it = items[+b.dataset.i]; closeMenu(); if (it.onClick) it.onClick(); };
+    });
+    document.getElementById('menu-scrim').classList.add('open');
+    // anchor: right-align under the button
+    var r = anchorEl.getBoundingClientRect();
+    pop.style.top = (r.bottom + 6) + 'px';
+    pop.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+    pop.style.left = 'auto';
+}
+function closeMenu() {
+    document.getElementById('menu-scrim').classList.remove('open');
+}
+
 /* ---- new setlist ---- */
 function openNewSetlistSheet() {
     openSheet(
@@ -1557,10 +1624,13 @@ function createSetlist() {
 function openAddToSetlistSheet() {
     var sl = setlistById(state.currentSetlistId);
     if (!sl) return;
-    var html = '<div class="sheet-title">Add to ' + esc(sl.name) + '</div>' +
-        '<input class="field" id="sh-add-search" placeholder="Search songs&hellip;" oninput="filterAddList()" autocomplete="off">' +
-        '<div id="sh-add-list"></div>' +
-        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Done</button></div>';
+    var html = '<div class="sheet-head">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
+        '<div class="sheet-title">Add to ' + esc(sl.name) + '</div>' +
+        '<button class="tap primary" onclick="closeSheet()">Done</button></div>' +
+        '<input class="field" id="sh-add-search" placeholder="Search songs&hellip;" oninput="filterAddList()" autocomplete="off" style="margin-bottom:0;">' +
+        '</div>' +
+        '<div id="sh-add-list"></div>';
     openSheet(html);
     renderAddList();
 }
@@ -1595,10 +1665,13 @@ var medleyPick = null; // { songId, keyOption, sections:[idx] }
 function openMedleySheet() {
     medleyPick = null;
     openSheet(
+        '<div class="sheet-head">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
         '<div class="sheet-title">Add to medley</div>' +
-        '<input class="field" id="sh-medley-search" placeholder="Search songs&hellip;" oninput="renderMedleyList()" autocomplete="off">' +
-        '<div id="sh-medley-list"></div>' +
-        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button></div>'
+        '<button class="tap" onclick="closeSheet()">Cancel</button></div>' +
+        '<input class="field" id="sh-medley-search" placeholder="Search songs&hellip;" oninput="renderMedleyList()" autocomplete="off" style="margin-bottom:0;">' +
+        '</div>' +
+        '<div id="sh-medley-list"></div>'
     );
     renderMedleyList();
 }
@@ -1739,6 +1812,7 @@ function deleteSong() {
         sl.songIds = sl.songIds.filter(function(s) { return s !== id; });
     });
     delete state.transpose[id];
+    delete state.capo[id];
     delete state.medleys[id];                       // its own medley
     Object.keys(state.medleys).forEach(function(host) {  // and any medley that appended it
         state.medleys[host] = state.medleys[host].filter(function(m) { return m.songId !== id; });
@@ -1833,7 +1907,7 @@ function exportBackup() {
     var blob = new Blob([JSON.stringify({
         version: '2.0', exportDate: new Date().toISOString(),
         profile: state.profile, customs: state.customs, favorites: state.favorites,
-        setlists: state.setlists, transpose: state.transpose, medleys: state.medleys,
+        setlists: state.setlists, transpose: state.transpose, capo: state.capo, medleys: state.medleys,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats }
     }, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
@@ -1855,6 +1929,7 @@ function importBackup(event) {
                 if (b.favorites) state.favorites = b.favorites;
                 if (b.setlists) state.setlists = b.setlists;
                 if (b.transpose) state.transpose = b.transpose;
+                if (b.capo) state.capo = b.capo;
                 if (b.medleys) state.medleys = b.medleys;
                 if (b.settings) {
                     state.fontSize = b.settings.fontSize || 16;
