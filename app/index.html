@@ -117,6 +117,11 @@
         .row .star { font-size: 18px; color: var(--faint); padding: 8px 2px 8px 14px; background: none; border: none; cursor: pointer; }
         .row .star.on { color: var(--gold); }
         .row-action { color: var(--danger); font-size: 13px; padding: 8px 0 8px 14px; background: none; border: none; cursor: pointer; }
+        .row-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+        .row-action.move { color: var(--muted); font-size: 18px; padding: 8px 8px; line-height: 1; }
+        .row-action.move:hover:not(:disabled) { color: var(--accent); }
+        .row-action.move:disabled { color: var(--faint); opacity: 0.4; cursor: default; }
+        .row-action.danger { color: var(--danger); }
 
         .empty { color: var(--faint); text-align: center; padding: 48px 0; font-size: 14px; line-height: 1.7; }
 
@@ -819,7 +824,19 @@ function songRow(song, opts) {
     sub.innerHTML = esc(song.artist) + ' &middot; <span class="key">' + esc(noteName(currentKeyIndex(song))) + '</span>';
     main.appendChild(t); main.appendChild(sub);
     row.appendChild(main);
-    if (opts.action) {
+    if (opts.actions) {
+        var group = document.createElement('div');
+        group.className = 'row-actions';
+        opts.actions.forEach(function(a) {
+            var btn = document.createElement('button');
+            btn.className = 'row-action' + (a.cls ? ' ' + a.cls : '');
+            btn.innerHTML = a.html;
+            btn.disabled = !!a.disabled;
+            btn.onclick = function(e) { e.stopPropagation(); if (!a.disabled) a.onClick(); };
+            group.appendChild(btn);
+        });
+        row.appendChild(group);
+    } else if (opts.action) {
         var act = document.createElement('button');
         act.className = 'row-action';
         act.textContent = opts.action;
@@ -1115,14 +1132,29 @@ function renderSetlistDetail() {
         box.innerHTML = '<div class="empty">No songs yet — tap + Add song.</div>';
         return;
     }
+    var lastIdx = sl.songIds.length - 1;
     sl.songIds.forEach(function(songId, pos) {
         var song = songById(songId);
         if (!song) return;
         var opts = state.setlistEdit
-            ? { action: 'Remove', onAction: function() { sl.songIds.splice(pos, 1); save(); renderSetlistDetail(); } }
+            ? { actions: [
+                { html: '&uarr;', cls: 'move', disabled: pos === 0, onClick: function() { moveSetlistSong(pos, -1); } },
+                { html: '&darr;', cls: 'move', disabled: pos === lastIdx, onClick: function() { moveSetlistSong(pos, 1); } },
+                { html: 'Remove', cls: 'danger', onClick: function() { sl.songIds.splice(pos, 1); save(); renderSetlistDetail(); } }
+              ] }
             : { onOpen: function(s) { state.setlistPos = pos; openChart(s.id, 'setlist'); } };
         box.appendChild(songRow(song, opts));
     });
+}
+function moveSetlistSong(pos, dir) {
+    var sl = setlistById(state.currentSetlistId);
+    if (!sl) return;
+    var np = pos + dir;
+    if (np < 0 || np >= sl.songIds.length) return;
+    var tmp = sl.songIds[pos];
+    sl.songIds[pos] = sl.songIds[np];
+    sl.songIds[np] = tmp;
+    save(); renderSetlistDetail();
 }
 function toggleSetlistEdit() {
     state.setlistEdit = !state.setlistEdit;
