@@ -444,9 +444,9 @@
 <div class="view" id="view-songs">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()">&#9776;</button></span>
+            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
             <span class="wordmark">Chord.ph</span>
-            <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()">+</button></span>
+            <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()" aria-label="Add song">+</button></span>
         </div>
         <input class="search" id="search" placeholder="Search songs&hellip;" oninput="renderSongList()" autocomplete="off">
         <div id="song-list"></div>
@@ -456,7 +456,7 @@
 <div class="view" id="view-favorites">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()">&#9776;</button></span>
+            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
             <span class="wordmark">Favorites</span>
             <span class="bar-side right"></span>
         </div>
@@ -467,9 +467,9 @@
 <div class="view" id="view-setlists">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()">&#9776;</button></span>
+            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
             <span class="wordmark">Setlists</span>
-            <span class="bar-side right"><button class="tap glyph" id="setlists-menu-btn" onclick="onSetlistsMenuBtn()">&#8943;</button></span>
+            <span class="bar-side right"><button class="tap glyph" id="setlists-menu-btn" onclick="onSetlistsMenuBtn()" aria-label="Setlist options">&#8943;</button></span>
         </div>
         <div id="setlists-hint" style="font-size:12px;color:var(--faint);padding:2px 0 6px;"></div>
         <div id="setlists-list"></div>
@@ -482,7 +482,7 @@
             <span class="bar-side"><button class="tap" onclick="go('setlists')">&lsaquo; Setlists</button></span>
             <span></span>
             <span class="bar-side right">
-                <button class="tap glyph" id="setlist-menu-btn" onclick="onSetlistMenuBtn()">&#8943;</button>
+                <button class="tap glyph" id="setlist-menu-btn" onclick="onSetlistMenuBtn()" aria-label="Setlist options">&#8943;</button>
             </span>
         </div>
         <div class="chart-head">
@@ -500,16 +500,16 @@
     <div class="wrap">
         <div class="bar">
             <span class="bar-side" style="display:flex;gap:6px;">
-                <button class="tap glyph menu-btn" onclick="openDrawer()">&#9776;</button>
+                <button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
                 <button class="tap" id="chart-back" onclick="chartBack()">&lsaquo; Songs</button>
             </span>
             <span style="display:flex;gap:14px;">
-                <button class="tap" id="chart-prev" onclick="setlistStep(-1)" style="display:none;">&larr;</button>
-                <button class="tap" id="chart-next" onclick="setlistStep(1)" style="display:none;">&rarr;</button>
+                <button class="tap" id="chart-prev" onclick="setlistStep(-1)" style="display:none;" aria-label="Previous song">&larr;</button>
+                <button class="tap" id="chart-next" onclick="setlistStep(1)" style="display:none;" aria-label="Next song">&rarr;</button>
             </span>
             <span class="bar-side right">
                 <button class="tap" id="chart-edit" onclick="openSongSheet(currentSongId)" style="display:none;">Edit</button>
-                <button class="tap glyph star-toggle" id="chart-star" onclick="toggleFav(currentSongId); renderChart();">&#9734;</button>
+                <button class="tap glyph star-toggle" id="chart-star" onclick="toggleFav(currentSongId); renderChart();" aria-label="Toggle favorite">&#9734;</button>
             </span>
         </div>
         <div class="chart-head">
@@ -526,12 +526,12 @@
             </div>
 
             <div class="layer" id="layer-transpose">
-                <button class="tap glyph" onclick="transposeBy(-1)">&minus;</button>
-                <span class="val" id="transpose-val">0</span>
-                <button class="tap glyph" onclick="transposeBy(1)">+</button>
+                <button class="tap glyph" onclick="transposeBy(-1)" aria-label="Transpose down">&minus;</button>
+                <span class="val" id="transpose-val" aria-live="polite">0</span>
+                <button class="tap glyph" onclick="transposeBy(1)" aria-label="Transpose up">+</button>
                 <span class="lbl">&nbsp;</span>
-                <button class="tap" id="notation-sharp" onclick="setNotation(false)">&#9839;</button>
-                <button class="tap" id="notation-flat" onclick="setNotation(true)">&#9837;</button>
+                <button class="tap" id="notation-sharp" onclick="setNotation(false)" aria-label="Use sharps">&#9839;</button>
+                <button class="tap" id="notation-flat" onclick="setNotation(true)" aria-label="Use flats">&#9837;</button>
                 <span class="lbl">&nbsp;</span>
                 <button class="tap" onclick="resetTranspose()">Reset</button>
             </div>
@@ -539,17 +539,17 @@
             <div class="layer" id="layer-capo"></div>
 
             <div class="layer" id="layer-text">
-                <button class="tap glyph" onclick="fontBy(-2)">A&minus;</button>
-                <span class="val" id="font-val">16</span>
-                <button class="tap glyph" onclick="fontBy(2)">A+</button>
+                <button class="tap glyph" onclick="fontBy(-2)" aria-label="Smaller text">A&minus;</button>
+                <span class="val" id="font-val" aria-live="polite">16</span>
+                <button class="tap glyph" onclick="fontBy(2)" aria-label="Larger text">A+</button>
             </div>
 
             <div class="layer" id="layer-scroll">
                 <button class="tap primary" id="scroll-toggle" onclick="toggleScroll()">&#9654; Play</button>
                 <span class="lbl">speed</span>
-                <button class="tap glyph" onclick="scrollSpeedBy(-1)">&minus;</button>
-                <span class="val" id="scroll-val">3</span>
-                <button class="tap glyph" onclick="scrollSpeedBy(1)">+</button>
+                <button class="tap glyph" onclick="scrollSpeedBy(-1)" aria-label="Scroll slower">&minus;</button>
+                <span class="val" id="scroll-val" aria-live="polite">3</span>
+                <button class="tap glyph" onclick="scrollSpeedBy(1)" aria-label="Scroll faster">+</button>
             </div>
         </div>
 
@@ -712,6 +712,7 @@ var state = {
     medleys: {},                // { hostSongId: [{songId, keyOption, sectionIndices}] } — persisted
     medley: [],                 // working copy for the open chart
     openLayer: null,
+    todayInstrument: null,      // session-only override ("play as … today"), never saved
     scroll: { playing: false, speed: 3, raf: null },
     updatedAt: 0                // last local change (ms) — drives sync merge
 };
@@ -966,7 +967,9 @@ function show(viewId) {
 }
 function updateProfileRow() {
     document.getElementById('profile-name').textContent = state.profile ? state.profile.name : 'Set up profile';
-    document.getElementById('profile-instrument').textContent = state.profile ? state.profile.instrument : 'Tap to begin';
+    document.getElementById('profile-instrument').textContent = state.profile
+        ? (state.todayInstrument ? state.todayInstrument + ' · today only' : state.profile.instrument)
+        : 'Tap to begin';
 }
 function go(view) {
     closeDrawer();
@@ -1030,6 +1033,7 @@ function songRow(song, opts) {
         var star = document.createElement('button');
         star.className = 'star' + (isFav(song.id) ? ' on' : '');
         star.innerHTML = isFav(song.id) ? '&#9733;' : '&#9734;';
+        star.setAttribute('aria-label', isFav(song.id) ? 'Remove from favorites' : 'Add to favorites');
         star.onclick = function(e) { e.stopPropagation(); toggleFav(song.id); };
         row.appendChild(star);
     }
@@ -1079,7 +1083,10 @@ function chartBack() {
     if (state.chartFrom === 'setlist') { openSetlist(state.currentSetlistId); }
     else go(state.chartFrom);
 }
-function viewFor() { return INSTRUMENT_VIEWS[state.profile ? state.profile.instrument : 'Vocalist'] || 'vocalist'; }
+function activeInstrument() {
+    return state.todayInstrument || (state.profile ? state.profile.instrument : 'Vocalist');
+}
+function viewFor() { return INSTRUMENT_VIEWS[activeInstrument()] || 'vocalist'; }
 
 function renderChart() {
     var song = songById(currentSongId);
@@ -1115,8 +1122,9 @@ function renderChart() {
     document.getElementById('ctl-capo').style.display = view === 'guitarist' ? 'inline-block' : 'none';
     if (view !== 'guitarist' && state.openLayer === 'capo') state.openLayer = null;
 
-    // layers
-    document.getElementById('transpose-val').textContent = steps === 0 ? '0' : (steps > 0 ? '+' + steps : steps);
+    // layers — show transpose as the shortest signed move (−5..+6), not a raw counter
+    var disp = steps > 6 ? steps - 12 : steps;
+    document.getElementById('transpose-val').textContent = disp === 0 ? '0' : (disp > 0 ? '+' + disp : '' + disp);
     document.getElementById('notation-sharp').classList.toggle('on', !state.useFlats);
     document.getElementById('notation-flat').classList.toggle('on', state.useFlats);
     document.getElementById('font-val').textContent = state.fontSize;
@@ -1161,7 +1169,10 @@ function toggleLayer(name) {
     renderChart();
 }
 function transposeBy(d) {
-    state.transpose[currentSongId] = (state.transpose[currentSongId] || 0) + d;
+    // keep stored steps in 0..11 (matches capo's stepsToShape range); the
+    // display converts to signed. Chord math is mod-12 either way.
+    var v = (state.transpose[currentSongId] || 0) + d;
+    state.transpose[currentSongId] = ((v % 12) + 12) % 12;
     save(); renderChart();
 }
 function resetTranspose() {
@@ -1227,7 +1238,10 @@ function renderMedley(mainSong, keyIdx) {
         rm.className = 'tap danger';
         rm.style.fontSize = '12px';
         rm.textContent = 'Remove';
-        rm.onclick = function() { state.medley.splice(i, 1); persistMedley(); renderChart(); };
+        rm.onclick = function() {
+            if (!confirm('Remove ' + song.title + ' from the medley?')) return;
+            state.medley.splice(i, 1); persistMedley(); renderChart();
+        };
         head.appendChild(rm);
         var title = document.createElement('div');
         title.className = 'medley-title';
@@ -1592,9 +1606,10 @@ function renderMedleyList() {
     var q = (document.getElementById('sh-medley-search').value || '').toLowerCase();
     var box = document.getElementById('sh-medley-list');
     box.innerHTML = '';
+    // Duplicates are allowed on purpose: e.g. Oceans' chorus early, then
+    // Oceans' bridge later in the same medley (only the current host is hidden).
     allSongs().filter(function(s) {
         if (s.id === currentSongId) return false;
-        if (state.medley.some(function(m) { return m.songId === s.id; })) return false;
         return !q || s.title.toLowerCase().indexOf(q) !== -1 || s.artist.toLowerCase().indexOf(q) !== -1;
     }).forEach(function(s) {
         var row = document.createElement('div');
@@ -1741,11 +1756,18 @@ function openSettings() {
     var chips = INSTRUMENTS.map(function(ins) {
         return '<button class="chip' + (p.instrument === ins ? ' on' : '') + '" onclick="pickInstrument(this, \'' + ins + '\')">' + ins + '</button>';
     }).join('');
+    var todayChips = INSTRUMENTS.map(function(ins) {
+        return '<button class="chip' + (state.todayInstrument === ins ? ' on' : '') + '" onclick="pickTodayInstrument(\'' + ins + '\')">' + ins + '</button>';
+    }).join('');
     openSheet(
         '<div class="sheet-title">Settings</div>' +
         '<div class="section-label" style="margin-top:4px;">Profile</div>' +
         '<input class="field" id="sh-profile-name" placeholder="Your name" value="' + esc(p.name) + '" autocomplete="off">' +
         '<div class="chip-row" id="sh-instruments">' + chips + '</div>' +
+        '<div class="section-label">Play as &mdash; <span style="text-transform:none;letter-spacing:0;">today only, doesn\'t change your profile</span></div>' +
+        '<div class="chip-row" id="sh-today">' + todayChips + '</div>' +
+        '<div id="sh-today-note" style="font-size:12px;color:var(--faint);padding:0 0 2px;">' +
+        (state.todayInstrument ? 'Showing charts as ' + esc(state.todayInstrument) + ' — tap again to go back to ' + esc(p.instrument) + '.' : '') + '</div>' +
         (syncEnabled() ? '<div class="section-label">Sync</div><div id="sync-status">' + renderSyncSection() + '</div>' : '') +
         '<div class="section-label">Backup</div>' +
         '<div style="display:flex;gap:24px;">' +
@@ -1779,6 +1801,21 @@ async function submitMagicLink() {
     var err = await sendMagicLink(email);
     if (err) { msg.style.color = 'var(--danger)'; msg.textContent = err; }
     else { msg.style.color = 'var(--accent)'; msg.textContent = 'Check your email for the sign-in link.'; }
+}
+function pickTodayInstrument(ins) {
+    state.todayInstrument = (state.todayInstrument === ins ? null : ins);  // tap again = clear
+    document.querySelectorAll('#sh-today .chip').forEach(function(c) {
+        c.classList.toggle('on', c.textContent === state.todayInstrument);
+    });
+    var note = document.getElementById('sh-today-note');
+    if (note) {
+        var p = state.profile || { instrument: '' };
+        note.textContent = state.todayInstrument
+            ? 'Showing charts as ' + state.todayInstrument + ' — tap again to go back to ' + p.instrument + '.'
+            : '';
+    }
+    updateProfileRow();
+    if (document.getElementById('view-chart').classList.contains('active')) renderChart();
 }
 function pickInstrument(el, ins) {
     window.__pickedInstrument = ins;
