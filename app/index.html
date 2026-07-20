@@ -134,15 +134,33 @@
         .chart-meta { font-size: 14px; color: var(--muted); margin-top: 3px; }
         .chart-meta .key { color: var(--accent); font-weight: 650; cursor: pointer; }
 
+        /* control dock stays pinned to the top while the chart scrolls,
+           so transpose / text / scroll are always a tap away */
+        .control-dock {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: var(--bg);
+            margin-top: 14px;
+        }
+        #view-chart .bar { position: static; }
         .controls {
             display: flex;
             gap: 18px;
             flex-wrap: wrap;
-            margin: 14px 0 0;
-            padding: 6px 0;
+            padding: 8px 0;
             border-top: 1px solid var(--hairline);
             border-bottom: 1px solid var(--hairline);
             font-size: 14px;
+        }
+        .controls .tap.on { position: relative; }
+        .controls .tap.on::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0; bottom: -9px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 2px;
         }
 
         /* ---- disclosure layer: appears under the control words ---- */
@@ -452,7 +470,10 @@
 <div class="view" id="view-chart">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap" id="chart-back" onclick="chartBack()">&lsaquo; Songs</button></span>
+            <span class="bar-side" style="display:flex;gap:6px;">
+                <button class="tap glyph menu-btn" onclick="openDrawer()">&#9776;</button>
+                <button class="tap" id="chart-back" onclick="chartBack()">&lsaquo; Songs</button>
+            </span>
             <span style="display:flex;gap:14px;">
                 <button class="tap" id="chart-prev" onclick="setlistStep(-1)" style="display:none;">&larr;</button>
                 <button class="tap" id="chart-next" onclick="setlistStep(1)" style="display:none;">&rarr;</button>
@@ -467,38 +488,40 @@
             <div class="chart-meta" id="chart-meta"></div>
         </div>
 
-        <div class="controls" id="chart-controls">
-            <button class="tap" id="ctl-transpose" onclick="toggleLayer('transpose')">Transpose</button>
-            <button class="tap" id="ctl-capo" onclick="toggleLayer('capo')">Capo</button>
-            <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
-            <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
-        </div>
+        <div class="control-dock">
+            <div class="controls" id="chart-controls">
+                <button class="tap" id="ctl-transpose" onclick="toggleLayer('transpose')">Transpose</button>
+                <button class="tap" id="ctl-capo" onclick="toggleLayer('capo')">Capo</button>
+                <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
+                <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
+            </div>
 
-        <div class="layer" id="layer-transpose">
-            <button class="tap glyph" onclick="transposeBy(-1)">&minus;</button>
-            <span class="val" id="transpose-val">0</span>
-            <button class="tap glyph" onclick="transposeBy(1)">+</button>
-            <span class="lbl">&nbsp;</span>
-            <button class="tap" id="notation-sharp" onclick="setNotation(false)">&#9839;</button>
-            <button class="tap" id="notation-flat" onclick="setNotation(true)">&#9837;</button>
-            <span class="lbl">&nbsp;</span>
-            <button class="tap" onclick="resetTranspose()">Reset</button>
-        </div>
+            <div class="layer" id="layer-transpose">
+                <button class="tap glyph" onclick="transposeBy(-1)">&minus;</button>
+                <span class="val" id="transpose-val">0</span>
+                <button class="tap glyph" onclick="transposeBy(1)">+</button>
+                <span class="lbl">&nbsp;</span>
+                <button class="tap" id="notation-sharp" onclick="setNotation(false)">&#9839;</button>
+                <button class="tap" id="notation-flat" onclick="setNotation(true)">&#9837;</button>
+                <span class="lbl">&nbsp;</span>
+                <button class="tap" onclick="resetTranspose()">Reset</button>
+            </div>
 
-        <div class="layer" id="layer-capo"></div>
+            <div class="layer" id="layer-capo"></div>
 
-        <div class="layer" id="layer-text">
-            <button class="tap glyph" onclick="fontBy(-2)">A&minus;</button>
-            <span class="val" id="font-val">16</span>
-            <button class="tap glyph" onclick="fontBy(2)">A+</button>
-        </div>
+            <div class="layer" id="layer-text">
+                <button class="tap glyph" onclick="fontBy(-2)">A&minus;</button>
+                <span class="val" id="font-val">16</span>
+                <button class="tap glyph" onclick="fontBy(2)">A+</button>
+            </div>
 
-        <div class="layer" id="layer-scroll">
-            <button class="tap primary" id="scroll-toggle" onclick="toggleScroll()">&#9654; Play</button>
-            <span class="lbl">speed</span>
-            <button class="tap glyph" onclick="scrollSpeedBy(-1)">&minus;</button>
-            <span class="val" id="scroll-val">3</span>
-            <button class="tap glyph" onclick="scrollSpeedBy(1)">+</button>
+            <div class="layer" id="layer-scroll">
+                <button class="tap primary" id="scroll-toggle" onclick="toggleScroll()">&#9654; Play</button>
+                <span class="lbl">speed</span>
+                <button class="tap glyph" onclick="scrollSpeedBy(-1)">&minus;</button>
+                <span class="val" id="scroll-val">3</span>
+                <button class="tap glyph" onclick="scrollSpeedBy(1)">+</button>
+            </div>
         </div>
 
         <pre class="chart" id="chart-body"></pre>
@@ -553,6 +576,35 @@ function getStepsToReach(fromKey, toKeyNote) {
     var toIndex = getNoteIndex(toKeyNote);
     if (fromIndex === -1 || toIndex === -1) return 0;
     return (toIndex - fromIndex + 12) % 12;
+}
+
+/* Split a chart into sections by [Label] headers. Each section keeps its
+   header line; content before the first header (rare) becomes "Intro". */
+function parseSections(chart) {
+    var lines = chart.split('\n');
+    var sections = [];
+    var cur = null;
+    lines.forEach(function(line) {
+        if (/^\s*\[.*\]\s*$/.test(line)) {
+            if (cur) sections.push(cur);
+            cur = { label: line.trim().replace(/^\[|\]$/g, ''), lines: [line] };
+        } else {
+            if (!cur) cur = { label: 'Intro', lines: [] };
+            cur.lines.push(line);
+        }
+    });
+    if (cur) sections.push(cur);
+    return sections.map(function(s) { return { label: s.label, text: s.lines.join('\n').replace(/^\n+|\n+$/g, '') }; });
+}
+/* Build the chart text for a medley entry: whole song, or only the chosen
+   section indices in the order the song presents them. */
+function medleyChartText(song, sectionIndices) {
+    if (!sectionIndices) return song.chart;
+    var secs = parseSections(song.chart);
+    return sectionIndices
+        .filter(function(i) { return secs[i]; })
+        .map(function(i) { return secs[i].text; })
+        .join('\n\n');
 }
 
 function esc(s) {
@@ -981,13 +1033,20 @@ function renderMedley(mainSong, keyIdx) {
         title.textContent = song.title;
         var sub = document.createElement('div');
         sub.className = 'medley-sub';
-        sub.textContent = song.artist + ' · Key of ' + dispKey + (m.keyOption === 'match' ? ' (matched)' : ' (original)');
+        var partsNote = '';
+        if (m.sectionIndices) {
+            var allSecs = parseSections(song.chart);
+            var names = m.sectionIndices.map(function(idx) { return allSecs[idx] ? allSecs[idx].label : null; }).filter(Boolean);
+            if (names.length && names.length < allSecs.length) partsNote = ' · ' + names.join(', ');
+        }
+        sub.textContent = song.artist + ' · Key of ' + dispKey + (m.keyOption === 'match' ? ' (matched)' : ' (original)') + partsNote;
+        var chartText = medleyChartText(song, m.sectionIndices);
         var pre = document.createElement('pre');
         pre.className = 'chart';
         pre.style.fontSize = state.fontSize + 'px';
         pre.innerHTML = view === 'drummer'
-            ? formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo || '—') + ' BPM\n\n' + song.chart)
-            : formatChart(transposeChordText(song.chart, steps));
+            ? formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo || '—') + ' BPM\n\n' + chartText)
+            : formatChart(transposeChordText(chartText, steps));
         block.appendChild(head); block.appendChild(title); block.appendChild(sub); block.appendChild(pre);
         box.appendChild(block);
     });
@@ -1146,23 +1205,18 @@ function renderAddList() {
 }
 function filterAddList() { renderAddList(); }
 
-/* ---- medley picker ---- */
+/* ---- medley picker: step 1 pick a song, step 2 pick key + parts ---- */
+var medleyPick = null; // { songId, keyOption, sections:[idx] }
+
 function openMedleySheet() {
-    var html = '<div class="sheet-title">Add to medley</div>' +
+    medleyPick = null;
+    openSheet(
+        '<div class="sheet-title">Add to medley</div>' +
         '<input class="field" id="sh-medley-search" placeholder="Search songs&hellip;" oninput="renderMedleyList()" autocomplete="off">' +
-        '<div class="chip-row">' +
-        '<button class="chip on" id="mk-same" onclick="medleyKeyOpt(\'same\')">Keep its key</button>' +
-        '<button class="chip" id="mk-match" onclick="medleyKeyOpt(\'match\')">Match current key</button></div>' +
         '<div id="sh-medley-list"></div>' +
-        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button></div>';
-    openSheet(html);
-    window.__medleyKeyOpt = 'same';
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button></div>'
+    );
     renderMedleyList();
-}
-function medleyKeyOpt(opt) {
-    window.__medleyKeyOpt = opt;
-    document.getElementById('mk-same').classList.toggle('on', opt === 'same');
-    document.getElementById('mk-match').classList.toggle('on', opt === 'match');
 }
 function renderMedleyList() {
     var q = (document.getElementById('sh-medley-search').value || '').toLowerCase();
@@ -1170,19 +1224,68 @@ function renderMedleyList() {
     box.innerHTML = '';
     allSongs().filter(function(s) {
         if (s.id === currentSongId) return false;
-        if (state.medley.some(function(m) { return m.songId === s.id; })) return false;
         return !q || s.title.toLowerCase().indexOf(q) !== -1 || s.artist.toLowerCase().indexOf(q) !== -1;
     }).forEach(function(s) {
         var row = document.createElement('div');
         row.className = 'row';
         row.innerHTML = '<div class="row-main"><div class="row-title" style="font-weight:500;">' + esc(s.title) +
-            ' <span style="color:var(--faint);font-size:12px;">' + esc(s.key) + '</span></div></div>';
-        row.onclick = function() {
-            state.medley.push({ songId: s.id, keyOption: window.__medleyKeyOpt });
-            closeSheet(); renderChart();
-        };
+            ' <span style="color:var(--faint);font-size:12px;">' + esc(s.key) + '</span></div></div>' +
+            '<span class="tap primary" style="font-size:13px;">Choose &rsaquo;</span>';
+        row.onclick = function() { medleyStep2(s.id); };
         box.appendChild(row);
     });
+}
+function medleyStep2(songId) {
+    var song = songById(songId);
+    var secs = parseSections(song.chart);
+    medleyPick = { songId: songId, keyOption: 'same', sections: secs.map(function(_, i) { return i; }) };
+    var chips = secs.map(function(s, i) {
+        return '<button class="chip on" id="msec-' + i + '" onclick="toggleMedleySection(' + i + ')">' + esc(s.label) + '</button>';
+    }).join('');
+    openSheet(
+        '<div class="sheet-title">' + esc(song.title) + '</div>' +
+        '<div class="section-label" style="margin-top:2px;">Key</div>' +
+        '<div class="chip-row">' +
+        '<button class="chip on" id="mk-same" onclick="medleyKeyOpt(\'same\')">Keep its key</button>' +
+        '<button class="chip" id="mk-match" onclick="medleyKeyOpt(\'match\')">Match current key</button></div>' +
+        '<div class="section-label">Which parts? <span style="text-transform:none;letter-spacing:0;">— tap to include/exclude</span></div>' +
+        '<div class="chip-row" id="sh-medley-sections">' + chips + '</div>' +
+        '<div class="form-error" id="sh-medley-err"></div>' +
+        '<div class="sheet-actions">' +
+        '<button class="tap" onclick="openMedleySheet()">&lsaquo; Back</button>' +
+        '<button class="tap primary" onclick="confirmMedley()">Add to medley</button></div>'
+    );
+}
+function medleyKeyOpt(opt) {
+    if (!medleyPick) return;
+    medleyPick.keyOption = opt;
+    document.getElementById('mk-same').classList.toggle('on', opt === 'same');
+    document.getElementById('mk-match').classList.toggle('on', opt === 'match');
+}
+function toggleMedleySection(i) {
+    if (!medleyPick) return;
+    var pos = medleyPick.sections.indexOf(i);
+    if (pos === -1) medleyPick.sections.push(i); else medleyPick.sections.splice(pos, 1);
+    document.getElementById('msec-' + i).classList.toggle('on', pos === -1);
+}
+function confirmMedley() {
+    if (!medleyPick) return;
+    if (!medleyPick.sections.length) {
+        var err = document.getElementById('sh-medley-err');
+        err.textContent = 'Pick at least one part.';
+        err.style.display = 'block';
+        return;
+    }
+    var song = songById(medleyPick.songId);
+    var total = parseSections(song.chart).length;
+    var chosen = medleyPick.sections.slice().sort(function(a, b) { return a - b; });
+    state.medley.push({
+        songId: medleyPick.songId,
+        keyOption: medleyPick.keyOption,
+        sectionIndices: chosen.length === total ? null : chosen  // null = whole song
+    });
+    medleyPick = null;
+    closeSheet(); renderChart();
 }
 
 /* ---- add / edit song ---- */
