@@ -707,7 +707,8 @@ var state = {
     currentSetlistId: null,
     setlistPos: 0,
     setlistEdit: false,
-    medley: [],                 // [{songId, keyOption}]
+    medleys: {},                // { hostSongId: [{songId, keyOption, sectionIndices}] } — persisted
+    medley: [],                 // working copy for the open chart
     openLayer: null,
     scroll: { playing: false, speed: 3, raf: null },
     updatedAt: 0                // last local change (ms) — drives sync merge
@@ -721,9 +722,15 @@ function save() {
     localStorage.setItem('chordph2_favorites', JSON.stringify(state.favorites));
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
+    localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
     queuePush();
+}
+function persistMedley() {
+    if (state.medley && state.medley.length) state.medleys[currentSongId] = state.medley;
+    else delete state.medleys[currentSongId];
+    save();
 }
 function load() {
     try {
@@ -732,6 +739,7 @@ function load() {
         state.favorites = JSON.parse(localStorage.getItem('chordph2_favorites') || '[]');
         state.setlists = JSON.parse(localStorage.getItem('chordph2_setlists') || '[]');
         state.transpose = JSON.parse(localStorage.getItem('chordph2_transpose') || '{}');
+        state.medleys = JSON.parse(localStorage.getItem('chordph2_medleys') || '{}');
         var s = JSON.parse(localStorage.getItem('chordph2_settings') || '{}');
         if (s.fontSize) state.fontSize = s.fontSize;
         if (s.useFlats) state.useFlats = s.useFlats;
@@ -757,6 +765,7 @@ function localSnapshot() {
         favorites: state.favorites,
         setlists: state.setlists,
         transpose: state.transpose,
+        medleys: state.medleys,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats },
         updated_at: state.updatedAt || 0
     };
@@ -767,6 +776,7 @@ function applySnapshot(snap) {
     state.favorites = snap.favorites || [];
     state.setlists = snap.setlists || [];
     state.transpose = snap.transpose || {};
+    state.medleys = snap.medleys || {};
     if (snap.settings) {
         state.fontSize = snap.settings.fontSize || 16;
         state.useFlats = !!snap.settings.useFlats;
@@ -778,6 +788,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_favorites', JSON.stringify(state.favorites));
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
+    localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
 }
@@ -802,6 +813,7 @@ function mergeData(local, cloud) {
         setlists: mergeById(newer.setlists, older.setlists),
         favorites: Array.from(new Set((local.favorites || []).concat(cloud.favorites || []))),
         transpose: Object.assign({}, older.transpose, newer.transpose),
+        medleys: Object.assign({}, older.medleys, newer.medleys),
         settings: newer.settings || older.settings,
         updated_at: Math.max(local.updated_at || 0, cloud.updated_at || 0)
     };
@@ -1056,7 +1068,7 @@ function renderFavorites() {
 function openChart(songId, from) {
     currentSongId = songId;
     state.chartFrom = from || 'songs';
-    state.medley = [];
+    state.medley = (state.medleys[songId] || []).slice();  // restore saved medley
     state.openLayer = null;
     renderChart();
     show('chart');
@@ -1213,7 +1225,7 @@ function renderMedley(mainSong, keyIdx) {
         rm.className = 'tap danger';
         rm.style.fontSize = '12px';
         rm.textContent = 'Remove';
-        rm.onclick = function() { state.medley.splice(i, 1); renderChart(); };
+        rm.onclick = function() { state.medley.splice(i, 1); persistMedley(); renderChart(); };
         head.appendChild(rm);
         var title = document.createElement('div');
         title.className = 'medley-title';
@@ -1598,6 +1610,7 @@ function confirmMedley() {
         sectionIndices: chosen.length === total ? null : chosen  // null = whole song
     });
     medleyPick = null;
+    persistMedley();
     closeSheet(); renderChart();
 }
 
@@ -1665,6 +1678,11 @@ function deleteSong() {
         sl.songIds = sl.songIds.filter(function(s) { return s !== id; });
     });
     delete state.transpose[id];
+    delete state.medleys[id];                       // its own medley
+    Object.keys(state.medleys).forEach(function(host) {  // and any medley that appended it
+        state.medleys[host] = state.medleys[host].filter(function(m) { return m.songId !== id; });
+        if (!state.medleys[host].length) delete state.medleys[host];
+    });
     save(); closeSheet();
     editingSongId = null;
     go('songs');
