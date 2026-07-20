@@ -2,10 +2,11 @@
   "name": "Chord.ph",
   "short_name": "Chord.ph",
   "description": "Chord charts for Filipino worship musicians",
-  "start_url": "/",
+  "start_url": "/app/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#1a1a2e",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
   "orientation": "portrait",
     "icons": [
         {
