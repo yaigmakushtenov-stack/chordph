@@ -974,8 +974,16 @@ var SUPABASE_CONFIG = {
     anonKey: 'sb_publishable_MVJjUxOe827PftmJlDiTsQ_RN0hLIII'   // publishable key — safe in-browser (RLS protects data)
 };
 var supa = null, currentUser = null, pushTimer = null;
-var ADMIN_EMAIL = 'yaigmakushtenov@gmail.com';   // sole reviewer (mirrors is_admin() in the DB)
-function isAdmin() { return !!(currentUser && (currentUser.email || '').toLowerCase() === ADMIN_EMAIL); }
+var ADMIN_EMAIL = 'yaigmakushtenov@gmail.com';   // owner — instant fallback before the DB allowlist check returns
+var isAdminUser = false;                          // authoritative: set from the DB admins allowlist (supports many admins)
+function isAdmin() { return isAdminUser || !!(currentUser && (currentUser.email || '').toLowerCase() === ADMIN_EMAIL); }
+function refreshAdminFlag() {
+    if (!supa || !currentUser) { isAdminUser = false; updateContribUI(); return; }
+    supa.rpc('is_admin').then(function(res) {
+        isAdminUser = !!(res && !res.error && res.data);
+        updateContribUI();
+    }).catch(function() {});
+}
 
 function syncEnabled() { return !!(SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey && window.supabase); }
 
@@ -1050,11 +1058,13 @@ function initSync() {
     supa.auth.getSession().then(function(res) {
         currentUser = res.data.session ? res.data.session.user : null;
         updateAuthUI();
+        refreshAdminFlag();
         if (currentUser) syncNow();
     });
     supa.auth.onAuthStateChange(function(event, session) {
         currentUser = session ? session.user : null;
         updateAuthUI();
+        refreshAdminFlag();
         if (event === 'SIGNED_IN') syncNow();
     });
 }
@@ -1107,6 +1117,7 @@ async function signOut() {
     if (!supa) return;
     await supa.auth.signOut();
     currentUser = null;
+    isAdminUser = false;
     updateAuthUI();
 }
 function updateAuthUI() {

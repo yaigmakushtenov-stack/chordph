@@ -5,13 +5,32 @@
 -- Users submit; the admin reviews; approved submissions become versions.
 
 -- ---------------------------------------------------------------------------
--- Admin identity — single source of truth for who may review/approve/curate.
--- To add more admins later, extend this function (or swap it for a table).
+-- Admin identity — an allowlist of emails who may review/approve/curate.
+-- Add a reviewer later with:  insert into public.admins (email) values ('them@x.com');
+-- They just sign in with that email (magic-link) — no passwords anywhere.
 -- ---------------------------------------------------------------------------
+create table if not exists public.admins (
+    email    text primary key,
+    added_at timestamptz not null default now()
+);
+alter table public.admins enable row level security;
+
+-- is_admin() runs as owner (security definer) so it can read the allowlist even
+-- though normal users can't — this also avoids RLS recursion on public.admins.
 create or replace function public.is_admin() returns boolean
-language sql stable as $$
-  select coalesce((auth.jwt() ->> 'email') = 'yaigmakushtenov@gmail.com', false);
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.admins where email = (auth.jwt() ->> 'email'));
 $$;
+
+-- only admins can see (and, below, manage) the admin list
+drop policy if exists "admins_read" on public.admins;
+create policy "admins_read" on public.admins for select using (public.is_admin());
+drop policy if exists "admins_manage" on public.admins;
+create policy "admins_manage" on public.admins
+    for all using (public.is_admin()) with check (public.is_admin());
+
+-- seed the owner as the first admin
+insert into public.admins (email) values ('yaigmakushtenov@gmail.com') on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
 -- 1. submissions — what users send in, awaiting review
