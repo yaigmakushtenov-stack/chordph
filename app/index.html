@@ -150,6 +150,44 @@
 
         .empty { color: var(--faint); text-align: center; padding: 48px 0; font-size: 14px; line-height: 1.7; }
 
+        /* ---- community: review queue, versions, voting ---- */
+        .review-badge {
+            display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px;
+            font-size: 11px; line-height: 18px; text-align: center; border-radius: 9px;
+            background: var(--accent); color: #fff; font-weight: 700;
+        }
+        .sub-card {
+            background: var(--panel-2, #171c28); border: 1px solid var(--border, #263041);
+            border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+        }
+        .sub-card .sc-title { font-size: 16px; font-weight: 650; }
+        .sub-card .sc-by { font-size: 12px; color: var(--muted); margin-top: 2px; }
+        .sub-card .sc-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .sc-tag {
+            font-size: 11px; padding: 2px 8px; border-radius: 999px;
+            background: rgba(79,140,255,0.14); color: #9dc0ff; border: 1px solid rgba(79,140,255,0.3);
+        }
+        .sub-card pre.sc-chart {
+            white-space: pre-wrap; font-size: 12px; line-height: 1.5; max-height: 220px; overflow: auto;
+            background: rgba(0,0,0,0.22); border-radius: 8px; padding: 10px; margin: 6px 0;
+        }
+        .sub-card .sc-actions { display: flex; gap: 18px; margin-top: 8px; }
+        .vote-btn {
+            display: inline-flex; align-items: center; gap: 6px; font: inherit; cursor: pointer;
+            background: none; border: 1px solid var(--border, #263041); color: var(--muted);
+            border-radius: 999px; padding: 4px 12px;
+        }
+        .vote-btn.voted { border-color: var(--accent); color: var(--accent); background: rgba(79,140,255,0.12); }
+        #chart-versions { margin-top: 6px; }
+        #app-toast {
+            position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+            background: #10141d; border: 1px solid var(--border, #263041); color: var(--text, #e8ecf3);
+            padding: 11px 18px; border-radius: 999px; font-size: 13px; max-width: 88vw; text-align: center;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.5); opacity: 0; pointer-events: none;
+            transition: opacity .2s, transform .2s; z-index: 900;
+        }
+        #app-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
         .section-label {
             font-size: 11px;
             color: var(--faint);
@@ -476,6 +514,8 @@
         <button class="tap" id="nav-favorites" onclick="go('favorites')">Favorites</button>
         <button class="tap" id="nav-setlists" onclick="go('setlists')">Setlists</button>
         <hr class="drawer-hr">
+        <button class="tap" id="nav-submit" onclick="openSubmitSheet()">Submit a chart</button>
+        <button class="tap" id="nav-review" onclick="go('review')" style="display:none;">Review queue <span id="review-badge" class="review-badge" style="display:none;"></span></button>
         <button class="tap" onclick="location.href='/analyzer/'">Key &amp; BPM Analyzer</button>
     </div>
     <button class="drawer-profile" onclick="openSettings()">
@@ -575,6 +615,7 @@
         <div class="chart-head">
             <div class="chart-title" id="chart-title"></div>
             <div class="chart-meta" id="chart-meta"></div>
+            <div id="chart-versions"></div>
         </div>
 
         <div class="control-dock">
@@ -628,6 +669,17 @@
         <div style="padding: 6px 0 20px;">
             <button class="tap" onclick="openMedleySheet()">+ Medley</button>
         </div>
+    </div>
+</div>
+
+<div class="view" id="view-review">
+    <div class="wrap">
+        <div class="bar">
+            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
+            <span class="wordmark">Review queue</span>
+            <span class="bar-side right"><button class="tap" onclick="renderReview()" aria-label="Refresh">&#8635;</button></span>
+        </div>
+        <div id="review-list"></div>
     </div>
 </div>
 
@@ -922,6 +974,8 @@ var SUPABASE_CONFIG = {
     anonKey: 'sb_publishable_MVJjUxOe827PftmJlDiTsQ_RN0hLIII'   // publishable key — safe in-browser (RLS protects data)
 };
 var supa = null, currentUser = null, pushTimer = null;
+var ADMIN_EMAIL = 'yaigmakushtenov@gmail.com';   // sole reviewer (mirrors is_admin() in the DB)
+function isAdmin() { return !!(currentUser && (currentUser.email || '').toLowerCase() === ADMIN_EMAIL); }
 
 function syncEnabled() { return !!(SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey && window.supabase); }
 
@@ -1056,9 +1110,272 @@ async function signOut() {
     updateAuthUI();
 }
 function updateAuthUI() {
+    updateContribUI();   // admin-only Review item + submit availability follow auth
     var el = document.getElementById('sync-status');
     if (!el) return;
     el.innerHTML = renderSyncSection();
+}
+
+/* =========================================================
+   COMMUNITY — submit a chart, admin review, versions, voting
+   ========================================================= */
+function updateContribUI() {
+    var review = document.getElementById('nav-review');
+    if (review) review.style.display = isAdmin() ? 'block' : 'none';
+    if (isAdmin()) refreshReviewBadge();
+}
+function refreshReviewBadge() {
+    if (!supa || !isAdmin()) return;
+    supa.from('submissions').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+        .then(function(res) {
+            var b = document.getElementById('review-badge');
+            if (!b) return;
+            var n = res.count || 0;
+            b.textContent = n;
+            b.style.display = n ? 'inline-block' : 'none';
+        });
+}
+var TAB_INSTRUMENTS = ['Lead Guitar', 'Rhythm Guitar', 'Bass', 'Keyboard', 'Ukulele', 'Other'];
+function isRefUrl(u) {
+    return /^https?:\/\/\S+/i.test(u) && /(youtube\.com|youtu\.be|spotify\.com)/i.test(u);
+}
+function openSubmitSheet() {
+    closeDrawer();
+    var keyOpts = SHARPS.map(function(k) { return '<option>' + k + '</option>'; }).join('');
+    var instOpts = TAB_INSTRUMENTS.map(function(i) { return '<option>' + i + '</option>'; }).join('');
+    var signedOut = !currentUser;
+    openSheet(
+        '<div class="sheet-head"><div class="sheet-title">Submit a chart</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Shared with everyone after review. ' +
+        '<button class="tap" style="padding:0;color:var(--accent);font-size:12px;" onclick="openRulesSheet()">See the rules</button> — ' +
+        'you need a title, a YouTube/Spotify reference link, and a real chart.</div></div>' +
+        '<div class="sheet-scroll">' +
+        '<input class="field" id="sub-title" placeholder="Song title *" autocomplete="off">' +
+        '<input class="field" id="sub-artist" placeholder="Original artist *" autocomplete="off">' +
+        '<div class="field-row">' +
+        '<select class="field" id="sub-key"><option value="">Key *</option>' + keyOpts + '</select>' +
+        '<input class="field" id="sub-tempo" type="number" placeholder="BPM"></div>' +
+        '<div class="field-row">' +
+        '<select class="field" id="sub-type" onchange="onSubTypeChange()"><option value="chord">Chord chart</option><option value="tab">Tab</option></select>' +
+        '<select class="field" id="sub-instrument" style="display:none;"><option value="">Instrument *</option>' + instOpts + '</select></div>' +
+        '<input class="field" id="sub-ref" placeholder="YouTube or Spotify link * (reference)" autocomplete="off">' +
+        '<textarea class="field" id="sub-chart" placeholder="Chart *&#10;&#10;[Verse 1]&#10;G              D&#10;Your lyrics here" style="min-height:160px;"></textarea>' +
+        '<div class="form-error" id="sub-err"></div>' +
+        (signedOut ? '<div style="font-size:12px;color:var(--muted);">Not signed in — this saves to your device now. ' +
+            'To submit it to the shared library for review, sign in from Settings.</div>' : '') +
+        '</div>' +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button>' +
+        '<button class="tap primary" onclick="submitChart()">' + (signedOut ? 'Save to device' : 'Submit') + '</button></div>',
+        true
+    );
+}
+function onSubTypeChange() {
+    var isTab = document.getElementById('sub-type').value === 'tab';
+    document.getElementById('sub-instrument').style.display = isTab ? '' : 'none';
+}
+function openRulesSheet() {
+    openSheet(
+        '<div class="sheet-title">Submission rules</div>' +
+        '<div class="sheet-scroll" style="font-size:13px;line-height:1.65;color:var(--muted);">' +
+        '<p><b style="color:var(--text);">Every submission is reviewed before it goes public.</b> Until then it stays on your device — you can still use it.</p>' +
+        '<p style="margin-top:10px;"><b style="color:var(--text);">Required</b></p>' +
+        '<ul style="margin:4px 0 0 18px;">' +
+        '<li>Correct song title and <b>original</b> artist.</li>' +
+        '<li>The key the chart is written in.</li>' +
+        '<li>A YouTube/Spotify <b>reference link</b> to the recording — this is how it’s checked.</li>' +
+        '<li>For tabs: which instrument it’s for.</li>' +
+        '<li>Section labels (<code>[Verse]</code>, <code>[Chorus]</code>).</li></ul>' +
+        '<p style="margin-top:10px;"><b style="color:var(--text);">Formatting</b></p>' +
+        '<ul style="margin:4px 0 0 18px;">' +
+        '<li>Chords on their own line, above the lyric they change on.</li>' +
+        '<li>Standard names: <code>G</code>, <code>Em</code>, <code>C#m</code>, <code>A/C#</code>.</li>' +
+        '<li>One song per submission, playable start to finish.</li></ul>' +
+        '<p style="margin-top:10px;"><b style="color:var(--text);">Rejected:</b> duplicates of an existing good version, a missing or mismatched reference, wrong or placeholder chords, spam, or full lyric reprints with no chords.</p>' +
+        '<p style="margin-top:10px;">Approved charts can be <b>thumbs-up voted</b>, so the best version of each song rises to the top.</p>' +
+        '</div>' +
+        '<div class="sheet-actions"><button class="tap primary" onclick="openSubmitSheet()">Back to submit</button></div>',
+        true
+    );
+}
+function submitChart() {
+    var title = document.getElementById('sub-title').value.trim();
+    var artist = document.getElementById('sub-artist').value.trim();
+    var key = document.getElementById('sub-key').value;
+    var tempo = parseInt(document.getElementById('sub-tempo').value, 10) || 0;
+    var type = document.getElementById('sub-type').value;
+    var instrument = type === 'tab' ? document.getElementById('sub-instrument').value : '';
+    var ref = document.getElementById('sub-ref').value.trim();
+    var chart = document.getElementById('sub-chart').value.trim();
+    var err = document.getElementById('sub-err');
+    function fail(m) { err.textContent = m; err.style.display = 'block'; }
+    if (!title || !artist || !key || !chart) return fail('Title, artist, key and chart are required.');
+    if (!isRefUrl(ref)) return fail('A YouTube or Spotify reference link is required.');
+    if (type === 'tab' && !instrument) return fail('Pick the instrument this tab is for.');
+
+    // Always save locally so the contributor can use it right away (per the plan:
+    // usable on your device until it's approved into the shared library).
+    state.customs.push({ id: 'c' + Date.now(), title: title, artist: artist, key: key,
+                         tempo: tempo, feel: '', chart: chart, custom: true });
+    save();
+    if (state.view === 'songs') renderSongList();
+
+    if (!currentUser || !supa) {
+        closeSheet();
+        toast('Saved to your device. Sign in (Settings) to submit it for review.');
+        return;
+    }
+    supa.from('submissions').insert({
+        submitter_id: currentUser.id, submitter_email: currentUser.email,
+        title: title, artist: artist, key: key, tempo: tempo || null, feel: null,
+        type: type, instrument: instrument || null, reference_url: ref, chart: chart
+    }).then(function(res) {
+        closeSheet();
+        if (res.error) toast('Saved locally, but submission failed: ' + res.error.message);
+        else toast('Submitted for review — thanks! It’s on your device meanwhile.');
+    });
+}
+
+/* ---- admin review queue ---- */
+function renderReview() {
+    var box = document.getElementById('review-list');
+    if (!isAdmin() || !supa) { box.innerHTML = '<div class="empty">Admins only.</div>'; return; }
+    box.innerHTML = '<div class="empty">Loading…</div>';
+    supa.from('submissions').select('*').eq('status', 'pending').order('created_at', { ascending: true })
+        .then(function(res) {
+            if (res.error) { box.innerHTML = '<div class="empty">Couldn’t load: ' + esc(res.error.message) + '</div>'; return; }
+            var rows = res.data || [];
+            if (!rows.length) { box.innerHTML = '<div class="empty">Nothing pending. 🎉</div>'; return; }
+            box.innerHTML = rows.map(reviewCard).join('');
+        });
+}
+function reviewCard(s) {
+    var tags = ['<span class="sc-tag">' + esc(s.type === 'tab' ? 'Tab' + (s.instrument ? ' · ' + esc(s.instrument) : '') : 'Chords') + '</span>',
+                '<span class="sc-tag">Key ' + esc(s.key || '?') + '</span>',
+                s.tempo ? '<span class="sc-tag">' + s.tempo + ' BPM</span>' : '',
+                s.song_id ? '<span class="sc-tag">version of ' + esc(s.song_id) + '</span>' : '<span class="sc-tag">new song</span>'].join('');
+    return '<div class="sub-card">' +
+        '<div class="sc-title">' + esc(s.title) + '</div>' +
+        '<div class="sc-by">' + esc(s.artist || '') + ' · by ' + esc(s.submitter_email) + '</div>' +
+        '<div class="sc-tags">' + tags + '</div>' +
+        '<div class="sc-by"><a href="' + esc(s.reference_url) + '" target="_blank" rel="noopener" style="color:var(--accent);">Reference ↗</a></div>' +
+        '<pre class="sc-chart">' + esc(s.chart) + '</pre>' +
+        '<div class="sc-actions">' +
+        '<button class="tap primary" onclick="approveSubmission(\'' + s.id + '\')">Approve</button>' +
+        '<button class="tap danger" onclick="rejectSubmission(\'' + s.id + '\')">Reject</button></div>' +
+        '</div>';
+}
+function slugify(t) {
+    return (t || 'song').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'song';
+}
+async function approveSubmission(id) {
+    if (!isAdmin() || !supa) return;
+    try {
+        var got = await supa.from('submissions').select('*').eq('id', id).single();
+        if (got.error) throw got.error;
+        var s = got.data;
+        var songId = s.song_id;
+        if (!songId) {
+            // brand-new song: mint a unique catalog id and create the row
+            songId = slugify(s.title);
+            var exists = await supa.from('songs').select('id').eq('id', songId).maybeSingle();
+            if (exists.data) songId = songId + '-' + Date.now().toString(36).slice(-4);
+            var ins = await supa.from('songs').insert({
+                id: songId, title: s.title, artist: s.artist, key: s.key,
+                tempo: s.tempo || null, feel: s.feel || null, chart: s.chart
+            });
+            if (ins.error) throw ins.error;
+        }
+        var v = await supa.from('song_versions').insert({
+            song_id: songId, contributor_email: s.submitter_email, key: s.key,
+            type: s.type, instrument: s.instrument, reference_url: s.reference_url, chart: s.chart
+        });
+        if (v.error) throw v.error;
+        var up = await supa.from('submissions').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', id);
+        if (up.error) throw up.error;
+        toast('Approved.');
+        fetchLibrary();          // pull the new/updated song into everyone's library
+        renderReview(); refreshReviewBadge();
+    } catch (e) { toast('Approve failed: ' + (e.message || e)); }
+}
+async function rejectSubmission(id) {
+    if (!isAdmin() || !supa) return;
+    var note = prompt('Reason (optional, shown to no one for now):') || null;
+    var res = await supa.from('submissions').update({ status: 'rejected', review_note: note, reviewed_at: new Date().toISOString() }).eq('id', id);
+    if (res.error) toast('Reject failed: ' + res.error.message);
+    else { toast('Rejected.'); renderReview(); refreshReviewBadge(); }
+}
+
+/* ---- versions + voting (on the chart) ---- */
+function renderChartVersions(songId) {
+    var el = document.getElementById('chart-versions');
+    if (!el) return;
+    el.innerHTML = '';
+    // custom/local songs aren't in the cloud catalog; only library songs have versions
+    if (!supa || !songId || songId.charAt(0) === 'c') return;
+    supa.from('song_versions').select('id', { count: 'exact', head: true }).eq('song_id', songId)
+        .then(function(res) {
+            var n = res.count || 0;
+            if (!n) return;
+            el.innerHTML = '<button class="tap" onclick="openVersionsSheet(\'' + songId + '\')">' +
+                '♪ ' + n + ' community version' + (n > 1 ? 's' : '') + ' &amp; voting ›</button>';
+        });
+}
+async function openVersionsSheet(songId) {
+    openSheet('<div class="sheet-title">Community versions</div><div class="sheet-scroll" id="ver-list"><div class="empty">Loading…</div></div>' +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button></div>', true);
+    try {
+        var vres = await supa.from('song_versions').select('*').eq('song_id', songId).order('votes', { ascending: false });
+        if (vres.error) throw vres.error;
+        var versions = vres.data || [];
+        var mine = {};
+        if (currentUser) {
+            var mv = await supa.from('votes').select('version_id').eq('user_id', currentUser.id);
+            (mv.data || []).forEach(function(r) { mine[r.version_id] = true; });
+        }
+        var box = document.getElementById('ver-list');
+        if (!box) return;
+        if (!versions.length) { box.innerHTML = '<div class="empty">No versions yet. Be the first — Submit a chart.</div>'; return; }
+        box.innerHTML = versions.map(function(v) { return versionCard(v, mine[v.id]); }).join('');
+    } catch (e) {
+        var b = document.getElementById('ver-list'); if (b) b.innerHTML = '<div class="empty">Couldn’t load: ' + esc(e.message || e) + '</div>';
+    }
+}
+function versionCard(v, voted) {
+    var tag = v.type === 'tab' ? 'Tab' + (v.instrument ? ' · ' + esc(v.instrument) : '') : 'Chords';
+    return '<div class="sub-card">' +
+        '<div class="sc-tags"><span class="sc-tag">' + tag + '</span><span class="sc-tag">Key ' + esc(v.key || '?') + '</span>' +
+        (v.contributor_email ? '<span class="sc-tag">' + esc(v.contributor_email.split('@')[0]) + '</span>' : '') + '</div>' +
+        '<pre class="sc-chart">' + esc(v.chart) + '</pre>' +
+        '<div class="sc-actions">' +
+        '<button class="vote-btn' + (voted ? ' voted' : '') + '" id="vote-' + v.id + '" onclick="toggleVote(\'' + v.id + '\')">' +
+        '👍 <span id="votes-' + v.id + '">' + (v.votes || 0) + '</span></button></div></div>';
+}
+async function toggleVote(versionId) {
+    if (!supa) return;
+    if (!currentUser) { toast('Sign in (Settings) to vote.'); return; }
+    var btn = document.getElementById('vote-' + versionId);
+    var cnt = document.getElementById('votes-' + versionId);
+    var voted = btn && btn.classList.contains('voted');
+    var n = parseInt(cnt.textContent, 10) || 0;
+    if (voted) {
+        btn.classList.remove('voted'); cnt.textContent = Math.max(0, n - 1);
+        var d = await supa.from('votes').delete().eq('version_id', versionId).eq('user_id', currentUser.id);
+        if (d.error) { btn.classList.add('voted'); cnt.textContent = n; toast('Vote failed.'); }
+    } else {
+        btn.classList.add('voted'); cnt.textContent = n + 1;
+        var i = await supa.from('votes').insert({ version_id: versionId, user_id: currentUser.id });
+        if (i.error) { btn.classList.remove('voted'); cnt.textContent = n; toast('Vote failed.'); }
+    }
+}
+
+/* lightweight toast */
+var toastTimer = null;
+function toast(msg) {
+    var t = document.getElementById('app-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'app-toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.className = 'show';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { t.className = ''; }, 3200);
 }
 
 /* One-time migration from the index-based v1 (worshipapp_*) data */
@@ -1164,6 +1481,7 @@ function go(view) {
     if (view === 'songs') { renderSongList(); show('songs'); }
     if (view === 'favorites') { renderFavorites(); show('favorites'); }
     if (view === 'setlists') { state.setlistEdit = false; state.setlistsEdit = false; renderSetlists(); show('setlists'); }
+    if (view === 'review') { renderReview(); show('review'); }
 }
 function openDrawer() {
     document.getElementById('drawer').classList.add('open');
@@ -1302,6 +1620,7 @@ function renderChart() {
     if (capo > 0) meta += ' &middot; <span class="key" onclick="toggleLayer(\'capo\')">Capo ' + capo +
         ' &rarr; ' + esc(noteName(fingeredKeyIdx)) + ' shapes</span>';
     document.getElementById('chart-meta').innerHTML = meta;
+    renderChartVersions(song.id);
 
     var star = document.getElementById('chart-star');
     star.innerHTML = isFav(song.id) ? '&#9733;' : '&#9734;';
