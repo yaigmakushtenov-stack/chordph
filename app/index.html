@@ -179,6 +179,17 @@
         }
         .vote-btn.voted { border-color: var(--accent); color: var(--accent); background: rgba(79,140,255,0.12); }
         #chart-versions { margin-top: 6px; }
+        .tag-filter {
+            display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+        }
+        .tag-filter::-webkit-scrollbar { display: none; }
+        .tag-chip {
+            flex: 0 0 auto; font: inherit; font-size: 12px; cursor: pointer;
+            padding: 5px 12px; border-radius: 999px; white-space: nowrap;
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border, #263041); color: var(--muted);
+        }
+        .tag-chip.on { background: rgba(79,140,255,0.15); border-color: var(--accent); color: var(--accent); }
         #app-toast {
             position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
             background: #10141d; border: 1px solid var(--border, #263041); color: var(--text, #e8ecf3);
@@ -544,7 +555,8 @@
             <span class="wordmark">Chord.ph</span>
             <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()" aria-label="Add song">+</button></span>
         </div>
-        <input class="search" id="search" placeholder="Search songs&hellip;" oninput="renderSongList()" autocomplete="off">
+        <input class="search" id="search" placeholder="Search songs, artists, tags&hellip;" oninput="renderSongList()" autocomplete="off">
+        <div id="tag-filter" class="tag-filter"></div>
         <div id="song-list"></div>
     </div>
 </div>
@@ -1169,6 +1181,7 @@ function openSubmitSheet() {
         '<div class="field-row">' +
         '<select class="field" id="sub-type" onchange="onSubTypeChange()"><option value="chord">Chord chart</option><option value="tab">Tab</option></select>' +
         '<select class="field" id="sub-instrument" style="display:none;"><option value="">Instrument *</option>' + instOpts + '</select></div>' +
+        '<input class="field" id="sub-tags" placeholder="Tags, comma-separated — Worship, Filipino, Mellow…" autocomplete="off">' +
         '<input class="field" id="sub-ref" placeholder="YouTube or Spotify link * (reference)" autocomplete="off">' +
         '<textarea class="field" id="sub-chart" placeholder="Chart *&#10;&#10;[Verse 1]&#10;G              D&#10;Your lyrics here" style="min-height:160px;"></textarea>' +
         '<div class="form-error" id="sub-err"></div>' +
@@ -1216,6 +1229,7 @@ function submitChart() {
     var type = document.getElementById('sub-type').value;
     var instrument = type === 'tab' ? document.getElementById('sub-instrument').value : '';
     var ref = document.getElementById('sub-ref').value.trim();
+    var tags = parseTags(document.getElementById('sub-tags').value);
     var chart = document.getElementById('sub-chart').value.trim();
     var err = document.getElementById('sub-err');
     function fail(m) { err.textContent = m; err.style.display = 'block'; }
@@ -1226,7 +1240,7 @@ function submitChart() {
     // Always save locally so the contributor can use it right away (per the plan:
     // usable on your device until it's approved into the shared library).
     state.customs.push({ id: 'c' + Date.now(), title: title, artist: artist, key: key,
-                         tempo: tempo, feel: '', chart: chart, custom: true });
+                         tempo: tempo, feel: '', tags: tags, chart: chart, custom: true });
     save();
     if (state.view === 'songs') renderSongList();
 
@@ -1237,7 +1251,7 @@ function submitChart() {
     }
     supa.from('submissions').insert({
         submitter_id: currentUser.id, submitter_email: currentUser.email,
-        title: title, artist: artist, key: key, tempo: tempo || null, feel: null,
+        title: title, artist: artist, key: key, tempo: tempo || null, feel: null, tags: tags,
         type: type, instrument: instrument || null, reference_url: ref, chart: chart
     }).then(function(res) {
         closeSheet();
@@ -1292,7 +1306,7 @@ async function approveSubmission(id) {
             if (exists.data) songId = songId + '-' + Date.now().toString(36).slice(-4);
             var ins = await supa.from('songs').insert({
                 id: songId, title: s.title, artist: s.artist, key: s.key,
-                tempo: s.tempo || null, feel: s.feel || null, chart: s.chart
+                tempo: s.tempo || null, feel: s.feel || null, tags: s.tags || [], chart: s.chart
             });
             if (ins.error) throw ins.error;
         }
@@ -1441,7 +1455,7 @@ function songById(id) {
 /* Shared library: cache-first for instant/offline paint, then refresh from cloud. */
 function fetchLibrary() {
     if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.anonKey) return;
-    var url = SUPABASE_CONFIG.url + '/rest/v1/songs?select=id,title,artist,key,tempo,feel,chart&order=title';
+    var url = SUPABASE_CONFIG.url + '/rest/v1/songs?select=id,title,artist,key,tempo,feel,chart,tags&order=title';
     fetch(url, { headers: { apikey: SUPABASE_CONFIG.anonKey, Authorization: 'Bearer ' + SUPABASE_CONFIG.anonKey } })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(rows) {
@@ -1551,12 +1565,54 @@ function songRow(song, opts) {
     return row;
 }
 
+var songFilterTags = [];   // active tag filters in the songs view (session)
+function songTags(s) { return (s && s.tags) || []; }
+function parseTags(str) {
+    return (str || '').split(',').map(function(t) {
+        t = t.trim().replace(/\s+/g, ' ');
+        return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';   // Title-case first letter
+    }).filter(Boolean).filter(function(t, i, a) { return a.indexOf(t) === i; }).slice(0, 8);
+}
+function matchesQuery(s, q) {
+    if (!q) return true;
+    if (s.title.toLowerCase().indexOf(q) !== -1) return true;
+    if ((s.artist || '').toLowerCase().indexOf(q) !== -1) return true;
+    return songTags(s).some(function(t) { return t.toLowerCase().indexOf(q) !== -1; });
+}
+function hasAllTags(s, tags) {
+    var st = songTags(s);
+    return tags.every(function(t) { return st.indexOf(t) !== -1; });
+}
+function renderTagFilter() {
+    var el = document.getElementById('tag-filter');
+    if (!el) return;
+    var counts = {};
+    allSongs().forEach(function(s) { songTags(s).forEach(function(t) { counts[t] = (counts[t] || 0) + 1; }); });
+    var tags = Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a] || a.localeCompare(b); });
+    // keep any active tag visible even if it momentarily has no matches
+    songFilterTags.forEach(function(t) { if (tags.indexOf(t) === -1) tags.push(t); });
+    if (!tags.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    var chips = tags.map(function(t) {
+        var on = songFilterTags.indexOf(t) !== -1;
+        return '<button class="tag-chip' + (on ? ' on' : '') + '" onclick="toggleTagFilter(\'' + esc(t).replace(/'/g, "\\'") + '\')">' + esc(t) + '</button>';
+    });
+    if (songFilterTags.length) chips.unshift('<button class="tag-chip" onclick="clearTagFilter()">Clear ✕</button>');
+    el.innerHTML = chips.join('');
+}
+function toggleTagFilter(t) {
+    var i = songFilterTags.indexOf(t);
+    if (i === -1) songFilterTags.push(t); else songFilterTags.splice(i, 1);
+    renderSongList();
+}
+function clearTagFilter() { songFilterTags = []; renderSongList(); }
 function renderSongList() {
     var q = (document.getElementById('search').value || '').toLowerCase();
     var box = document.getElementById('song-list');
+    renderTagFilter();
     box.innerHTML = '';
     var list = allSongs().filter(function(s) {
-        return !q || s.title.toLowerCase().indexOf(q) !== -1 || s.artist.toLowerCase().indexOf(q) !== -1;
+        return matchesQuery(s, q) && hasAllTags(s, songFilterTags);
     });
     if (!list.length) {
         box.innerHTML = '<div class="empty">No songs match.</div>';
@@ -2347,6 +2403,7 @@ function openSongSheet(songId) {
         '<input class="field" id="sh-song-tempo" type="number" placeholder="BPM" value="' + (song && song.tempo ? song.tempo : '') + '">' +
         '</div>' +
         '<select class="field" id="sh-song-feel"><option value="">Song feel</option>' + feels + '</select>' +
+        '<input class="field" id="sh-song-tags" placeholder="Tags, comma-separated — e.g. Worship, Filipino, Mellow" value="' + (song && song.tags ? esc(song.tags.join(', ')) : '') + '" autocomplete="off">' +
         '<textarea class="field" id="sh-song-chart" placeholder="Chord chart *&#10;&#10;[Verse 1]&#10;G              D&#10;Your lyrics here">' + (song ? esc(song.chart) : '') + '</textarea>' +
         '<div class="form-error" id="sh-song-err"></div>' +
         '<div class="sheet-actions">' +
@@ -2361,6 +2418,7 @@ function saveSong() {
     var key = document.getElementById('sh-song-key').value;
     var tempo = parseInt(document.getElementById('sh-song-tempo').value, 10) || 0;
     var feel = document.getElementById('sh-song-feel').value;
+    var tags = parseTags(document.getElementById('sh-song-tags').value);
     var chart = document.getElementById('sh-song-chart').value.trim();
     var err = document.getElementById('sh-song-err');
     if (!title || !artist || !key || !chart) {
@@ -2371,10 +2429,10 @@ function saveSong() {
     if (editingSongId) {
         var song = songById(editingSongId);
         song.title = title; song.artist = artist; song.key = key;
-        song.tempo = tempo; song.feel = feel; song.chart = chart;
+        song.tempo = tempo; song.feel = feel; song.tags = tags; song.chart = chart;
     } else {
         state.customs.push({ id: 'c' + Date.now(), title: title, artist: artist, key: key,
-                             tempo: tempo, feel: feel, chart: chart, custom: true });
+                             tempo: tempo, feel: feel, tags: tags, chart: chart, custom: true });
     }
     save(); closeSheet();
     if (state.view === 'songs') renderSongList();
