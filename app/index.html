@@ -220,6 +220,15 @@
             color: var(--text);
             padding: 18px 0 10px;
         }
+        /* guitar chord diagram reference strip */
+        .chord-strip {
+            display: flex; gap: 14px; overflow-x: auto;
+            padding: 14px 0 12px; margin-top: 8px;
+            border-bottom: 1px solid var(--hairline);
+        }
+        .chord-dia { flex-shrink: 0; text-align: center; }
+        .cd-name { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 3px; }
+        .chord-strip .cd-missing { font-size: 11px; color: var(--faint); align-self: center; }
         pre.chart .chord-line { color: var(--accent); font-weight: 700; }
         pre.chart .sec-head {
             color: var(--accent-2);
@@ -567,6 +576,7 @@
                 <button class="tap" id="ctl-transpose" onclick="toggleLayer('transpose')">Transpose</button>
                 <button class="tap" id="ctl-capo" onclick="toggleLayer('capo')">Capo</button>
                 <button class="tap" id="ctl-numbers" onclick="toggleNashville()">Numbers</button>
+                <button class="tap" id="ctl-diagrams" onclick="toggleDiagrams()">Chords</button>
                 <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
                 <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
             </div>
@@ -599,6 +609,7 @@
             </div>
         </div>
 
+        <div class="chord-strip" id="chord-strip" style="display:none;"></div>
         <pre class="chart" id="chart-body"></pre>
         <div id="medley-blocks"></div>
         <div style="padding: 6px 0 20px;">
@@ -731,6 +742,88 @@ function formatChartNashville(text, keyRootIndex) {
 }
 
 /* =========================================================
+   GUITAR CHORD SHAPES + DIAGRAMS
+   Fret arrays are 6 ints low-E→high-E: -1 mute, 0 open, n = fret.
+   ========================================================= */
+var OPEN_CHORDS = {
+    'C': [-1,3,2,0,1,0], 'Cmaj7': [-1,3,2,0,0,0], 'C7': [-1,3,2,3,1,0], 'Cadd9': [-1,3,2,0,3,0],
+    'D': [-1,-1,0,2,3,2], 'Dm': [-1,-1,0,2,3,1], 'D7': [-1,-1,0,2,1,2], 'Dmaj7': [-1,-1,0,2,2,2],
+    'Dm7': [-1,-1,0,2,1,1], 'Dsus4': [-1,-1,0,2,3,3], 'Dsus2': [-1,-1,0,2,3,0],
+    'E': [0,2,2,1,0,0], 'Em': [0,2,2,0,0,0], 'E7': [0,2,0,1,0,0], 'Em7': [0,2,0,0,0,0], 'Emaj7': [0,2,1,1,0,0],
+    'F': [1,3,3,2,1,1], 'Fmaj7': [-1,-1,3,2,1,0], 'F7': [1,3,1,2,1,1],
+    'G': [3,2,0,0,0,3], 'G7': [3,2,0,0,0,1], 'Gmaj7': [3,2,0,0,0,2], 'Gsus4': [3,3,0,0,1,3], 'Gadd9': [3,0,0,0,0,3],
+    'A': [-1,0,2,2,2,0], 'Am': [-1,0,2,2,1,0], 'A7': [-1,0,2,0,2,0], 'Am7': [-1,0,2,0,1,0],
+    'Amaj7': [-1,0,2,1,2,0], 'Asus4': [-1,0,2,2,3,0], 'Asus2': [-1,0,2,2,0,0],
+    'B7': [-1,2,1,2,0,2], 'Bm': [-1,2,4,4,3,2]
+};
+// Movable barre templates (offset from the barre fret; -1 muted string)
+var BARRE_E = { '': [0,2,2,1,0,0], 'm': [0,2,2,0,0,0], '7': [0,2,0,1,0,0], 'm7': [0,2,0,0,0,0], 'maj7': [0,2,1,1,0,0], 'sus4': [0,2,2,2,0,0] };
+var BARRE_A = { '': [-1,0,2,2,2,0], 'm': [-1,0,2,2,1,0], '7': [-1,0,2,0,2,0], 'm7': [-1,0,2,0,1,0], 'maj7': [-1,0,2,1,2,0], 'sus4': [-1,0,2,2,3,0], 'sus2': [-1,0,2,2,0,0] };
+function normalizeQuality(q) {
+    q = (q || '').replace(/maj7|M7|Δ/,'maj7').replace(/min7|-7/,'m7').replace(/^min$/,'m').replace(/^-$/,'m');
+    if (BARRE_E[q] || BARRE_A[q]) return q;
+    if (q.indexOf('m7') === 0) return 'm7';
+    if (q.indexOf('maj7') === 0) return 'maj7';
+    if (q.indexOf('m') === 0) return 'm';
+    if (q.indexOf('sus4') === 0) return 'sus4';
+    if (q.indexOf('sus2') === 0) return 'sus2';
+    if (q.indexOf('7') === 0) return '7';
+    if (q === '') return '';
+    return null; // dim/aug/add9/etc — no barre template
+}
+function getGuitarShape(name) {
+    if (OPEN_CHORDS[name]) return OPEN_CHORDS[name];
+    var m = name.match(/^([A-G][b#]?)(.*)$/);
+    if (!m) return null;
+    var rootIdx = getNoteIndex(m[1]);
+    if (rootIdx < 0) return null;
+    var q = normalizeQuality(m[2]);
+    if (q === null) return null;
+    var fE = ((rootIdx - 4) % 12 + 12) % 12;   // E-string root fret
+    var fA = ((rootIdx - 9) % 12 + 12) % 12;    // A-string root fret
+    var canE = BARRE_E[q] && fE >= 1, canA = BARRE_A[q] && fA >= 1;
+    var useA;
+    if (canE && canA) useA = fA < fE;
+    else if (canA) useA = true;
+    else if (canE) useA = false;
+    else return null;
+    var tpl = useA ? BARRE_A[q] : BARRE_E[q], base = useA ? fA : fE;
+    return tpl.map(function(o) { return o < 0 ? -1 : o + base; });
+}
+// Unique chord names in appearance order (bass note dropped for the diagram)
+function uniqueChords(text) {
+    var seen = {}, out = [];
+    text.replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
+        function(match, root, quality) {
+            var name = root + (quality || '');
+            if (!seen[name]) { seen[name] = 1; out.push(name); }
+            return match;
+        });
+    return out;
+}
+function renderChordDiagram(name, frets) {
+    var fretted = frets.filter(function(f) { return f > 0; });
+    var maxF = fretted.length ? Math.max.apply(null, fretted) : 0;
+    var minF = fretted.length ? Math.min.apply(null, fretted) : 0;
+    var base = (maxF <= 4 || !fretted.length) ? 1 : minF;   // window start fret
+    var W = 46, x0 = 8, sw = (W - 2 * x0) / 5, top = 16, fh = 9, rows = 4;
+    var s = '<svg width="' + W + '" height="' + (top + rows * fh + 6) + '" viewBox="0 0 ' + W + ' ' + (top + rows * fh + 6) + '">';
+    // nut (thick) only when window starts at fret 1
+    if (base === 1) s += '<rect x="' + x0 + '" y="' + (top - 1) + '" width="' + (5 * sw) + '" height="2.5" fill="#8b93a7"/>';
+    else s += '<text x="' + (x0 - 4) + '" y="' + (top + fh) + '" font-size="7" fill="#8b93a7" text-anchor="end">' + base + '</text>';
+    for (var r = 0; r <= rows; r++) s += '<line x1="' + x0 + '" y1="' + (top + r * fh) + '" x2="' + (x0 + 5 * sw) + '" y2="' + (top + r * fh) + '" stroke="#3a4150" stroke-width="0.7"/>';
+    for (var c = 0; c < 6; c++) s += '<line x1="' + (x0 + c * sw) + '" y1="' + top + '" x2="' + (x0 + c * sw) + '" y2="' + (top + rows * fh) + '" stroke="#3a4150" stroke-width="0.7"/>';
+    for (var i = 0; i < 6; i++) {
+        var f = frets[i], x = x0 + i * sw;
+        if (f === -1) s += '<text x="' + x + '" y="' + (top - 4) + '" font-size="7" fill="#566072" text-anchor="middle">×</text>';
+        else if (f === 0) s += '<circle cx="' + x + '" cy="' + (top - 6) + '" r="2.4" fill="none" stroke="#8b93a7" stroke-width="0.9"/>';
+        else s += '<circle cx="' + x + '" cy="' + (top + (f - base + 0.5) * fh) + '" r="3" fill="#4f8cff"/>';
+    }
+    s += '</svg>';
+    return '<div class="chord-dia"><div class="cd-name">' + esc(name) + '</div>' + s + '</div>';
+}
+
+/* =========================================================
    BUILT-IN LIBRARY (ids are permanent — never renumber)
    ========================================================= */
 var BUILTIN_IDS = ['glorious','way-maker','presence','lilim','heart-of-worship','take-it-all','god-is-here','lead-me-to-the-cross','oceans','endless-praise','this-is-our-time','turn-it-up','dance'];
@@ -776,6 +869,7 @@ var state = {
     fontSize: 16,
     useFlats: false,
     nashville: false,           // show chords as Nashville numbers
+    showDiagrams: false,        // guitar chord-diagram reference strip
     view: 'songs',
     chartFrom: 'songs',         // where Back returns to
     currentSetlistId: null,
@@ -799,7 +893,7 @@ function save() {
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
     queuePush();
 }
@@ -821,6 +915,7 @@ function load() {
         if (s.fontSize) state.fontSize = s.fontSize;
         if (s.useFlats) state.useFlats = s.useFlats;
         if (s.nashville) state.nashville = s.nashville;
+        if (s.showDiagrams) state.showDiagrams = s.showDiagrams;
         state.updatedAt = parseInt(localStorage.getItem('chordph2_updated') || '0', 10);
     } catch (e) { console.warn('load failed', e); }
 }
@@ -845,7 +940,7 @@ function localSnapshot() {
         transpose: state.transpose,
         capo: state.capo,
         medleys: state.medleys,
-        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville },
+        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams },
         updated_at: state.updatedAt || 0
     };
 }
@@ -861,6 +956,7 @@ function applySnapshot(snap) {
         state.fontSize = snap.settings.fontSize || 16;
         state.useFlats = !!snap.settings.useFlats;
         state.nashville = !!snap.settings.nashville;
+        state.showDiagrams = !!snap.settings.showDiagrams;
     }
     state.updatedAt = snap.updated_at || Date.now();
     // persist without bumping the timestamp or re-queueing a push
@@ -871,7 +967,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
 }
 
@@ -1220,21 +1316,46 @@ function renderChart() {
         document.getElementById('ctl-' + l).classList.toggle('on', state.openLayer === l);
     });
     document.getElementById('ctl-numbers').classList.toggle('on', state.nashville);
+    document.getElementById('ctl-diagrams').classList.toggle('on', state.showDiagrams);
 
     // body
     var body = document.getElementById('chart-body');
     body.style.fontSize = state.fontSize + 'px';
+    var displayedChart = transposeChordText(song.chart, displaySteps);
     if (view === 'drummer') {
         body.innerHTML = formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo ? song.tempo + ' BPM' : '—') + '\n\n' + song.chart);
     } else if (state.nashville) {
         body.innerHTML = formatChartNashville(song.chart, getNoteIndex(song.key));  // key-relative; transpose/capo don't change numbers
     } else {
-        body.innerHTML = formatChart(transposeChordText(song.chart, displaySteps));
+        body.innerHTML = formatChart(displayedChart);
+    }
+
+    // chord diagram strip (guitar fingering for each unique fingered chord)
+    var strip = document.getElementById('chord-strip');
+    if (state.showDiagrams && view !== 'drummer' && !state.nashville) {
+        renderChordStrip(strip, displayedChart);
+        strip.style.display = 'flex';
+    } else {
+        strip.style.display = 'none';
     }
     renderMedley(song, keyIdx, capo);
 }
+function renderChordStrip(strip, chartText) {
+    var names = uniqueChords(chartText);
+    var html = names.map(function(n) {
+        var shape = getGuitarShape(n);
+        return shape ? renderChordDiagram(n, shape) : '';
+    }).filter(Boolean).join('');
+    strip.innerHTML = html || '<span class="cd-missing">No diagrams for these chords.</span>';
+}
 function toggleNashville() {
     state.nashville = !state.nashville;
+    if (state.nashville) state.showDiagrams = false;  // numbers + fingerings don't mix
+    save(); renderChart();
+}
+function toggleDiagrams() {
+    state.showDiagrams = !state.showDiagrams;
+    if (state.showDiagrams) state.nashville = false;
     save(); renderChart();
 }
 
@@ -1964,6 +2085,7 @@ function importBackup(event) {
                     state.fontSize = b.settings.fontSize || 16;
                     state.useFlats = !!b.settings.useFlats;
                     state.nashville = !!b.settings.nashville;
+                    state.showDiagrams = !!b.settings.showDiagrams;
                 }
                 save();
                 alert('Backup restored.');
