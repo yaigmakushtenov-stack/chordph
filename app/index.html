@@ -514,6 +514,7 @@
             <span class="wordmark">Favorites</span>
             <span class="bar-side right"></span>
         </div>
+        <input class="search" id="fav-search" placeholder="Search favorites&hellip;" oninput="renderFavorites()" autocomplete="off">
         <div id="favorites-list"></div>
     </div>
 </div>
@@ -1244,12 +1245,20 @@ function renderSongList() {
 
 function renderFavorites() {
     var box = document.getElementById('favorites-list');
+    var searchEl = document.getElementById('fav-search');
+    var q = (searchEl && searchEl.value || '').toLowerCase();
     box.innerHTML = '';
-    var list = state.favorites.map(songById).filter(Boolean);
-    if (!list.length) {
+    var favs = state.favorites.map(songById).filter(Boolean);
+    if (!favs.length) {
+        if (searchEl) searchEl.style.display = 'none';
         box.innerHTML = '<div class="empty">No favorites yet.<br>Tap the &#9734; on any song.</div>';
         return;
     }
+    if (searchEl) searchEl.style.display = '';
+    var list = favs.filter(function(s) {
+        return !q || s.title.toLowerCase().indexOf(q) !== -1 || s.artist.toLowerCase().indexOf(q) !== -1;
+    });
+    if (!list.length) { box.innerHTML = '<div class="empty">No favorites match.</div>'; return; }
     list.forEach(function(s) {
         box.appendChild(songRow(s, { onOpen: function(song) { openChart(song.id, 'favorites'); } }));
     });
@@ -1433,7 +1442,7 @@ function toggleScroll() {
         var acc = 0;
         function step() {
             if (!state.scroll.playing) return;
-            acc += state.scroll.speed * 0.35;
+            acc += state.scroll.speed * 0.18;   // gentler: speed 1 crawls, 5 is a moderate read
             if (acc >= 1) {
                 var px = Math.floor(acc); acc -= px;
                 window.scrollBy(0, px);
@@ -1451,7 +1460,7 @@ function stopScroll() {
     if (b) b.innerHTML = '&#9654; Play';
 }
 function scrollSpeedBy(d) {
-    state.scroll.speed = Math.max(1, Math.min(8, state.scroll.speed + d));
+    state.scroll.speed = Math.max(1, Math.min(5, state.scroll.speed + d));
     document.getElementById('scroll-val').textContent = state.scroll.speed;
 }
 
@@ -2193,12 +2202,33 @@ function finishOnboarding() {
     go('songs');
 }
 
+/* Left-edge swipe opens the drawer — so nav is reachable even when the top
+   bar has scrolled away. Mobile only (desktop keeps the persistent sidebar).
+   Passive listeners, so page scrolling is never blocked. */
+function setupEdgeSwipe() {
+    var sx = 0, sy = 0, tracking = false;
+    document.addEventListener('touchstart', function(e) {
+        tracking = false;
+        if (window.innerWidth >= 980) return;
+        if (document.getElementById('drawer').classList.contains('open')) return;
+        if (document.body.classList.contains('pre-app')) return;
+        var t = e.touches[0];
+        if (t.clientX <= 22) { sx = t.clientX; sy = t.clientY; tracking = true; }
+    }, { passive: true });
+    document.addEventListener('touchmove', function(e) {
+        if (!tracking) return;
+        var t = e.touches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+        if (dx > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) { tracking = false; openDrawer(); }
+    }, { passive: true });
+    document.addEventListener('touchend', function() { tracking = false; }, { passive: true });
+}
 function init() {
     migrate();
     load();
     if (state.profile && state.profile.name) go('songs');
     else renderOnboarding();
     initSync();
+    setupEdgeSwipe();
 }
 init();
 </script>
