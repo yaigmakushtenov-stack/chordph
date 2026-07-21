@@ -887,8 +887,7 @@ var state = {
     setlistPos: 0,
     setlistEdit: false,         // editing songs inside one setlist
     setlistsEdit: false,        // editing the list of setlists
-    medleys: {},                // { hostSongId: [{songId, keyOption, sectionIndices}] } — persisted
-    medley: [],                 // working copy for the open chart
+    medley: [],                 // working copy for the open chart (persisted per setlist, not globally)
     openLayer: null,
     scroll: { playing: false, speed: 3, raf: null },
     updatedAt: 0                // last local change (ms) — drives sync merge
@@ -903,14 +902,20 @@ function save() {
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
-    localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
     queuePush();
 }
+/* Medleys live inside the setlist the song is opened from. Adding one while
+   browsing the library (songs/favorites) is a session-only preview — never
+   saved. */
 function persistMedley() {
-    if (state.medley && state.medley.length) state.medleys[currentSongId] = state.medley;
-    else delete state.medleys[currentSongId];
+    if (state.chartFrom !== 'setlist' || !state.currentSetlistId) return;
+    var sl = setlistById(state.currentSetlistId);
+    if (!sl) return;
+    if (!sl.medleys) sl.medleys = {};
+    if (state.medley && state.medley.length) sl.medleys[currentSongId] = state.medley;
+    else delete sl.medleys[currentSongId];
     save();
 }
 function load() {
@@ -921,7 +926,6 @@ function load() {
         state.setlists = JSON.parse(localStorage.getItem('chordph2_setlists') || '[]');
         state.transpose = JSON.parse(localStorage.getItem('chordph2_transpose') || '{}');
         state.capo = JSON.parse(localStorage.getItem('chordph2_capo') || '{}');
-        state.medleys = JSON.parse(localStorage.getItem('chordph2_medleys') || '{}');
         var s = JSON.parse(localStorage.getItem('chordph2_settings') || '{}');
         if (s.fontSize) state.fontSize = s.fontSize;
         if (s.useFlats) state.useFlats = s.useFlats;
@@ -950,7 +954,6 @@ function localSnapshot() {
         setlists: state.setlists,
         transpose: state.transpose,
         capo: state.capo,
-        medleys: state.medleys,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams },
         updated_at: state.updatedAt || 0
     };
@@ -962,7 +965,6 @@ function applySnapshot(snap) {
     state.setlists = snap.setlists || [];
     state.transpose = snap.transpose || {};
     state.capo = snap.capo || {};
-    state.medleys = snap.medleys || {};
     if (snap.settings) {
         state.fontSize = snap.settings.fontSize || 16;
         state.useFlats = !!snap.settings.useFlats;
@@ -977,7 +979,6 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
-    localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
 }
@@ -1003,7 +1004,6 @@ function mergeData(local, cloud) {
         favorites: Array.from(new Set((local.favorites || []).concat(cloud.favorites || []))),
         transpose: Object.assign({}, older.transpose, newer.transpose),
         capo: Object.assign({}, older.capo, newer.capo),
-        medleys: Object.assign({}, older.medleys, newer.medleys),
         settings: newer.settings || older.settings,
         updated_at: Math.max(local.updated_at || 0, cloud.updated_at || 0)
     };
@@ -1270,7 +1270,13 @@ function renderFavorites() {
 function openChart(songId, from) {
     currentSongId = songId;
     state.chartFrom = from || 'songs';
-    state.medley = (state.medleys[songId] || []).slice();  // restore saved medley
+    // medley is remembered per setlist; from the library it starts empty
+    if (state.chartFrom === 'setlist' && state.currentSetlistId) {
+        var sl = setlistById(state.currentSetlistId);
+        state.medley = (sl && sl.medleys && sl.medleys[songId] || []).slice();
+    } else {
+        state.medley = [];
+    }
     state.openLayer = null;
     renderChart();
     show('chart');
@@ -2059,10 +2065,14 @@ function deleteSong() {
     });
     delete state.transpose[id];
     delete state.capo[id];
-    delete state.medleys[id];                       // its own medley
-    Object.keys(state.medleys).forEach(function(host) {  // and any medley that appended it
-        state.medleys[host] = state.medleys[host].filter(function(m) { return m.songId !== id; });
-        if (!state.medleys[host].length) delete state.medleys[host];
+    // purge the song from every setlist's medleys (as host and as an appended part)
+    state.setlists.forEach(function(sl) {
+        if (!sl.medleys) return;
+        delete sl.medleys[id];
+        Object.keys(sl.medleys).forEach(function(host) {
+            sl.medleys[host] = sl.medleys[host].filter(function(m) { return m.songId !== id; });
+            if (!sl.medleys[host].length) delete sl.medleys[host];
+        });
     });
     save(); closeSheet();
     editingSongId = null;
@@ -2131,7 +2141,7 @@ function exportBackup() {
     var blob = new Blob([JSON.stringify({
         version: '2.0', exportDate: new Date().toISOString(),
         profile: state.profile, customs: state.customs, favorites: state.favorites,
-        setlists: state.setlists, transpose: state.transpose, capo: state.capo, medleys: state.medleys,
+        setlists: state.setlists, transpose: state.transpose, capo: state.capo,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville }
     }, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
@@ -2154,7 +2164,6 @@ function importBackup(event) {
                 if (b.setlists) state.setlists = b.setlists;
                 if (b.transpose) state.transpose = b.transpose;
                 if (b.capo) state.capo = b.capo;
-                if (b.medleys) state.medleys = b.medleys;
                 if (b.settings) {
                     state.fontSize = b.settings.fontSize || 16;
                     state.useFlats = !!b.settings.useFlats;
