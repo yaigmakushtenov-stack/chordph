@@ -1006,21 +1006,43 @@ const fmtTime = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padSt
 // source is kept alive across analyses and reused until the user
 // disconnects it, changes it, or stops sharing from Chrome's own bar.
 let captureStream = null;
+let captureMode = null;   // 'tab' (desktop system/tab audio) | 'mic' (phone microphone)
+
+// Tab/system-audio capture (getDisplayMedia) exists on desktop browsers but not
+// on iOS Safari, and doesn't yield an audio track on Android. On phones we fall
+// back to the microphone: play the song out loud, we listen through the mic.
+const hasTabCapture = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+const useMic = !hasTabCapture ||
+  (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
 
 function captureAlive() {
   return !!captureStream && captureStream.getAudioTracks().some(t => t.readyState === "live");
 }
 function updateSourceUI() {
-  const alive = captureAlive();
+  // The persistent "source connected" row is a tab-capture convenience (answer
+  // the share picker once). In mic mode we acquire fresh per Listen, so hide it.
+  const alive = captureAlive() && captureMode === "tab";
   sourceRow.style.display = alive ? "flex" : "none";
   listenHint.style.display = alive ? "none" : "block";
 }
 function dropCapture() {
   if (captureStream) captureStream.getTracks().forEach(t => t.stop());
   captureStream = null;
+  captureMode = null;
   updateSourceUI();
 }
-async function acquireCapture() {
+async function acquireMic() {
+  // Music fidelity: turn off the voice-call DSP so it doesn't distort the track.
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+  });
+  stream.getAudioTracks().forEach(t => t.addEventListener("ended", () => { captureStream = null; updateSourceUI(); }));
+  captureStream = stream;
+  captureMode = "mic";
+  updateSourceUI();
+  return true;
+}
+async function acquireTab() {
   const stream = await navigator.mediaDevices.getDisplayMedia({
     video: true,
     audio: true,
@@ -1036,8 +1058,12 @@ async function acquireCapture() {
   stream.getVideoTracks().forEach(t => t.stop()); // only the audio is needed
   audioTracks.forEach(t => t.addEventListener("ended", () => { captureStream = null; updateSourceUI(); }));
   captureStream = new MediaStream(audioTracks);
+  captureMode = "tab";
   updateSourceUI();
   return true;
+}
+async function acquireCapture() {
+  return useMic ? acquireMic() : acquireTab();
 }
 document.getElementById("changeSrcBtn").addEventListener("click", async () => {
   const old = captureStream;
@@ -1048,18 +1074,37 @@ document.getElementById("changeSrcBtn").addEventListener("click", async () => {
 });
 document.getElementById("dropSrcBtn").addEventListener("click", dropCapture);
 
+// On phones (mic mode) the tab/screen-share instructions don't apply — swap the
+// Listen copy for microphone instructions.
+if (useMic) {
+  listenBtn.innerHTML = "&#127908; Listen &mdash; analyze a song playing out loud";
+  listenHint.innerHTML = "Play the song out loud (a speaker, or another phone/laptop), then tap " +
+    "<b>Listen</b>. chord.ph listens through your mic for a few seconds and works out the key and " +
+    "tempo. Keep the phone near the speaker in a quiet room. Audio is analyzed on your device &mdash; " +
+    "nothing is uploaded.";
+}
+
 listenBtn.addEventListener("click", async () => {
   errorBox.style.display = "none";
   if (!captureAlive()) {
     try {
       if (!(await acquireCapture())) {
         errorBox.style.display = "block";
-        errorBox.textContent = "No audio was shared. Pick the tab or screen playing the music and enable " +
-          "“Also share tab audio” (or “Share system audio”), then try again.";
+        errorBox.textContent = useMic
+          ? "Couldn’t access the microphone. Allow mic access, then try again."
+          : "No audio was shared. Pick the tab or screen playing the music and enable " +
+            "“Also share tab audio” (or “Share system audio”), then try again.";
         return;
       }
     } catch (e) {
-      return; // user cancelled the share dialog
+      // mic denied / share dialog cancelled
+      if (useMic && e && (e.name === "NotAllowedError" || e.name === "NotFoundError")) {
+        errorBox.style.display = "block";
+        errorBox.textContent = e.name === "NotFoundError"
+          ? "No microphone found on this device."
+          : "Microphone access was blocked. Enable it for chord.ph in your browser settings, then try again.";
+      }
+      return;
     }
   }
   const audioTracks = captureStream.getAudioTracks();
@@ -1110,7 +1155,10 @@ listenBtn.addEventListener("click", async () => {
   });
   clearInterval(timer);
   listening.style.display = "none";
-  updateSourceUI(); // tracks stay live for the next Listen
+  // Tab capture stays live for the next Listen (answer the picker once); the mic
+  // is released after every capture so there's no lingering "mic on" indicator.
+  if (captureMode === "mic") dropCapture();
+  updateSourceUI();
 
   if (startError) {
     inputArea.style.display = "block";
