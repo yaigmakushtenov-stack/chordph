@@ -190,6 +190,13 @@
             background: rgba(255,255,255,0.04); border: 1px solid var(--border, #263041); color: var(--muted);
         }
         .tag-chip.on { background: rgba(79,140,255,0.15); border-color: var(--accent); color: var(--accent); }
+        .sort-row { display: flex; justify-content: flex-end; padding: 0 0 8px; }
+        .sort-row:empty { display: none; }
+        .sort-sel {
+            font: inherit; font-size: 12px; color: var(--muted); cursor: pointer;
+            background: transparent; border: 1px solid var(--border, #263041); border-radius: 8px; padding: 4px 8px;
+        }
+        .sort-lbl { font-size: 12px; color: var(--faint); display: inline-flex; align-items: center; gap: 6px; }
         #app-toast {
             position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
             background: #10141d; border: 1px solid var(--border, #263041); color: var(--text, #e8ecf3);
@@ -404,6 +411,18 @@
         }
         .sheet-scroll { flex: 1; overflow-y: auto; padding: 4px 24px 24px; }
 
+        /* fit sheet: same pinned-header/scroll structure as tall, but sized to
+           its content (capped at 85vh) — for fixed forms, not dynamic lists, so
+           the actions sit right under the content with no dead space. */
+        .sheet.sheet-fit {
+            max-height: 85vh;
+            padding: 0; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        .sheet-fit .sheet-head { position: static; margin: 0; flex-shrink: 0; padding: 18px 24px 10px; }
+        .sheet-fit .sheet-scroll { flex: 0 1 auto; overflow-y: auto; padding: 4px 24px 8px; }
+        .sheet-fit .sheet-actions { flex-shrink: 0; margin: 0; padding: 8px 24px 20px; }
+
         /* dropdown menu anchored under a top-bar button (⋯) */
         .menu-scrim { display: none; position: fixed; inset: 0; z-index: 420; }
         .menu-scrim.open { display: block; }
@@ -557,6 +576,7 @@
         </div>
         <input class="search" id="search" placeholder="Search songs, artists, tags&hellip;" oninput="renderSongList()" autocomplete="off">
         <div id="tag-filter" class="tag-filter"></div>
+        <div id="songs-sort" class="sort-row"></div>
         <div id="song-list"></div>
     </div>
 </div>
@@ -569,6 +589,7 @@
             <span class="bar-side right"></span>
         </div>
         <input class="search" id="fav-search" placeholder="Search favorites&hellip;" oninput="renderFavorites()" autocomplete="off">
+        <div id="fav-sort" class="sort-row"></div>
         <div id="favorites-list"></div>
     </div>
 </div>
@@ -1190,7 +1211,7 @@ function openSubmitSheet() {
         '</div>' +
         '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button>' +
         '<button class="tap primary" onclick="submitChart()">' + (signedOut ? 'Save to device' : 'Submit') + '</button></div>',
-        true
+        'fit'
     );
 }
 function onSubTypeChange() {
@@ -1218,7 +1239,7 @@ function openRulesSheet() {
         '<p style="margin-top:10px;">Approved charts can be <b>thumbs-up voted</b>, so the best version of each song rises to the top.</p>' +
         '</div>' +
         '<div class="sheet-actions"><button class="tap primary" onclick="openSubmitSheet()">Back to submit</button></div>',
-        true
+        'fit'
     );
 }
 function submitChart() {
@@ -1455,9 +1476,14 @@ function songById(id) {
 /* Shared library: cache-first for instant/offline paint, then refresh from cloud. */
 function fetchLibrary() {
     if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.anonKey) return;
-    var url = SUPABASE_CONFIG.url + '/rest/v1/songs?select=id,title,artist,key,tempo,feel,chart,tags&order=title';
-    fetch(url, { headers: { apikey: SUPABASE_CONFIG.anonKey, Authorization: 'Bearer ' + SUPABASE_CONFIG.anonKey } })
-        .then(function(r) { return r.ok ? r.json() : null; })
+    var hdr = { apikey: SUPABASE_CONFIG.anonKey, Authorization: 'Bearer ' + SUPABASE_CONFIG.anonKey };
+    // request tags too, but fall back if the column doesn't exist yet (tags.sql
+    // not run) so the library still loads either way
+    function get(cols) {
+        return fetch(SUPABASE_CONFIG.url + '/rest/v1/songs?select=' + cols + '&order=title', { headers: hdr });
+    }
+    get('id,title,artist,key,tempo,feel,chart,tags')
+        .then(function(r) { return r.ok ? r.json() : get('id,title,artist,key,tempo,feel,chart').then(function(r2) { return r2.ok ? r2.json() : null; }); })
         .then(function(rows) {
             if (!rows || !rows.length) return;          // never blank out a good cache
             LIBRARY = rows;
@@ -1566,6 +1592,26 @@ function songRow(song, opts) {
 }
 
 var songFilterTags = [];   // active tag filters in the songs view (session)
+var songSort = localStorage.getItem('chordph2_sort') || 'default';
+var SORTS = [['default', 'Default order'], ['title', 'Title A–Z'], ['artist', 'Artist'], ['key', 'Key'], ['tempo', 'Tempo']];
+function sortSelectHTML() {
+    return '<label class="sort-lbl">Sort <select class="sort-sel" onchange="setSongSort(this.value)">' +
+        SORTS.map(function(s) { return '<option value="' + s[0] + '"' + (songSort === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('') +
+        '</select></label>';
+}
+function setSongSort(v) {
+    songSort = v; localStorage.setItem('chordph2_sort', v);
+    if (document.getElementById('view-songs').classList.contains('active')) renderSongList();
+    if (document.getElementById('view-favorites').classList.contains('active')) renderFavorites();
+}
+function applySort(list) {
+    var l = list.slice();
+    if (songSort === 'title')  l.sort(function(a, b) { return a.title.localeCompare(b.title); });
+    else if (songSort === 'artist') l.sort(function(a, b) { return (a.artist || '').localeCompare(b.artist || '') || a.title.localeCompare(b.title); });
+    else if (songSort === 'key')    l.sort(function(a, b) { return getNoteIndex(a.key) - getNoteIndex(b.key) || a.title.localeCompare(b.title); });
+    else if (songSort === 'tempo')  l.sort(function(a, b) { return (a.tempo || 0) - (b.tempo || 0) || a.title.localeCompare(b.title); });
+    return l;   // 'default' keeps the incoming order
+}
 function songTags(s) { return (s && s.tags) || []; }
 function parseTags(str) {
     return (str || '').split(',').map(function(t) {
@@ -1610,10 +1656,11 @@ function renderSongList() {
     var q = (document.getElementById('search').value || '').toLowerCase();
     var box = document.getElementById('song-list');
     renderTagFilter();
+    var sortEl = document.getElementById('songs-sort'); if (sortEl) sortEl.innerHTML = sortSelectHTML();
     box.innerHTML = '';
-    var list = allSongs().filter(function(s) {
+    var list = applySort(allSongs().filter(function(s) {
         return matchesQuery(s, q) && hasAllTags(s, songFilterTags);
-    });
+    }));
     if (!list.length) {
         box.innerHTML = '<div class="empty">No songs match.</div>';
         return;
@@ -1629,13 +1676,15 @@ function renderFavorites() {
     var favs = state.favorites.map(songById).filter(Boolean);
     if (!favs.length) {
         if (searchEl) searchEl.style.display = 'none';
+        var fs0 = document.getElementById('fav-sort'); if (fs0) fs0.innerHTML = '';
         box.innerHTML = '<div class="empty">No favorites yet.<br>Tap the &#9734; on any song.</div>';
         return;
     }
     if (searchEl) searchEl.style.display = '';
-    var list = favs.filter(function(s) {
-        return !q || s.title.toLowerCase().indexOf(q) !== -1 || s.artist.toLowerCase().indexOf(q) !== -1;
-    });
+    var favSort = document.getElementById('fav-sort'); if (favSort) favSort.innerHTML = sortSelectHTML();
+    var list = applySort(favs.filter(function(s) {
+        return matchesQuery(s, q);
+    }));
     if (!list.length) { box.innerHTML = '<div class="empty">No favorites match.</div>'; return; }
     list.forEach(function(s) {
         box.appendChild(songRow(s, { onOpen: function(song) { openChart(song.id, 'favorites'); } }));
@@ -2201,9 +2250,10 @@ function setlistStep(dir) {
 /* =========================================================
    SHEETS (bottom-sheet modals)
    ========================================================= */
-function openSheet(html, tall) {
+function openSheet(html, mode) {
     var sheet = document.getElementById('sheet');
-    sheet.className = 'sheet' + (tall ? ' sheet-tall' : '');
+    var cls = mode === 'fit' ? ' sheet-fit' : (mode ? ' sheet-tall' : '');
+    sheet.className = 'sheet' + cls;
     sheet.innerHTML = html;
     document.getElementById('sheet-scrim').classList.add('open');
 }
