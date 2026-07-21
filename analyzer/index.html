@@ -80,7 +80,7 @@
 
   .metrics { display: flex; gap: 16px; }
   .metric {
-    flex: 1; background: var(--panel-2); border: 1px solid var(--border);
+    flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--border);
     border-radius: 12px; padding: 20px; text-align: center;
   }
   .metric .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
@@ -92,9 +92,9 @@
     background: rgba(155, 107, 255, 0.15); color: #c4a8ff;
     border: 1px solid rgba(155, 107, 255, 0.35);
   }
-  .conf-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 12px; }
-  .conf-row .conf-label { font-size: 11px; color: var(--muted); }
-  .conf-track { width: 90px; height: 5px; border-radius: 3px; background: #12151d; overflow: hidden; }
+  .conf-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 12px; min-width: 0; }
+  .conf-row .conf-label { font-size: 11px; color: var(--muted); flex: 0 0 auto; }
+  .conf-track { flex: 0 1 90px; min-width: 24px; height: 5px; border-radius: 3px; background: #12151d; overflow: hidden; }
   .conf-fill { height: 100%; background: var(--ok); border-radius: 3px; }
 
   .alts {

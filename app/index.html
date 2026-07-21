@@ -121,8 +121,10 @@
         .row-action.danger { color: var(--danger); }
 
         /* drag-to-reorder */
-        .setlist-drag-row { touch-action: pan-y; }
+        .setlist-drag-row { touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
         .setlist-drag-row .row-main { cursor: grab; }
+        /* while lifting/dragging a row, kill text selection + tap highlight everywhere */
+        body.dragging, body.dragging * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
         #setlist-songs { position: relative; }
         .drag-clone {
             position: fixed;
@@ -838,34 +840,10 @@ function renderChordDiagram(name, frets) {
    BUILT-IN LIBRARY (ids are permanent — never renumber)
    ========================================================= */
 var BUILTIN_IDS = ['glorious','way-maker','presence','lilim','heart-of-worship','take-it-all','god-is-here','lead-me-to-the-cross','oceans','endless-praise','this-is-our-time','turn-it-up','dance'];
-var BUILTINS = [
-    { id: 'glorious', title: "Glorious", artist: "Victory Worship", key: "G", tempo: 72, feel: "Moderate Worship",
-      chart: "[Intro]\nG  D  Em  C\n\n[Verse 1]\nG              D\nYou are glorious, Lord\nEm             C\nWorthy of all praise\n\n[Chorus]\nG         D\nGlorious, glorious\nEm        C\nYou are glorious" },
-    { id: 'way-maker', title: "Way Maker", artist: "Sinach", key: "B", tempo: 68, feel: "Slow Worship",
-      chart: "[Intro]\nB  F#  G#m  E\n\n[Verse 1]\nB                F#\nYou are the way maker\nG#m              E\nMiracle worker, promise keeper\n\n[Chorus]\nB          F#\nWay maker, miracle worker\nG#m        E\nThat is who you are" },
-    { id: 'presence', title: "Presence", artist: "His Life Music", key: "A", tempo: 65, feel: "Slow Worship",
-      chart: "[Intro]\nA  E  F#m  D\n\n[Verse 1]\nA              E\nIn your presence Lord\nF#m            D\nI find everything I need\n\n[Chorus]\nA         E\nYour presence, your presence\nF#m       D\nIs all I need" },
-    { id: 'lilim', title: "Lilim", artist: "Victory Worship", key: "E", tempo: 70, feel: "Slow Worship",
-      chart: "[Intro]\nE  G#m  A  C#m  B\n\n[Verse 1]\nE           G#m       A\nPanginoon ang nais ko\nC#m        B        E\nKagandahan Mo ay pagmasdan\nG#m              A\nAng pag-ibig Mo saki'y tugon\nC#m       B      F#m\nKailanma'y 'di pababayaan\n\n[Pre-Chorus]\nG#m      A      F#m\nSa 'Yo lamang matatagpuan\nG#m      A      B\nSa 'Yo lamang\n\n[Chorus]\nE          G#m\nMananatili sa Iyong lilim\nA          C#m       B\nAt sasambahin ka sa dakong lihim\nE          G#m\nMananatili sa Iyong lilim\nA          C#m       B\nNang masumpungan ka sa dakong lihim\n\n[Bridge]\nA       B       C#m\nAng pagpuri ko ay tanging sa 'Yo\nE     G#m    A\nSa 'Yo lamang iniaalay\nB       C#m\nO Panginoon ang puso ko'y\nE\nSa 'Yo magpakailanman" },
-    { id: 'heart-of-worship', title: "Heart of Worship", artist: "Matt Redman", key: "D", tempo: 74, feel: "Slow Worship",
-      chart: "[Verse 1]\nD              A\nWhen the music fades\nEm                  A\nAll is stripped away and I simply come\nD              A\nLonging just to bring\nEm             A\nSomething that's of worth that will bless Your heart\n\n[Pre-Chorus]\nEm      D       A\nI'll bring You more than a song\nEm      D       A\nFor a song in itself is not what You have required\n\n[Chorus]\nD              A\nI'm coming back to the heart of worship\nEm             G    A    D\nAnd it's all about You it's all about You Jesus\nD              A\nI'm sorry Lord for the thing I've made it\nEm             G    A    D\nWhen it's all about You all about You Jesus\n\n[Verse 2]\nD              A\nKing of endless worth\nEm                  A\nNo one could express how much You deserve\nD              A\nThough I'm weak and poor\nEm             A\nAll I have is Yours every single breath" },
-    { id: 'take-it-all', title: "Take It All", artist: "Hillsong Worship", key: "B", tempo: 140, feel: "Upbeat Praise",
-      chart: "[Intro]\nB\n\n[Verse 1]\nB\nSearching the world the lost will be found\nIn freedom we live as one we cry out\nYou carried the cross You died and rose again\nMy God I'll only ever give my all\n\n[Verse 2]\nB                    G#m\nYou sent Your Son from heaven to earth\n                     E\nYou delivered us all it's eternally heard\nB\nI searched for truth and all I found was You\nMy God I'll only ever give my all\n\n[Chorus]\nB           F#\nJesus we're livin' for Your name\nG#m              E\nWe'll never be ashamed of You\nB           F#\nOur praise and all we are today\nC#m\nTake take take it all take take take it all\n\n[Bridge]\nC#m   G#m   F#   E\nRunning to the One who heals the blind\nC#m   G#m   F#\nFollowing the shining light\nC#m   G#m   F#   E\nIn Your hands the power to save the world\nB\nAnd my life" },
-    { id: 'god-is-here', title: "God Is Here", artist: "Darlene Zschech", key: "D", tempo: 80, feel: "Moderate Worship",
-      chart: "[Intro]\nD\n\n[Verse 1]\nD       G    D\nOpen our eyes Lord we want to see You\nA       G    Em\nOpen our hearts Lord we want to know You\nD       G    D\nOpen our ears Lord we need to hear You\nA       G    D\nJesus be revealed Jesus be revealed\n\n[Chorus]\nD    A    Bm   D\nGod is here God is here God is here He is able\nD    G    Bm   A\nWe draw near to see Jesus face to face\nD    A    Bm   D\nGod is here God is here God is here He is faithful\nF#m  Bm   G    D\nWe draw near to see Jesus Oh Jesus be revealed\n\n[Verse 2]\nD       G    D\nOpen the gates Lord reveal Your glory\nA       G    Em\nOpen the nations establish Your Kingdom\nD       G    D\nOpen the Heavens pour out Your Spirit\nA       G    D\nJesus be revealed Jesus be revealed\n\n[Bridge]\nG    Bm\nHoly we cry holy\nEm   G    A\nHallelujah God is here\nG    Bm\nHoly we cry holy\nEm   D\nHallelujah God is here" },
-    { id: 'lead-me-to-the-cross', title: "Lead Me to the Cross", artist: "Hillsong United", key: "D", tempo: 70, feel: "Slow Worship",
-      chart: "[Intro]\nBm  A  G  D  A\n\n[Verse 1]\nBm    A      G\nSavior I come quiet my soul\nD       A\nRemember redemption's hill\nBm    A      G\nWhere Your blood was spilled\nD       A\nFor my ransom\n\n[Pre-Chorus]\nEm        A\nEverything I once held dear\nBm    A      G\nI count it all as loss\n\n[Chorus]\nG       D    A\nLead me to the cross where Your love poured out\nG       D    A\nBring me to my knees Lord I lay me down\nBm    G       D    A\nRid me of myself I belong to You\nEm\nOh lead me\nG    A    Bm\nLead me to the cross\n\n[Verse 2]\nBm    A      G\nYou were as I tempted and tried human\nD       A\nThe Word became flesh\nBm    A      G\nBore my sin and death\nD       A\nNow You're risen\n\n[Bridge]\nD    G    A\nTo Your heart\nD    G    A\nTo Your heart\nD    G    A\nLead me to Your heart\nD    G    A\nLead me to Your heart" },
-    { id: 'oceans', title: "Oceans", artist: "Hillsong United", key: "D", tempo: 71, feel: "Slow Worship",
-      chart: "[Intro]\nBm  A  D  A  G\n\n[Verse 1]\nBm      A       D\nYou call me out upon the waters\nA              G\nThe great unknown where feet may fail\nBm      A       D\nAnd there I find You in the mystery\nA              G\nIn oceans deep my faith will stand\n\n[Chorus]\nG       D    A\nI will call upon Your Name\nG       D    A\nAnd keep my eyes above the waves\nBm   G\nWhen oceans rise\nD       A\nMy soul will rest in Your embrace\nG    A    Bm\nFor I am Yours and You are mine\n\n[Verse 2]\nBm      A       D\nYour grace abounds in deepest waters\nA              G\nYour sovereign hand will be my guide\nBm      A       D\nWhere feet may fail and fear surrounds me\nA              G\nYou've never failed and You won't start now\n\n[Bridge]\nBm          G\nSpirit lead me where my trust is without borders\nD\nLet me walk upon the waters\nA\nWherever You would call me\nBm          G\nTake me deeper than my feet could ever wander\nD\nAnd my faith will be made stronger\nA\nIn the presence of my Saviour" },
-    { id: 'endless-praise', title: "Endless Praise", artist: "Planetshakers", key: "D", tempo: 130, feel: "Upbeat Praise",
-      chart: "[Intro]\nBm  D  A  G\n\n[Verse 1]\nBm      D    A      G\nYou are God and we lift You up\nBm      D    A      G\nWe keep singing we keep praising\nBm      D    A      G\nWe won't stop giving all we got\nBm      D    A      G\nCause You're worthy of all glory\n\n[Pre-Chorus]\nA    Bm   G    D\nOh there is no other You are forever Lord over all\nBm   G    D\nThere's nobody like You no one beside You\n\n[Chorus]\nD    G    A    Bm\nTo You let endless praise resound\nD    G    A    D\nEvery night and day and with no delay\nD    G    A    D\nLet endless praise resound\n\n[Bridge]\nG\nWe lift You up up up\nBm\nWe are giving You our love love love\nG\nFor everything You've done done done\nBm\nWe give You all the praise" },
-    { id: 'this-is-our-time', title: "This Is Our Time", artist: "Planetshakers", key: "D", tempo: 130, feel: "Upbeat Praise",
-      chart: "[Hook]\nA  E  F#m  D\n\n[Verse]\nF#m\nHere and now making loud at the top of our lungs\nThere's a sound breaking out Lord for all that you've done\n\n[Pre-Chorus]\nA         E\nAnd now we're turning our\nD\nTurning our hearts to You\nA         E\nAnd no we'll never stop\nD\nNever stop loving You\n\n[Chorus]\nA    E    F#m  D\nThis is our time this is our season\nA    E    F#m  D\nWe lift our voice we give You all the glory\nA    E    F#m  D\nEvery heart and every nation\nA    E    F#m  D\nWe are Yours forever\n\n[Bridge]\nF#m  E    A    D\nWe are the generation that will seek Your face\nF#m  E    A    D\nWe are the generation we will take our place" },
-    { id: 'turn-it-up', title: "Turn It Up", artist: "Planetshakers", key: "E", tempo: 126, feel: "Upbeat Praise",
-      chart: "[Intro]\nE  A  C#m  B\n\n[Verse 1]\nE       A      C#m   B\nYou are here as we lift You up\nE       B\nYou are riding on our praise\nE       A      C#m   B\nBe enthroned over everything\nE       B\nYou are seated in our praise\n\n[Pre-Chorus]\nC#m          B\nThis is prophetic I can feel it in the air\nA                    B\nWe lift our praise and You change the atmosphere\nC#m          B\nWith hearts open now everybody singing out\nA\nI am free\n\n[Chorus]\nE       B\nTurn it up this sound of praise\nA\nMake it louder than any other\nE       B    C#m  A  B\nLift Him up and shout His name over all\n\n[Verse 2]\nE       A      C#m   B\nAs we praise I can feel the change\nE       B\nAs Your presence now invades\nE       A      C#m   B\nHear the sound of the broken chains\nE       B\nPrison doors are giving way\n\n[Bridge]\nE\nOur praise goes up\nA\nYour rain comes down\nC#m      B    E    A\nWith shouts of praise we celebrate\nC#m      B\nYou are riding on our praise\nA\nOh Lord" },
-    { id: 'dance', title: "Dance", artist: "Planetshakers", key: "E", tempo: 128, feel: "Upbeat Praise",
-      chart: "[Intro]\nC#m  B  E  A\n\n[Verse 1]\nC#m  B    E     A\nI'm alive cause Jesus gave me life\nC#m  B    E     A\nHe opened up my eyes\nC#m  B    E     A\nI can see clearly now\n\n[Pre-Chorus]\nC#m  B    E     A\nOh everybody dance now oh\n\n[Chorus]\nC#m  B    E     A\nEverybody give it up for Jesus\nC#m  B    E     A\nGive Him glory for He has redeemed us\nC#m  B    E     A\nEverybody give it up for Jesus\nC#m  B    E     A\nPraise His Name\n\n[Verse 2]\nC#m  B    E     A\nMy desire is to lift You higher\nC#m  B    E     A\nIt's only burning brighter\nC#m  B    E     A\nThis passion inside of me\n\n[Bridge]\nC#m  B    E     A\nThis praise is bursting out\nC#m  B    E     A\nI can't contain it now\nC#m  B    E     A\nThis praise is bursting out\nC#m  B\nOut out out" }
-];
+// Shared cloud library. Songs live in Supabase (public.songs), no longer in code.
+// load() hydrates this from the localStorage cache for instant/offline paint;
+// fetchLibrary() refreshes it from the cloud in the background.
+var LIBRARY = [];
 
 /* =========================================================
    STATE + STORAGE (id-based, v2 namespace)
@@ -932,6 +910,7 @@ function load() {
         if (s.nashville) state.nashville = s.nashville;
         if (s.showDiagrams) state.showDiagrams = s.showDiagrams;
         state.updatedAt = parseInt(localStorage.getItem('chordph2_updated') || '0', 10);
+        LIBRARY = JSON.parse(localStorage.getItem('chordph2_library') || '[]');
     } catch (e) { console.warn('load failed', e); }
 }
 
@@ -1125,11 +1104,25 @@ function migrate() {
 /* =========================================================
    SONG ACCESS
    ========================================================= */
-function allSongs() { return BUILTINS.concat(state.customs); }
+function allSongs() { return LIBRARY.concat(state.customs); }
 function songById(id) {
-    for (var i = 0; i < BUILTINS.length; i++) if (BUILTINS[i].id === id) return BUILTINS[i];
+    for (var i = 0; i < LIBRARY.length; i++) if (LIBRARY[i].id === id) return LIBRARY[i];
     for (var j = 0; j < state.customs.length; j++) if (state.customs[j].id === id) return state.customs[j];
     return null;
+}
+/* Shared library: cache-first for instant/offline paint, then refresh from cloud. */
+function fetchLibrary() {
+    if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.anonKey) return;
+    var url = SUPABASE_CONFIG.url + '/rest/v1/songs?select=id,title,artist,key,tempo,feel,chart&order=title';
+    fetch(url, { headers: { apikey: SUPABASE_CONFIG.anonKey, Authorization: 'Bearer ' + SUPABASE_CONFIG.anonKey } })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(rows) {
+            if (!rows || !rows.length) return;          // never blank out a good cache
+            LIBRARY = rows;
+            localStorage.setItem('chordph2_library', JSON.stringify(rows));
+            rerenderCurrent();
+        })
+        .catch(function(e) { console.warn('library fetch failed', e); });
 }
 function currentKeyIndex(song) {
     return (getNoteIndex(song.key) + (state.transpose[song.id] || 0) + 120) % 12;
@@ -1758,6 +1751,8 @@ function startDrag(row, pos, startY, cfg) {
     clone.style.width = rect.width + 'px';
     document.body.appendChild(clone);
     row.style.opacity = '0.25';
+    document.body.classList.add('dragging');
+    try { var sel = window.getSelection && window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges(); } catch (e) {}
     var indicator = document.createElement('div');
     indicator.className = 'drop-indicator';
     container.appendChild(indicator);
@@ -1797,6 +1792,7 @@ function onDragEnd() {
     slDrag.indicator.remove();
     slDrag.row.style.opacity = '';
     slDrag = null;
+    document.body.classList.remove('dragging');
     if (from !== to) cb(from, to);
     else cb(-1, -1); // no move, but let caller re-render
 }
@@ -1868,7 +1864,7 @@ function createSetlist() {
     var err = document.getElementById('sh-setlist-err');
     if (!name) { err.textContent = 'Give it a name.'; err.style.display = 'block'; return; }
     state.setlists.push({ id: 's' + Date.now(), name: name, songIds: [] });
-    save(); closeSheet(); renderSetlists();
+    save(); closeSheet(); renderSetlists(); window.scrollTo(0, 0);
 }
 
 /* ---- add song(s) to setlist ---- */
@@ -2236,6 +2232,7 @@ function init() {
     load();
     if (state.profile && state.profile.name) go('songs');
     else renderOnboarding();
+    fetchLibrary();     // shared cloud library — cache already painted, refresh in background
     initSync();
     setupEdgeSwipe();
 }
