@@ -328,6 +328,19 @@
         }
         .sheet-head .sheet-title { margin: 0; }
 
+        /* tall sheet: fixed height so it doesn't move/resize as search narrows
+           the list. Header pinned, list scrolls inside. */
+        .sheet.sheet-tall {
+            height: 85vh; max-height: 85vh;
+            padding: 0; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        .sheet-tall .sheet-head {
+            position: static; margin: 0; flex-shrink: 0;
+            padding: 18px 24px 10px;
+        }
+        .sheet-scroll { flex: 1; overflow-y: auto; padding: 4px 24px 24px; }
+
         /* dropdown menu anchored under a top-bar button (⋯) */
         .menu-scrim { display: none; position: fixed; inset: 0; z-index: 420; }
         .menu-scrim.open { display: block; }
@@ -508,7 +521,10 @@
 <div class="view" id="view-setlist">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap" onclick="go('setlists')">&lsaquo; Setlists</button></span>
+            <span class="bar-side" style="display:flex;gap:6px;">
+                <button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
+                <button class="tap" onclick="go('setlists')">&lsaquo; Setlists</button>
+            </span>
             <span></span>
             <span class="bar-side right">
                 <button class="tap glyph" id="setlist-menu-btn" onclick="onSetlistMenuBtn()" aria-label="Setlist options">&#8943;</button>
@@ -992,8 +1008,10 @@ function toggleFav(id) {
     var p = state.favorites.indexOf(id);
     if (p === -1) state.favorites.push(id); else state.favorites.splice(p, 1);
     save();
-    if (state.view === 'songs') renderSongList();
-    if (state.view === 'favorites') renderFavorites();
+    // re-render whichever view is actually on screen (star must update instantly)
+    if (document.getElementById('view-songs').classList.contains('active')) renderSongList();
+    if (document.getElementById('view-favorites').classList.contains('active')) renderFavorites();
+    if (document.getElementById('view-setlist').classList.contains('active')) renderSetlistDetail();
 }
 
 /* =========================================================
@@ -1570,8 +1588,10 @@ function setlistStep(dir) {
 /* =========================================================
    SHEETS (bottom-sheet modals)
    ========================================================= */
-function openSheet(html) {
-    document.getElementById('sheet').innerHTML = html;
+function openSheet(html, tall) {
+    var sheet = document.getElementById('sheet');
+    sheet.className = 'sheet' + (tall ? ' sheet-tall' : '');
+    sheet.innerHTML = html;
     document.getElementById('sheet-scrim').classList.add('open');
 }
 function closeSheet() {
@@ -1630,8 +1650,8 @@ function openAddToSetlistSheet() {
         '<button class="tap primary" onclick="closeSheet()">Done</button></div>' +
         '<input class="field" id="sh-add-search" placeholder="Search songs&hellip;" oninput="filterAddList()" autocomplete="off" style="margin-bottom:0;">' +
         '</div>' +
-        '<div id="sh-add-list"></div>';
-    openSheet(html);
+        '<div class="sheet-scroll" id="sh-add-list"></div>';
+    openSheet(html, true);
     renderAddList();
 }
 function renderAddList() {
@@ -1671,7 +1691,8 @@ function openMedleySheet() {
         '<button class="tap" onclick="closeSheet()">Cancel</button></div>' +
         '<input class="field" id="sh-medley-search" placeholder="Search songs&hellip;" oninput="renderMedleyList()" autocomplete="off" style="margin-bottom:0;">' +
         '</div>' +
-        '<div id="sh-medley-list"></div>'
+        '<div class="sheet-scroll" id="sh-medley-list"></div>',
+        true
     );
     renderMedleyList();
 }
