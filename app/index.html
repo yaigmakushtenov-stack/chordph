@@ -762,7 +762,6 @@ var state = {
     medleys: {},                // { hostSongId: [{songId, keyOption, sectionIndices}] } — persisted
     medley: [],                 // working copy for the open chart
     openLayer: null,
-    todayInstrument: null,      // session-only override ("play as … today"), never saved
     scroll: { playing: false, speed: 3, raf: null },
     updatedAt: 0                // last local change (ms) — drives sync merge
 };
@@ -1025,9 +1024,7 @@ function show(viewId) {
 }
 function updateProfileRow() {
     document.getElementById('profile-name').textContent = state.profile ? state.profile.name : 'Set up profile';
-    document.getElementById('profile-instrument').textContent = state.profile
-        ? (state.todayInstrument ? state.todayInstrument + ' · today only' : state.profile.instrument)
-        : 'Tap to begin';
+    document.getElementById('profile-instrument').textContent = state.profile ? state.profile.instrument : 'Tap to begin';
 }
 function go(view) {
     closeDrawer();
@@ -1141,10 +1138,9 @@ function chartBack() {
     if (state.chartFrom === 'setlist') { openSetlist(state.currentSetlistId); }
     else go(state.chartFrom);
 }
-function activeInstrument() {
-    return state.todayInstrument || (state.profile ? state.profile.instrument : 'Vocalist');
+function viewFor() {
+    return INSTRUMENT_VIEWS[state.profile ? state.profile.instrument : 'Vocalist'] || 'vocalist';
 }
-function viewFor() { return INSTRUMENT_VIEWS[activeInstrument()] || 'vocalist'; }
 
 function renderChart() {
     var song = songById(currentSongId);
@@ -1851,18 +1847,11 @@ function openSettings() {
     var chips = INSTRUMENTS.map(function(ins) {
         return '<button class="chip' + (p.instrument === ins ? ' on' : '') + '" onclick="pickInstrument(this, \'' + ins + '\')">' + ins + '</button>';
     }).join('');
-    var todayChips = INSTRUMENTS.map(function(ins) {
-        return '<button class="chip' + (state.todayInstrument === ins ? ' on' : '') + '" onclick="pickTodayInstrument(\'' + ins + '\')">' + ins + '</button>';
-    }).join('');
     openSheet(
         '<div class="sheet-title">Settings</div>' +
         '<div class="section-label" style="margin-top:4px;">Profile</div>' +
         '<input class="field" id="sh-profile-name" placeholder="Your name" value="' + esc(p.name) + '" autocomplete="off">' +
         '<div class="chip-row" id="sh-instruments">' + chips + '</div>' +
-        '<div class="section-label">Play as &mdash; <span style="text-transform:none;letter-spacing:0;">today only, doesn\'t change your profile</span></div>' +
-        '<div class="chip-row" id="sh-today">' + todayChips + '</div>' +
-        '<div id="sh-today-note" style="font-size:12px;color:var(--faint);padding:0 0 2px;">' +
-        (state.todayInstrument ? 'Showing charts as ' + esc(state.todayInstrument) + ' — tap again to go back to ' + esc(p.instrument) + '.' : '') + '</div>' +
         (syncEnabled() ? '<div class="section-label">Sync</div><div id="sync-status">' + renderSyncSection() + '</div>' : '') +
         '<div class="section-label">Backup</div>' +
         '<div style="display:flex;gap:24px;">' +
@@ -1896,21 +1885,6 @@ async function submitMagicLink() {
     var err = await sendMagicLink(email);
     if (err) { msg.style.color = 'var(--danger)'; msg.textContent = err; }
     else { msg.style.color = 'var(--accent)'; msg.textContent = 'Check your email for the sign-in link.'; }
-}
-function pickTodayInstrument(ins) {
-    state.todayInstrument = (state.todayInstrument === ins ? null : ins);  // tap again = clear
-    document.querySelectorAll('#sh-today .chip').forEach(function(c) {
-        c.classList.toggle('on', c.textContent === state.todayInstrument);
-    });
-    var note = document.getElementById('sh-today-note');
-    if (note) {
-        var p = state.profile || { instrument: '' };
-        note.textContent = state.todayInstrument
-            ? 'Showing charts as ' + state.todayInstrument + ' — tap again to go back to ' + p.instrument + '.'
-            : '';
-    }
-    updateProfileRow();
-    if (document.getElementById('view-chart').classList.contains('active')) renderChart();
 }
 function pickInstrument(el, ins) {
     window.__pickedInstrument = ins;
