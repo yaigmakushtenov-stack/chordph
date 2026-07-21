@@ -566,6 +566,7 @@
             <div class="controls" id="chart-controls">
                 <button class="tap" id="ctl-transpose" onclick="toggleLayer('transpose')">Transpose</button>
                 <button class="tap" id="ctl-capo" onclick="toggleLayer('capo')">Capo</button>
+                <button class="tap" id="ctl-numbers" onclick="toggleNashville()">Numbers</button>
                 <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
                 <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
             </div>
@@ -657,6 +658,18 @@ function getStepsToReach(fromKey, toKeyNote) {
     return (toIndex - fromIndex + 12) % 12;
 }
 
+// Nashville numbers: chord root -> scale degree relative to the key.
+// Diatonic degrees are plain; chromatic ones get flat/sharp (b3, #4…).
+var NASHVILLE_DEGREE = ['1', 'b2', '2', 'b3', '3', '4', '#4', '5', 'b6', '6', 'b7', '7'];
+function toNashville(text, keyRootIndex) {
+    return text.replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
+        function(match, root, quality, slashFull, bassNote) {
+            var deg = NASHVILLE_DEGREE[(getNoteIndex(root) - keyRootIndex + 120) % 12];
+            var bass = bassNote ? '/' + NASHVILLE_DEGREE[(getNoteIndex(bassNote) - keyRootIndex + 120) % 12] : '';
+            return deg + (quality || '') + bass;
+        });
+}
+
 /* Split a chart into sections by [Label] headers. Each section keeps its
    header line; content before the first header (rare) becomes "Intro". */
 function parseSections(chart) {
@@ -707,6 +720,15 @@ function formatChart(text) {
         return e;
     }).join('\n');
 }
+// Chord lines detected on the ORIGINAL text, then rewritten as Nashville
+// numbers (which aren't [A-G] so isChordLine can't detect them post-hoc).
+function formatChartNashville(text, keyRootIndex) {
+    return text.split('\n').map(function(line) {
+        if (/^\s*\[.*\]\s*$/.test(line)) return '<span class="sec-head">' + esc(line) + '</span>';
+        if (isChordLine(line)) return '<span class="chord-line">' + esc(toNashville(line, keyRootIndex)) + '</span>';
+        return esc(line);
+    }).join('\n');
+}
 
 /* =========================================================
    BUILT-IN LIBRARY (ids are permanent — never renumber)
@@ -753,6 +775,7 @@ var state = {
     capo: {},                   // { songId: fret } — guitarist fingering; sounding key unchanged
     fontSize: 16,
     useFlats: false,
+    nashville: false,           // show chords as Nashville numbers
     view: 'songs',
     chartFrom: 'songs',         // where Back returns to
     currentSetlistId: null,
@@ -776,7 +799,7 @@ function save() {
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
     queuePush();
 }
@@ -797,6 +820,7 @@ function load() {
         var s = JSON.parse(localStorage.getItem('chordph2_settings') || '{}');
         if (s.fontSize) state.fontSize = s.fontSize;
         if (s.useFlats) state.useFlats = s.useFlats;
+        if (s.nashville) state.nashville = s.nashville;
         state.updatedAt = parseInt(localStorage.getItem('chordph2_updated') || '0', 10);
     } catch (e) { console.warn('load failed', e); }
 }
@@ -821,7 +845,7 @@ function localSnapshot() {
         transpose: state.transpose,
         capo: state.capo,
         medleys: state.medleys,
-        settings: { fontSize: state.fontSize, useFlats: state.useFlats },
+        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville },
         updated_at: state.updatedAt || 0
     };
 }
@@ -836,6 +860,7 @@ function applySnapshot(snap) {
     if (snap.settings) {
         state.fontSize = snap.settings.fontSize || 16;
         state.useFlats = !!snap.settings.useFlats;
+        state.nashville = !!snap.settings.nashville;
     }
     state.updatedAt = snap.updated_at || Date.now();
     // persist without bumping the timestamp or re-queueing a push
@@ -846,7 +871,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_medleys', JSON.stringify(state.medleys));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
 }
 
@@ -1194,16 +1219,23 @@ function renderChart() {
         document.getElementById('layer-' + l).classList.toggle('open', state.openLayer === l);
         document.getElementById('ctl-' + l).classList.toggle('on', state.openLayer === l);
     });
+    document.getElementById('ctl-numbers').classList.toggle('on', state.nashville);
 
     // body
     var body = document.getElementById('chart-body');
     body.style.fontSize = state.fontSize + 'px';
     if (view === 'drummer') {
         body.innerHTML = formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo ? song.tempo + ' BPM' : '—') + '\n\n' + song.chart);
+    } else if (state.nashville) {
+        body.innerHTML = formatChartNashville(song.chart, getNoteIndex(song.key));  // key-relative; transpose/capo don't change numbers
     } else {
         body.innerHTML = formatChart(transposeChordText(song.chart, displaySteps));
     }
     renderMedley(song, keyIdx, capo);
+}
+function toggleNashville() {
+    state.nashville = !state.nashville;
+    save(); renderChart();
 }
 
 /* Capo picker. keyIdx = sounding key. Capo keeps the sounding key; it only
@@ -1330,7 +1362,9 @@ function renderMedley(mainSong, keyIdx, capo) {
         pre.style.fontSize = state.fontSize + 'px';
         pre.innerHTML = view === 'drummer'
             ? formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo || '—') + ' BPM\n\n' + chartText)
-            : formatChart(transposeChordText(chartText, steps - capo));
+            : state.nashville
+                ? formatChartNashville(chartText, getNoteIndex(song.key))
+                : formatChart(transposeChordText(chartText, steps - capo));
         block.appendChild(head); block.appendChild(title); block.appendChild(sub); block.appendChild(pre);
         box.appendChild(block);
     });
@@ -1903,7 +1937,7 @@ function exportBackup() {
         version: '2.0', exportDate: new Date().toISOString(),
         profile: state.profile, customs: state.customs, favorites: state.favorites,
         setlists: state.setlists, transpose: state.transpose, capo: state.capo, medleys: state.medleys,
-        settings: { fontSize: state.fontSize, useFlats: state.useFlats }
+        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville }
     }, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -1929,6 +1963,7 @@ function importBackup(event) {
                 if (b.settings) {
                     state.fontSize = b.settings.fontSize || 16;
                     state.useFlats = !!b.settings.useFlats;
+                    state.nashville = !!b.settings.nashville;
                 }
                 save();
                 alert('Backup restored.');
