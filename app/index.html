@@ -206,6 +206,9 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
         .layer .val { color: var(--text); font-weight: 650; min-width: 30px; text-align: center; display: inline-block; }
         .layer .lbl { color: var(--faint); font-size: 12px; }
+        .click-dot { width: 14px; height: 14px; border-radius: 50%; background: #2a3040; display: inline-block; transition: background .05s; }
+        .click-dot.pulse { animation: clickPulse .16s ease-out; }
+        @keyframes clickPulse { 0% { transform: scale(1.7); } 100% { transform: scale(1); } }
         .capo-opt { padding: 8px 4px; }
         .capo-opt b { color: var(--text); font-weight: 650; }
         .capo-opt.on b { color: var(--accent); }
@@ -579,6 +582,7 @@
                 <button class="tap" id="ctl-diagrams" onclick="toggleDiagrams()">Chords</button>
                 <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
                 <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
+                <button class="tap" id="ctl-click" onclick="toggleLayer('click')">Click</button>
             </div>
 
             <div class="layer" id="layer-transpose">
@@ -606,6 +610,12 @@
                 <button class="tap glyph" onclick="scrollSpeedBy(-1)" aria-label="Scroll slower">&minus;</button>
                 <span class="val" id="scroll-val" aria-live="polite">3</span>
                 <button class="tap glyph" onclick="scrollSpeedBy(1)" aria-label="Scroll faster">+</button>
+            </div>
+
+            <div class="layer" id="layer-click">
+                <button class="tap primary" id="click-toggle" onclick="toggleMetro()">&#9654; Start</button>
+                <span class="lbl" id="click-bpm">&mdash;</span>
+                <span class="click-dot" id="click-dot" aria-hidden="true"></span>
             </div>
         </div>
 
@@ -1139,6 +1149,7 @@ function toggleFav(id) {
    ========================================================= */
 function show(viewId) {
     stopScroll();
+    stopMetro();
     document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
     document.getElementById('view-' + viewId).classList.add('active');
     window.scrollTo(0, 0);
@@ -1311,7 +1322,11 @@ function renderChart() {
     document.getElementById('font-val').textContent = state.fontSize;
     document.getElementById('scroll-val').textContent = state.scroll.speed;
     renderCapoLayer(song, keyIdx);
-    ['transpose', 'capo', 'text', 'scroll'].forEach(function(l) {
+    // Click control needs a tempo; hide it (and its layer) on tempo-less songs
+    document.getElementById('ctl-click').style.display = song.tempo ? 'inline-block' : 'none';
+    if (!song.tempo && state.openLayer === 'click') state.openLayer = null;
+    document.getElementById('click-bpm').textContent = song.tempo ? song.tempo + ' BPM' : '—';
+    ['transpose', 'capo', 'text', 'scroll', 'click'].forEach(function(l) {
         document.getElementById('layer-' + l).classList.toggle('open', state.openLayer === l);
         document.getElementById('ctl-' + l).classList.toggle('on', state.openLayer === l);
     });
@@ -1438,6 +1453,56 @@ function stopScroll() {
 function scrollSpeedBy(d) {
     state.scroll.speed = Math.max(1, Math.min(8, state.scroll.speed + d));
     document.getElementById('scroll-val').textContent = state.scroll.speed;
+}
+
+/* ---- click / metronome (Web Audio, accent on beat 1 of 4/4) ---- */
+var metro = { playing: false, ctx: null, next: 0, beat: 0, timer: null, bpm: 120 };
+function startMetro(bpm) {
+    if (metro.playing || !bpm) return;
+    try { metro.ctx = metro.ctx || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+    if (metro.ctx.state === 'suspended') metro.ctx.resume();
+    metro.bpm = bpm; metro.beat = 0; metro.next = metro.ctx.currentTime + 0.08; metro.playing = true;
+    var b = document.getElementById('click-toggle');
+    if (b) b.innerHTML = '&#10074;&#10074; Stop';
+    scheduleMetro();
+}
+function scheduleMetro() {
+    if (!metro.playing) return;
+    var spb = 60 / metro.bpm;
+    while (metro.next < metro.ctx.currentTime + 0.2) {
+        var accent = metro.beat % 4 === 0;
+        clickAt(metro.next, accent);
+        (function(t, ac) {
+            setTimeout(function() { pulseClickDot(ac); }, Math.max(0, (t - metro.ctx.currentTime) * 1000));
+        })(metro.next, accent);
+        metro.next += spb; metro.beat++;
+    }
+    metro.timer = setTimeout(scheduleMetro, 40);
+}
+function clickAt(time, accent) {
+    var o = metro.ctx.createOscillator(), g = metro.ctx.createGain();
+    o.frequency.value = accent ? 1600 : 950;
+    g.gain.setValueAtTime(accent ? 0.5 : 0.28, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    o.connect(g); g.connect(metro.ctx.destination);
+    o.start(time); o.stop(time + 0.06);
+}
+function pulseClickDot(accent) {
+    var dot = document.getElementById('click-dot');
+    if (!dot) return;
+    dot.style.background = accent ? 'var(--accent-2)' : 'var(--accent)';
+    dot.classList.remove('pulse'); void dot.offsetWidth; dot.classList.add('pulse');
+}
+function stopMetro() {
+    metro.playing = false;
+    if (metro.timer) clearTimeout(metro.timer);
+    var b = document.getElementById('click-toggle');
+    if (b) b.innerHTML = '&#9654; Start';
+}
+function toggleMetro() {
+    var song = songById(currentSongId);
+    if (metro.playing) stopMetro();
+    else if (song && song.tempo) startMetro(song.tempo);
 }
 
 /* ---- medley ---- */
