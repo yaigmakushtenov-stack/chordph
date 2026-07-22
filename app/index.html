@@ -184,6 +184,11 @@
         .status-rejected { background:rgba(255,92,92,0.16); color:#ff8a8a; }
         .review-note { font-size:13px; line-height:1.55; color:var(--muted); margin-top:8px; padding:10px 12px; background:rgba(0,0,0,0.2); border-radius:8px; border-left:2px solid var(--border,#263041); }
         .review-note b { color:var(--text); }
+        .share-banner {
+            margin-top: 8px; font-size: 13px; color: var(--muted);
+            padding: 8px 12px; border-radius: 8px;
+            background: rgba(79,140,255,0.10); border: 1px solid rgba(79,140,255,0.28);
+        }
         #chart-versions { margin-top: 6px; }
         .tag-filter {
             display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px;
@@ -649,12 +654,14 @@
             </span>
             <span class="bar-side right">
                 <button class="tap" id="chart-edit" onclick="openSongSheet(currentSongId)" style="display:none;">Edit</button>
+                <button class="tap glyph" id="chart-share" onclick="shareSong(currentSongId)" aria-label="Share song">&#8599;</button>
                 <button class="tap glyph star-toggle" id="chart-star" onclick="toggleFav(currentSongId); renderChart();" aria-label="Toggle favorite">&#9734;</button>
             </span>
         </div>
         <div class="chart-head">
             <div class="chart-title" id="chart-title"></div>
             <div class="chart-meta" id="chart-meta"></div>
+            <div id="share-banner" class="share-banner" style="display:none;"></div>
             <div id="chart-versions"></div>
         </div>
 
@@ -706,9 +713,25 @@
         <div class="chord-strip" id="chord-strip" style="display:none;"></div>
         <pre class="chart" id="chart-body"></pre>
         <div id="medley-blocks"></div>
-        <div style="padding: 6px 0 20px;">
+        <div id="medley-add" style="padding: 6px 0 20px;">
             <button class="tap" onclick="openMedleySheet()">+ Medley</button>
         </div>
+    </div>
+</div>
+
+<div class="view" id="view-shared">
+    <div class="wrap">
+        <div class="bar">
+            <span class="bar-side"><button class="tap" onclick="leaveShared()">&lsaquo; Chord.ph</button></span>
+            <span class="wordmark">Shared</span>
+            <span class="bar-side right"></span>
+        </div>
+        <div class="chart-head">
+            <div class="chart-title" id="shared-name"></div>
+            <div class="chart-meta" id="shared-count"></div>
+        </div>
+        <div style="padding:10px 0;"><button class="tap primary" onclick="saveSharedSetlist()">Save to my setlists</button></div>
+        <div id="shared-list"></div>
     </div>
 </div>
 
@@ -1606,6 +1629,7 @@ function allSongs() { return LIBRARY.concat(state.customs); }
 function songById(id) {
     for (var i = 0; i < LIBRARY.length; i++) if (LIBRARY[i].id === id) return LIBRARY[i];
     for (var j = 0; j < state.customs.length; j++) if (state.customs[j].id === id) return state.customs[j];
+    if (sharedSongs[id]) return sharedSongs[id];   // transient shared-link songs
     return null;
 }
 /* Shared library: cache-first for instant/offline paint, then refresh from cloud. */
@@ -1828,6 +1852,114 @@ function renderFavorites() {
 }
 
 /* =========================================================
+   SHARE — read-only links (song / setlist), self-contained in the URL
+   ========================================================= */
+var sharedSongs = {};       // transient id -> shared song object
+var sharedSetlist = null;   // { name, ids:[] } while viewing a shared setlist
+function b64urlEncode(obj) {
+    return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64urlDecode(str) {
+    var b = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    return JSON.parse(decodeURIComponent(escape(atob(b))));
+}
+function shareUrl(url, title) {
+    if (navigator.share) { navigator.share({ title: title, url: url }).catch(function () {}); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () { toast('Link copied — paste to share.'); },
+                                                function () { window.prompt('Copy this link:', url); });
+        return;
+    }
+    window.prompt('Copy this link:', url);
+}
+function songSnapshot(s) {
+    return { title: s.title, artist: s.artist, key: s.key, tempo: s.tempo || 0, feel: s.feel || '',
+             tags: s.tags || [], chart: s.chart, transpose: state.transpose[s.id] || 0, capo: state.capo[s.id] || 0 };
+}
+function shareSong(id) {
+    var s = songById(id); if (!s) return;
+    shareUrl(location.origin + '/app/#share=' + b64urlEncode({ v: 1, type: 'song', song: songSnapshot(s) }), s.title);
+}
+function shareSetlist(id) {
+    var sl = setlistById(id); if (!sl) return;
+    var songs = sl.songIds.map(songById).filter(Boolean).map(songSnapshot);
+    if (!songs.length) { toast('This setlist is empty — nothing to share yet.'); return; }
+    shareUrl(location.origin + '/app/#share=' + b64urlEncode({ v: 1, type: 'setlist', name: sl.name, songs: songs }), sl.name);
+}
+function checkSharedLink() {
+    var m = (location.hash || '').match(/^#share=(.+)$/);
+    if (!m) return false;
+    try {
+        var p = b64urlDecode(m[1]);
+        if (p && p.type === 'song' && p.song) { openSharedSong(p.song); return true; }
+        if (p && p.type === 'setlist' && p.songs && p.songs.length) { openSharedSetlist(p); return true; }
+    } catch (e) { console.warn('bad share link', e); }
+    return false;
+}
+function registerSharedSong(snap, idx) {
+    var id = 'shared-' + (idx == null ? Date.now() : idx);
+    sharedSongs[id] = { id: id, title: snap.title, artist: snap.artist, key: snap.key, tempo: snap.tempo || 0,
+                        feel: snap.feel || '', tags: snap.tags || [], chart: snap.chart, shared: true };
+    if (snap.transpose) state.transpose[id] = snap.transpose;   // open in the sharer's key
+    if (snap.capo) state.capo[id] = snap.capo;
+    return id;
+}
+function exitPreApp() {
+    document.body.classList.remove('pre-app');
+    var ob = document.getElementById('view-onboarding'); if (ob) ob.style.display = 'none';
+}
+function openSharedSong(snap) {
+    exitPreApp();
+    sharedSetlist = null;
+    openChart(registerSharedSong(snap), 'shared');
+}
+function openSharedSetlist(p) {
+    exitPreApp();
+    sharedSetlist = { name: p.name || 'Shared setlist', ids: p.songs.map(function (snap, i) { return registerSharedSong(snap, i); }) };
+    renderSharedSetlist();
+    show('shared');
+}
+function renderSharedSetlist() {
+    if (!sharedSetlist) { go('songs'); return; }
+    document.getElementById('shared-name').textContent = sharedSetlist.name;
+    document.getElementById('shared-count').textContent =
+        sharedSetlist.ids.length + ' song' + (sharedSetlist.ids.length !== 1 ? 's' : '') + ' · shared with you, read-only';
+    var box = document.getElementById('shared-list');
+    box.innerHTML = '';
+    sharedSetlist.ids.forEach(function (sid, pos) {
+        var s = sharedSongs[sid]; if (!s) return;
+        box.appendChild(songRow(s, { onOpen: function () { state.setlistPos = pos; openChart(sid, 'shared-set'); } }));
+    });
+}
+function leaveShared() { location.hash = ''; sharedSetlist = null; go('songs'); }
+function cloneSharedToCustom(id) {
+    var s = sharedSongs[id]; if (!s) return null;
+    var cid = 'c' + Date.now() + Math.floor(Math.random() * 1000);
+    state.customs.push({ id: cid, title: s.title, artist: s.artist, key: s.key, tempo: s.tempo || 0,
+                         feel: s.feel || '', tags: s.tags || [], chart: s.chart, custom: true });
+    if (state.transpose[id]) state.transpose[cid] = state.transpose[id];
+    if (state.capo[id]) state.capo[cid] = state.capo[id];
+    return cid;
+}
+function addSharedSongToMine() {
+    var cid = cloneSharedToCustom(currentSongId);
+    if (!cid) return;
+    save();
+    toast('Added to your songs.');
+    openChart(cid, 'songs');   // now a real, editable custom song
+}
+function saveSharedSetlist() {
+    if (!sharedSetlist) return;
+    var ids = sharedSetlist.ids.map(cloneSharedToCustom).filter(Boolean);
+    state.setlists.push({ id: 's' + Date.now(), name: sharedSetlist.name, songIds: ids });
+    save();
+    toast('Saved to your setlists.');
+    leaveShared();
+    go('setlists');
+}
+
+/* =========================================================
    CHART VIEW
    ========================================================= */
 function openChart(songId, from) {
@@ -1845,7 +1977,9 @@ function openChart(songId, from) {
     show('chart');
 }
 function chartBack() {
-    if (state.chartFrom === 'setlist') { openSetlist(state.currentSetlistId); }
+    if (state.chartFrom === 'setlist') openSetlist(state.currentSetlistId);
+    else if (state.chartFrom === 'shared-set') { renderSharedSetlist(); show('shared'); }
+    else if (state.chartFrom === 'shared') leaveShared();
     else go(state.chartFrom);
 }
 function viewFor() {
@@ -1863,21 +1997,40 @@ function renderChart() {
     var displaySteps = steps - capo;          // chords the guitarist actually fingers
     var fingeredKeyIdx = ((keyIdx - capo) % 12 + 12) % 12;
 
+    var cf = state.chartFrom;
+    var readonly = (cf === 'shared' || cf === 'shared-set');
     document.getElementById('chart-back').innerHTML =
-        state.chartFrom === 'setlist' ? '&lsaquo; Setlist' :
-        state.chartFrom === 'favorites' ? '&lsaquo; Favorites' : '&lsaquo; Songs';
+        cf === 'setlist' ? '&lsaquo; Setlist' :
+        cf === 'shared-set' ? '&lsaquo; Setlist' :
+        cf === 'shared' ? '&lsaquo; Close' :
+        cf === 'favorites' ? '&lsaquo; Favorites' : '&lsaquo; Songs';
     document.getElementById('chart-title').textContent = song.title;
     var meta = esc(song.artist) + ' &middot; Key of <span class="key" onclick="toggleLayer(\'transpose\')">' + esc(noteName(keyIdx)) + '</span>';
     if (song.tempo) meta += ' &middot; ' + song.tempo + ' BPM';
     if (capo > 0) meta += ' &middot; <span class="key" onclick="toggleLayer(\'capo\')">Capo ' + capo +
         ' &rarr; ' + esc(noteName(fingeredKeyIdx)) + ' shapes</span>';
     document.getElementById('chart-meta').innerHTML = meta;
-    renderChartVersions(song.id);
+
+    // read-only shared chart: no fav/share/edit/versions/medley, show a banner
+    var banner = document.getElementById('share-banner');
+    if (readonly) {
+        banner.style.display = 'block';
+        banner.innerHTML = 'Shared with you · read-only. ' +
+            '<button class="tap" style="padding:0;color:var(--accent);font-size:13px;" onclick="addSharedSongToMine()">Add to my songs</button>';
+        document.getElementById('chart-versions').innerHTML = '';
+    } else {
+        banner.style.display = 'none';
+        renderChartVersions(song.id);
+    }
+    var medAdd = document.getElementById('medley-add'); if (medAdd) medAdd.style.display = readonly ? 'none' : '';
+    if (readonly) document.getElementById('medley-blocks').innerHTML = '';
 
     var star = document.getElementById('chart-star');
     star.innerHTML = isFav(song.id) ? '&#9733;' : '&#9734;';
     star.style.color = isFav(song.id) ? 'var(--gold)' : '';
-    document.getElementById('chart-edit').style.display = song.custom ? 'inline-block' : 'none';
+    star.style.display = readonly ? 'none' : '';
+    document.getElementById('chart-share').style.display = readonly ? 'none' : '';
+    document.getElementById('chart-edit').style.display = (!readonly && song.custom) ? 'inline-block' : 'none';
 
     // setlist prev/next
     var inSetlist = state.chartFrom === 'setlist';
@@ -2266,6 +2419,7 @@ function onSetlistMenuBtn() {
 function openSetlistMenu() {
     openMenu([
         { label: 'Reorder & edit songs', icon: '⇅', onClick: enterSetlistEdit },
+        { label: 'Share setlist', icon: '↗', onClick: function() { shareSetlist(state.currentSetlistId); } },
         { label: 'Rename setlist', icon: '✎', onClick: renameSetlistPrompt },
         { label: 'Delete setlist', icon: '🗑', danger: true, onClick: deleteSetlistFromDetail }
     ], document.getElementById('setlist-menu-btn'));
@@ -2804,7 +2958,8 @@ function setupEdgeSwipe() {
 function init() {
     migrate();
     load();
-    if (state.profile && state.profile.name) go('songs');
+    if (checkSharedLink()) { /* opened a read-only shared link — skip normal routing */ }
+    else if (state.profile && state.profile.name) go('songs');
     else renderOnboarding();
     fetchLibrary();     // shared cloud library — cache already painted, refresh in background
     initSync();
