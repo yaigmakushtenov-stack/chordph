@@ -568,6 +568,7 @@
         <button class="tap" id="nav-favorites" onclick="go('favorites')">Favorites</button>
         <button class="tap" id="nav-setlists" onclick="go('setlists')">Setlists</button>
         <hr class="drawer-hr">
+        <button class="tap" id="nav-import" onclick="openImportSheet()">Import songs</button>
         <button class="tap" id="nav-submit" onclick="openSubmitSheet()">Submit a chart</button>
         <button class="tap" id="nav-mysubs" onclick="go('mysubs')" style="display:none;">My submissions <span id="mysubs-badge" class="review-badge" style="display:none;"></span></button>
         <button class="tap" id="nav-review" onclick="go('review')" style="display:none;">Review queue <span id="review-badge" class="review-badge" style="display:none;"></span></button>
@@ -1923,6 +1924,153 @@ function renderFavorites() {
 }
 
 /* =========================================================
+   IMPORT — ChordPro (.cho/.crd/.pro) and plain chord-over-lyric text
+   ========================================================= */
+/* One ChordPro line -> our format. "[G]Amazing [C]grace" becomes a chord line
+   with the chords sitting above the syllable they land on, then the lyric. */
+function chordProLineToChart(line) {
+    if (line.indexOf('[') === -1) return [line];
+    var lyric = '', re = /\[([^\]]*)\]/g, last = 0, m, chords = [];
+    while ((m = re.exec(line)) !== null) {
+        lyric += line.slice(last, m.index);
+        chords.push({ pos: lyric.length, text: m[1] });
+        last = m.index + m[0].length;
+    }
+    lyric += line.slice(last);
+    var row = '';
+    chords.forEach(function(c) {
+        if (row.length < c.pos) row += new Array(c.pos - row.length + 1).join(' ');
+        else if (row.length > 0) row += ' ';        // never let two chords collide
+        row += c.text;
+    });
+    var res = [];
+    if (row.trim()) res.push(row.replace(/\s+$/, ''));
+    if (lyric.trim()) res.push(lyric);
+    if (!res.length) res.push('');
+    return res;
+}
+var SECTION_NAMES = { verse: 'Verse', chorus: 'Chorus', bridge: 'Bridge', tab: 'Tab',
+                      grid: 'Grid', intro: 'Intro', outro: 'Outro', prechorus: 'Pre-Chorus' };
+function parseChordPro(text) {
+    var meta = { title: '', artist: '', key: '', tempo: 0 };
+    var out = [];
+    text.replace(/\r\n?/g, '\n').split('\n').forEach(function(raw) {
+        var d = raw.match(/^\s*\{\s*([^:}]+?)\s*(?::\s*([\s\S]*?))?\s*\}\s*$/);
+        if (d) {
+            var name = d[1].toLowerCase().replace(/[_\s-]/g, '');
+            var val = (d[2] || '').trim();
+            if (name === 'title' || name === 't') meta.title = meta.title || val;
+            else if (name === 'subtitle' || name === 'st' || name === 'artist') meta.artist = meta.artist || val;
+            else if (name === 'key') meta.key = meta.key || val;
+            else if (name === 'tempo' || name === 'bpm') meta.tempo = meta.tempo || (parseInt(val, 10) || 0);
+            else if (name === 'time') meta.timesig = meta.timesig || val;
+            else if (/^(startof|so)/.test(name)) {
+                var sec = name.replace(/^(startof|so)/, '');
+                out.push('', '[' + (val || SECTION_NAMES[sec] || (sec.charAt(0).toUpperCase() + sec.slice(1)) || 'Section') + ']');
+            } else if (/^(endof|eo)/.test(name)) out.push('');
+            else if (name === 'comment' || name === 'c' || name === 'ci') out.push('[' + val + ']');
+            return;   // every other directive is presentation-only — drop it
+        }
+        out.push.apply(out, chordProLineToChart(raw));
+    });
+    return { meta: meta, chart: out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '') };
+}
+/* ChordPro puts chords inline; our own format puts them on their own line. */
+function looksLikeChordPro(text) {
+    if (/^\s*\{[^}]+\}\s*$/m.test(text)) return true;              // has directives
+    return /\S[^\n]*\[[^\]]+\]|\[[^\]]+\][^\n]*\S/.test(text);     // has inline [chords]
+}
+/* Accept "Ab", "F# minor", "Em" … and return a key the pickers use (sharp spelling). */
+function normalizeImportedKey(k) {
+    if (!k) return '';
+    var m = String(k).trim().match(/^([A-Ga-g][b#]?)\s*(m|min|minor)?\b/);
+    if (!m) return '';
+    var root = m[1].charAt(0).toUpperCase() + m[1].slice(1);
+    var idx = getNoteIndex(root);
+    if (idx === -1) return '';
+    return SHARPS[idx] + (m[2] ? 'm' : '');
+}
+function guessKeyFromChart(chart) {
+    var lines = chart.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+        if (/^\s*\[.*\]\s*$/.test(lines[i])) continue;
+        if (!isChordLine(lines[i])) continue;
+        var m = lines[i].match(/\b([A-G][b#]?)(m)?/);
+        if (m) return m[1] + (m[2] ? 'm' : '');
+    }
+    return '';
+}
+/* Build a custom song from an imported file/paste. */
+function songFromImport(text, fallbackTitle) {
+    var title = '', artist = '', key = '', tempo = 0, chart = '';
+    if (looksLikeChordPro(text)) {
+        var p = parseChordPro(text);
+        title = p.meta.title; artist = p.meta.artist; key = p.meta.key;
+        tempo = p.meta.tempo; chart = p.chart;
+    } else {
+        chart = text.replace(/\r\n?/g, '\n').replace(/^\n+|\n+$/g, '');   // already chords-over-lyrics
+    }
+    if (!chart.trim()) return null;
+    key = normalizeImportedKey(key) || normalizeImportedKey(guessKeyFromChart(chart)) || 'C';
+    return { id: 'c' + Date.now() + Math.floor(Math.random() * 10000),
+             title: (title || fallbackTitle || 'Untitled').trim(),
+             artist: (artist || 'Unknown').trim(),
+             key: key, tempo: tempo || 0, feel: '', tags: [], chart: chart, custom: true };
+}
+function openImportSheet() {
+    closeDrawer();
+    openSheet(
+        '<div class="sheet-head"><div class="sheet-title">Import songs</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">ChordPro files (.cho, .crd, .pro) or plain charts with ' +
+        'chords above the lyrics. Imported songs are saved on this device.</div></div>' +
+        '<div class="sheet-scroll">' +
+        '<button class="tap primary big" style="width:100%;margin-bottom:14px;" onclick="document.getElementById(\'chordpro-input\').click()">Choose files…</button>' +
+        '<div class="section-label">or paste a chart</div>' +
+        '<textarea class="field" id="imp-text" style="min-height:150px;" placeholder="{title: Amazing Grace}&#10;{key: G}&#10;&#10;[G]Amazing [C]grace how [G]sweet the sound"></textarea>' +
+        '<input class="field" id="imp-title" placeholder="Title (only if the text has none)" autocomplete="off">' +
+        '<div class="form-error" id="imp-err"></div>' +
+        '<div id="imp-result" style="font-size:13px;color:var(--muted);"></div>' +
+        '</div>' +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button>' +
+        '<button class="tap primary" onclick="importPastedChart()">Import</button></div>',
+        'fit'
+    );
+}
+function importPastedChart() {
+    var text = document.getElementById('imp-text').value;
+    var err = document.getElementById('imp-err');
+    if (!text.trim()) { err.textContent = 'Paste a chart first, or choose files.'; err.style.display = 'block'; return; }
+    var song = songFromImport(text, document.getElementById('imp-title').value.trim());
+    if (!song) { err.textContent = 'Couldn’t find any chart content in that text.'; err.style.display = 'block'; return; }
+    state.customs.push(song); save();
+    closeSheet();
+    toast('Imported “' + song.title + '”.');
+    go('songs');
+}
+function importChordProFiles(ev) {
+    var files = Array.prototype.slice.call(ev.target.files || []);
+    ev.target.value = '';
+    if (!files.length) return;
+    var added = 0, done = 0;
+    files.forEach(function(file) {
+        var reader = new FileReader();
+        reader.onload = function() {
+            var base = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+            var song = songFromImport(String(reader.result || ''), base);
+            if (song) { state.customs.push(song); added++; }
+            if (++done === files.length) finish();
+        };
+        reader.onerror = function() { if (++done === files.length) finish(); };
+        reader.readAsText(file);
+    });
+    function finish() {
+        if (added) { save(); go('songs'); }
+        closeSheet();
+        toast(added ? ('Imported ' + added + ' song' + (added > 1 ? 's' : '') + '.') : 'Nothing could be imported from those files.');
+    }
+}
+
+/* =========================================================
    SHARE — read-only links (song / setlist), self-contained in the URL
    ========================================================= */
 var sharedSongs = {};       // transient id -> shared song object
@@ -3153,5 +3301,6 @@ function init() {
 init();
 </script>
 <input type="file" id="import-input" accept=".json" style="display:none;" onchange="importBackup(event)">
+<input type="file" id="chordpro-input" accept=".cho,.chopro,.crd,.pro,.chord,.txt,text/plain" multiple style="display:none;" onchange="importChordProFiles(event)">
 </body>
 </html>
