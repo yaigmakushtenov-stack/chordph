@@ -121,7 +121,8 @@
         .row-action.danger { color: var(--danger); }
 
         /* drag-to-reorder */
-        .setlist-drag-row { touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        /* touch-action:none so the browser hands us the gesture instead of scrolling */
+        .setlist-drag-row { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
         .setlist-drag-row .row-main { cursor: grab; }
         /* while lifting/dragging a row, kill text selection + tap highlight everywhere */
         body.dragging, body.dragging * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
@@ -647,9 +648,6 @@
             <div class="chart-title" id="setlist-name"></div>
             <div class="chart-meta" id="setlist-count"></div>
         </div>
-        <div style="padding:10px 0 0;">
-            <button class="tap primary" onclick="openAddToSetlistSheet()">+ Add song</button>
-        </div>
         <div id="setlist-songs"></div>
     </div>
 </div>
@@ -687,6 +685,7 @@
                 <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
                 <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
                 <button class="tap" id="ctl-click" onclick="toggleLayer('click')">Click</button>
+                <button class="tap" id="ctl-medley" onclick="openMedleySheet()" style="display:none;">Medley</button>
             </div>
 
             <div class="layer" id="layer-transpose">
@@ -711,9 +710,9 @@
             <div class="layer" id="layer-scroll">
                 <button class="tap primary" id="scroll-toggle" onclick="toggleScroll()">&#9654; Play</button>
                 <span class="lbl">speed</span>
-                <button class="tap glyph" onclick="scrollSpeedBy(-1)" aria-label="Scroll slower">&minus;</button>
+                <button class="tap glyph" onclick="scrollSpeedBy(-0.5)" aria-label="Scroll slower">&minus;</button>
                 <span class="val" id="scroll-val" aria-live="polite">3</span>
-                <button class="tap glyph" onclick="scrollSpeedBy(1)" aria-label="Scroll faster">+</button>
+                <button class="tap glyph" onclick="scrollSpeedBy(0.5)" aria-label="Scroll faster">+</button>
             </div>
 
             <div class="layer" id="layer-click">
@@ -726,9 +725,6 @@
         <div class="chord-strip" id="chord-strip" style="display:none;"></div>
         <pre class="chart" id="chart-body"></pre>
         <div id="medley-blocks"></div>
-        <div id="medley-add" style="padding: 6px 0 20px;">
-            <button class="tap" onclick="openMedleySheet()">+ Medley</button>
-        </div>
     </div>
 </div>
 
@@ -852,12 +848,22 @@ function getStepsToReach(fromKey, toKeyNote) {
 
 // Nashville numbers: chord root -> scale degree relative to the key.
 // Diatonic degrees are plain; chromatic ones get flat/sharp (b3, #4…).
-var NASHVILLE_DEGREE = ['1', 'b2', '2', 'b3', '3', '4', '#4', '5', 'b6', '6', 'b7', '7'];
+// Chromatic degrees, spelled two ways. Diatonic degrees (no accidental) are the
+// same in both; a chromatic note is spelled with the accidental the chord uses.
+var NASH_SHARP = ['1', '#1', '2', '#2', '3', '4', '#4', '5', '#5', '6', '#6', '7'];
+var NASH_FLAT  = ['1', 'b2', '2', 'b3', '3', '4', 'b5', '5', 'b6', '6', 'b7', '7'];
+function nashDegree(note, keyRootIndex) {
+    var i = (getNoteIndex(note) - keyRootIndex + 120) % 12;
+    var sharp = note.indexOf('#') !== -1 ? true
+              : note.indexOf('b') !== -1 ? false
+              : !state.useFlats;
+    return (sharp ? NASH_SHARP : NASH_FLAT)[i];
+}
 function toNashville(text, keyRootIndex) {
     return text.replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
         function(match, root, quality, slashFull, bassNote) {
-            var deg = NASHVILLE_DEGREE[(getNoteIndex(root) - keyRootIndex + 120) % 12];
-            var bass = bassNote ? '/' + NASHVILLE_DEGREE[(getNoteIndex(bassNote) - keyRootIndex + 120) % 12] : '';
+            var deg = nashDegree(root, keyRootIndex);
+            var bass = bassNote ? '/' + nashDegree(bassNote, keyRootIndex) : '';
             return deg + (quality || '') + bass;
         });
 }
@@ -2008,12 +2014,16 @@ function saveSharedSetlist() {
 function openChart(songId, from) {
     currentSongId = songId;
     state.chartFrom = from || 'songs';
-    // medley is remembered per setlist; from the library it starts empty
+    // medley + transpose are remembered per setlist; from the library they're
+    // fresh each open (transpose resets to the song's own key)
     if (state.chartFrom === 'setlist' && state.currentSetlistId) {
         var sl = setlistById(state.currentSetlistId);
         state.medley = (sl && sl.medleys && sl.medleys[songId] || []).slice();
+        state.transpose[songId] = (sl && sl.transposes && sl.transposes[songId]) || 0;
     } else {
         state.medley = [];
+        if (state.chartFrom === 'songs' || state.chartFrom === 'favorites') state.transpose[songId] = 0;
+        // 'shared'/'shared-set' keep the sharer's key set by registerSharedSong
     }
     state.openLayer = null;
     renderChart();
@@ -2065,7 +2075,8 @@ function renderChart() {
         banner.style.display = 'none';
         renderChartVersions(song.id);
     }
-    var medAdd = document.getElementById('medley-add'); if (medAdd) medAdd.style.display = readonly ? 'none' : '';
+    // Medley control lives with the other controls; only meaningful inside a setlist
+    document.getElementById('ctl-medley').style.display = (cf === 'setlist') ? 'inline-block' : 'none';
     if (readonly) document.getElementById('medley-blocks').innerHTML = '';
 
     var star = document.getElementById('chart-star');
@@ -2095,7 +2106,7 @@ function renderChart() {
     document.getElementById('notation-sharp').classList.toggle('on', !state.useFlats);
     document.getElementById('notation-flat').classList.toggle('on', state.useFlats);
     document.getElementById('font-val').textContent = state.fontSize;
-    document.getElementById('scroll-val').textContent = state.scroll.speed;
+    document.getElementById('scroll-val').textContent = fmtScroll(state.scroll.speed);
     renderCapoLayer(song, keyIdx);
     // Click control needs a tempo; hide it (and its layer) on tempo-less songs
     document.getElementById('ctl-click').style.display = song.tempo ? 'inline-block' : 'none';
@@ -2184,11 +2195,21 @@ function transposeBy(d) {
     // display converts to signed. Chord math is mod-12 either way.
     var v = (state.transpose[currentSongId] || 0) + d;
     state.transpose[currentSongId] = ((v % 12) + 12) % 12;
-    save(); renderChart();
+    persistTranspose(); renderChart();
 }
 function resetTranspose() {
     state.transpose[currentSongId] = 0;
-    save(); renderChart();
+    persistTranspose(); renderChart();
+}
+/* Transpose is a per-setlist setting: from a setlist it's saved on the setlist
+   and survives navigation; from the library/favorites it's session-only and
+   resets next time you open the song. */
+function persistTranspose() {
+    if (state.chartFrom === 'setlist' && state.currentSetlistId) {
+        var sl = setlistById(state.currentSetlistId);
+        if (sl) { sl.transposes = sl.transposes || {}; sl.transposes[currentSongId] = state.transpose[currentSongId] || 0; save(); }
+    }
+    // library/fav/shared: leave state.transpose as in-memory working value only
 }
 function setNotation(flats) {
     state.useFlats = flats;
@@ -2225,9 +2246,10 @@ function stopScroll() {
     var b = document.getElementById('scroll-toggle');
     if (b) b.innerHTML = '&#9654; Play';
 }
+function fmtScroll(s) { return (s % 1 === 0) ? String(s) : s.toFixed(1); }
 function scrollSpeedBy(d) {
-    state.scroll.speed = Math.max(1, Math.min(5, state.scroll.speed + d));
-    document.getElementById('scroll-val').textContent = state.scroll.speed;
+    state.scroll.speed = Math.max(1, Math.min(5, Math.round((state.scroll.speed + d) * 2) / 2));
+    document.getElementById('scroll-val').textContent = fmtScroll(state.scroll.speed);
 }
 
 /* ---- click / metronome (Web Audio, accent on beat 1 of 4/4) ---- */
@@ -2304,10 +2326,21 @@ function saveMetro() { localStorage.setItem('chordph2_metro', JSON.stringify(met
 function renderMetronome() {
     document.getElementById('metro-bpm').textContent = metronomeState.bpm;
     var sl = document.getElementById('metro-slider'); if (sl) sl.value = metronomeState.bpm;
-    document.getElementById('metro-sigs').innerHTML = METRO_SIGS.map(function(s) {
+    var sigs = METRO_SIGS.slice();
+    if (sigs.indexOf(metronomeState.sig) === -1) sigs.push(metronomeState.sig);   // keep a custom sig visible
+    var chips = sigs.map(function(s) {
         return '<button class="tag-chip' + (metronomeState.sig === s ? ' on' : '') + '" onclick="metroSetSig(\'' + s + '\')">' + s + '</button>';
-    }).join('');
+    });
+    chips.push('<button class="tag-chip" onclick="promptCustomSig()" aria-label="Custom time signature">＋</button>');
+    document.getElementById('metro-sigs').innerHTML = chips.join('');
     setMetroToggle(metro.playing);
+}
+function promptCustomSig() {
+    var v = window.prompt('Custom time signature (e.g. 5/4, 7/8, 12/8):', metronomeState.sig);
+    if (!v) return;
+    v = v.trim();
+    if (!/^\d{1,2}(\/\d{1,2})?$/.test(v)) { toast('Use a format like 5/4.'); return; }
+    metroSetSig(v);
 }
 function metroRestartIfPlaying() {
     if (metro.playing) { stopMetro(); startMetro(metronomeState.bpm, metroBeats()); }
@@ -2480,7 +2513,7 @@ function renderSetlistDetail() {
     var box = document.getElementById('setlist-songs');
     box.innerHTML = '';
     if (!valid.length) {
-        box.innerHTML = '<div class="empty">No songs yet — tap + Add song.</div>';
+        box.innerHTML = '<div class="empty">No songs yet.<br><button class="tap primary" onclick="openAddToSetlistSheet()">＋ Add song</button></div>';
         return;
     }
     sl.songIds.forEach(function(songId, pos) {
@@ -2516,6 +2549,7 @@ function onSetlistMenuBtn() {
 }
 function openSetlistMenu() {
     openMenu([
+        { label: 'Add song', icon: '＋', onClick: openAddToSetlistSheet },
         { label: 'Reorder & edit songs', icon: '⇅', onClick: enterSetlistEdit },
         { label: 'Share setlist', icon: '↗', onClick: function() { shareSetlist(state.currentSetlistId); } },
         { label: 'Rename setlist', icon: '✎', onClick: renameSetlistPrompt },
@@ -2548,20 +2582,35 @@ function deleteSetlistFromDetail() {
 
 /* ---- generic drag-to-reorder (long-press to lift, pointer events) ----
    cfg = { container, selector, onDrop(from, to) } */
+/* Drag-to-reorder using Pointer Capture: on a small move we lift the row, and
+   every subsequent pointer event is captured by the row (touch-action:none), so
+   the page never scrolls and pointerup always lands — clone can't get stuck. */
 var slDrag = null;
 function dragRowPointerDown(e, row, pos, cfg) {
-    if (e.target.closest('.row-action')) return;   // Delete/Remove button, not a drag
-    var startY = e.clientY;
-    var timer = setTimeout(function() { cleanup(); startDrag(row, pos, startY, cfg); }, 300);
-    function move(ev) { if (Math.abs(ev.clientY - startY) > 12) cleanup(); }  // scrolling, not holding
-    function up() { cleanup(); }
-    function cleanup() {
-        clearTimeout(timer);
-        document.removeEventListener('pointermove', move);
-        document.removeEventListener('pointerup', up);
+    if (e.target.closest('.row-action')) return;   // Remove button, not a drag
+    if (slDrag) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    var startY = e.clientY, pid = e.pointerId, started = false;
+    try { row.setPointerCapture(pid); } catch (_) {}
+    function move(ev) {
+        if (!started) {
+            if (Math.abs(ev.clientY - startY) < 6) return;   // small threshold = intent to drag
+            started = true;
+            startDrag(row, pos, ev.clientY, cfg);
+        }
+        if (ev.cancelable) ev.preventDefault();
+        onDragMove(ev);
     }
-    document.addEventListener('pointermove', move);
-    document.addEventListener('pointerup', up);
+    function end() {
+        row.removeEventListener('pointermove', move);
+        row.removeEventListener('pointerup', end);
+        row.removeEventListener('pointercancel', end);
+        try { row.releasePointerCapture(pid); } catch (_) {}
+        if (started) onDragEnd();
+    }
+    row.addEventListener('pointermove', move);
+    row.addEventListener('pointerup', end);
+    row.addEventListener('pointercancel', end);
 }
 function startDrag(row, pos, startY, cfg) {
     var container = cfg.container;
@@ -2580,11 +2629,24 @@ function startDrag(row, pos, startY, cfg) {
     indicator.className = 'drop-indicator';
     container.appendChild(indicator);
     slDrag = { row: row, pos: pos, clone: clone, indicator: indicator, rows: rows,
-               container: container, grabDy: startY - rect.top, target: pos, onDrop: cfg.onDrop };
+               container: container, grabDy: startY - rect.top, target: pos, onDrop: cfg.onDrop,
+               lastY: startY, autoRaf: null };
     if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
-    document.addEventListener('pointermove', onDragMove, { passive: false });
-    document.addEventListener('pointerup', onDragEnd);
+    autoScrollTick();
     positionDropIndicator(startY);
+}
+/* keep scrolling the page while the finger is held near the top/bottom edge */
+function autoScrollTick() {
+    if (!slDrag) return;
+    var y = slDrag.lastY, h = window.innerHeight, edge = 70, dy = 0;
+    if (y < edge) dy = -Math.ceil((edge - y) / 6);
+    else if (y > h - edge) dy = Math.ceil((y - (h - edge)) / 6);
+    if (dy) {
+        window.scrollBy(0, dy);
+        slDrag.clone.style.top = (slDrag.lastY - slDrag.grabDy) + 'px';
+        positionDropIndicator(slDrag.lastY);
+    }
+    slDrag.autoRaf = requestAnimationFrame(autoScrollTick);
 }
 function positionDropIndicator(clientY) {
     var d = slDrag;
@@ -2602,14 +2664,13 @@ function positionDropIndicator(clientY) {
 }
 function onDragMove(e) {
     if (!slDrag) return;
-    e.preventDefault();
+    slDrag.lastY = e.clientY;
     slDrag.clone.style.top = (e.clientY - slDrag.grabDy) + 'px';
     positionDropIndicator(e.clientY);
 }
 function onDragEnd() {
     if (!slDrag) return;
-    document.removeEventListener('pointermove', onDragMove, { passive: false });
-    document.removeEventListener('pointerup', onDragEnd);
+    if (slDrag.autoRaf) cancelAnimationFrame(slDrag.autoRaf);
     var from = slDrag.pos, to = slDrag.target, cb = slDrag.onDrop;
     slDrag.clone.remove();
     slDrag.indicator.remove();
@@ -2833,7 +2894,9 @@ function openSongSheet(songId) {
         return '<option' + (song && song.feel === f ? ' selected' : '') + '>' + f + '</option>';
     }).join('');
     openSheet(
-        '<div class="sheet-title">' + (song ? 'Edit song' : 'Add song') + '</div>' +
+        '<div class="sheet-head"><div class="sheet-title">' + (song ? 'Edit song' : 'Add song') + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Saved on this device. To share it with everyone, use “Submit a chart”.</div></div>' +
+        '<div class="sheet-scroll">' +
         '<input class="field" id="sh-song-title" placeholder="Song title *" value="' + (song ? esc(song.title) : '') + '" autocomplete="off">' +
         '<input class="field" id="sh-song-artist" placeholder="Artist / band *" value="' + (song ? esc(song.artist) : '') + '" autocomplete="off">' +
         '<div class="field-row">' +
@@ -2842,12 +2905,14 @@ function openSongSheet(songId) {
         '</div>' +
         '<select class="field" id="sh-song-feel"><option value="">Song feel</option>' + feels + '</select>' +
         '<input class="field" id="sh-song-tags" placeholder="Tags, comma-separated — e.g. Worship, Filipino, Mellow" value="' + (song && song.tags ? esc(song.tags.join(', ')) : '') + '" autocomplete="off">' +
-        '<textarea class="field" id="sh-song-chart" placeholder="Chord chart *&#10;&#10;[Verse 1]&#10;G              D&#10;Your lyrics here">' + (song ? esc(song.chart) : '') + '</textarea>' +
+        '<textarea class="field" id="sh-song-chart" placeholder="Chord chart *&#10;&#10;[Verse 1]&#10;G              D&#10;Your lyrics here" style="min-height:160px;">' + (song ? esc(song.chart) : '') + '</textarea>' +
         '<div class="form-error" id="sh-song-err"></div>' +
+        '</div>' +
         '<div class="sheet-actions">' +
         (song ? '<button class="tap danger" onclick="deleteSong()">Delete</button>' : '') +
         '<button class="tap" onclick="closeSheet()">Cancel</button>' +
-        '<button class="tap primary" onclick="saveSong()">Save</button></div>'
+        '<button class="tap primary" onclick="saveSong()">Save</button></div>',
+        'fit'
     );
 }
 function saveSong() {
@@ -2884,6 +2949,7 @@ function deleteSong() {
     state.favorites = state.favorites.filter(function(f) { return f !== id; });
     state.setlists.forEach(function(sl) {
         sl.songIds = sl.songIds.filter(function(s) { return s !== id; });
+        if (sl.transposes) delete sl.transposes[id];
     });
     delete state.transpose[id];
     delete state.capo[id];
