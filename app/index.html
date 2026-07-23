@@ -839,9 +839,24 @@ function transposeChordText(text, steps) {
             return transposedRoot + (quality || '') + transposedBass;
         });
 }
+/* A song key may be major ("G") or minor ("Em"). These split the two apart. */
+function keyRoot(k) { return String(k || '').replace(/m$/, ''); }
+function isMinorKey(k) { return /m$/.test(String(k || '')); }
+function keyLabel(index, minor) { return noteName(index) + (minor ? 'm' : ''); }
+/* <option>s for a key picker: 12 major + 12 minor (Em, Am, …) */
+function keyOptionsHTML(selected) {
+    function opts(suffix) {
+        return SHARPS.map(function(k) {
+            var v = k + suffix;
+            return '<option' + (selected === v ? ' selected' : '') + '>' + v + '</option>';
+        }).join('');
+    }
+    return '<optgroup label="Major">' + opts('') + '</optgroup>' +
+           '<optgroup label="Minor">' + opts('m') + '</optgroup>';
+}
 function getStepsToReach(fromKey, toKeyNote) {
-    var fromIndex = getNoteIndex(fromKey);
-    var toIndex = getNoteIndex(toKeyNote);
+    var fromIndex = getNoteIndex(keyRoot(fromKey));
+    var toIndex = getNoteIndex(keyRoot(toKeyNote));
     if (fromIndex === -1 || toIndex === -1) return 0;
     return (toIndex - fromIndex + 12) % 12;
 }
@@ -850,20 +865,27 @@ function getStepsToReach(fromKey, toKeyNote) {
 // Diatonic degrees are plain; chromatic ones get flat/sharp (b3, #4…).
 // Chromatic degrees, spelled two ways. Diatonic degrees (no accidental) are the
 // same in both; a chromatic note is spelled with the accidental the chord uses.
+// Major-key degrees: plain numbers are the major scale, chromatics take an accidental.
 var NASH_SHARP = ['1', '#1', '2', '#2', '3', '4', '#4', '5', '#5', '6', '#6', '7'];
 var NASH_FLAT  = ['1', 'b2', '2', 'b3', '3', '4', 'b5', '5', 'b6', '6', 'b7', '7'];
-function nashDegree(note, keyRootIndex) {
+// Minor-key degrees: plain numbers are the NATURAL MINOR scale (1 2 3 4 5 6 7 =
+// 0 2 3 5 7 8 10), so the raised leading tone lands on #7 — e.g. B/D# in Em = 5/#7.
+var NASH_MIN_SHARP = ['1', '#1', '2', '3', '#3', '4', '#4', '5', '6', '#6', '7', '#7'];
+var NASH_MIN_FLAT  = ['1', 'b2', '2', '3', 'b4', '4', 'b5', '5', '6', 'b7', '7', '#7'];
+function nashDegree(note, keyRootIndex, minor) {
     var i = (getNoteIndex(note) - keyRootIndex + 120) % 12;
     var sharp = note.indexOf('#') !== -1 ? true
               : note.indexOf('b') !== -1 ? false
               : !state.useFlats;
-    return (sharp ? NASH_SHARP : NASH_FLAT)[i];
+    var table = minor ? (sharp ? NASH_MIN_SHARP : NASH_MIN_FLAT)
+                      : (sharp ? NASH_SHARP : NASH_FLAT);
+    return table[i];
 }
-function toNashville(text, keyRootIndex) {
+function toNashville(text, keyRootIndex, minor) {
     return text.replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
         function(match, root, quality, slashFull, bassNote) {
-            var deg = nashDegree(root, keyRootIndex);
-            var bass = bassNote ? '/' + nashDegree(bassNote, keyRootIndex) : '';
+            var deg = nashDegree(root, keyRootIndex, minor);
+            var bass = bassNote ? '/' + nashDegree(bassNote, keyRootIndex, minor) : '';
             return deg + (quality || '') + bass;
         });
 }
@@ -920,10 +942,10 @@ function formatChart(text) {
 }
 // Chord lines detected on the ORIGINAL text, then rewritten as Nashville
 // numbers (which aren't [A-G] so isChordLine can't detect them post-hoc).
-function formatChartNashville(text, keyRootIndex) {
+function formatChartNashville(text, keyRootIndex, minor) {
     return text.split('\n').map(function(line) {
         if (/^\s*\[.*\]\s*$/.test(line)) return '<span class="sec-head">' + esc(line) + '</span>';
-        if (isChordLine(line)) return '<span class="chord-line">' + esc(toNashville(line, keyRootIndex)) + '</span>';
+        if (isChordLine(line)) return '<span class="chord-line">' + esc(toNashville(line, keyRootIndex, minor)) + '</span>';
         return esc(line);
     }).join('\n');
 }
@@ -1277,7 +1299,7 @@ function isRefUrl(u) {
 }
 function openSubmitSheet() {
     closeDrawer();
-    var keyOpts = SHARPS.map(function(k) { return '<option>' + k + '</option>'; }).join('');
+    var keyOpts = keyOptionsHTML('');
     var instOpts = TAB_INSTRUMENTS.map(function(i) { return '<option>' + i + '</option>'; }).join('');
     var signedOut = !currentUser;
     openSheet(
@@ -1445,7 +1467,7 @@ async function openEditSubmission(id) {
     var got = await supa.from('submissions').select('*').eq('id', id).single();
     if (got.error) { toast('Couldn’t load: ' + got.error.message); return; }
     var s = editingSub = got.data;
-    var keyOpts = SHARPS.map(function(k) { return '<option' + (s.key === k ? ' selected' : '') + '>' + k + '</option>'; }).join('');
+    var keyOpts = keyOptionsHTML(s.key);
     var instOpts = TAB_INSTRUMENTS.map(function(i) { return '<option' + (s.instrument === i ? ' selected' : '') + '>' + i + '</option>'; }).join('');
     openSheet(
         '<div class="sheet-head"><div class="sheet-title">Edit &amp; approve</div>' +
@@ -1700,7 +1722,7 @@ function fetchLibrary() {
         .catch(function(e) { console.warn('library fetch failed', e); });
 }
 function currentKeyIndex(song) {
-    return (getNoteIndex(song.key) + (state.transpose[song.id] || 0) + 120) % 12;
+    return (getNoteIndex(keyRoot(song.key)) + (state.transpose[song.id] || 0) + 120) % 12;
 }
 function isFav(id) { return state.favorites.indexOf(id) !== -1; }
 function toggleFav(id) {
@@ -1767,7 +1789,7 @@ function songRow(song, opts) {
     t.textContent = song.title;
     var sub = document.createElement('div');
     sub.className = 'row-sub';
-    sub.innerHTML = esc(song.artist) + ' &middot; <span class="key">' + esc(noteName(currentKeyIndex(song))) + '</span>';
+    sub.innerHTML = esc(song.artist) + ' &middot; <span class="key">' + esc(keyLabel(currentKeyIndex(song), isMinorKey(song.key))) + '</span>';
     main.appendChild(t); main.appendChild(sub);
     row.appendChild(main);
     if (opts.actions) {
@@ -2058,7 +2080,8 @@ function renderChart() {
         cf === 'shared' ? '&lsaquo; Close' :
         cf === 'favorites' ? '&lsaquo; Favorites' : '&lsaquo; Songs';
     document.getElementById('chart-title').textContent = song.title;
-    var meta = esc(song.artist) + ' &middot; Key of <span class="key" onclick="toggleLayer(\'transpose\')">' + esc(noteName(keyIdx)) + '</span>';
+    var minorKey = isMinorKey(song.key);
+    var meta = esc(song.artist) + ' &middot; Key of <span class="key" onclick="toggleLayer(\'transpose\')">' + esc(keyLabel(keyIdx, minorKey)) + '</span>';
     if (song.tempo) meta += ' &middot; ' + song.tempo + ' BPM';
     if (capo > 0) meta += ' &middot; <span class="key" onclick="toggleLayer(\'capo\')">Capo ' + capo +
         ' &rarr; ' + esc(noteName(fingeredKeyIdx)) + ' shapes</span>';
@@ -2126,7 +2149,7 @@ function renderChart() {
     if (view === 'drummer') {
         body.innerHTML = formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo ? song.tempo + ' BPM' : '—') + '\n\n' + song.chart);
     } else if (state.nashville) {
-        body.innerHTML = formatChartNashville(song.chart, getNoteIndex(song.key));  // key-relative; transpose/capo don't change numbers
+        body.innerHTML = formatChartNashville(song.chart, getNoteIndex(keyRoot(song.key)), isMinorKey(song.key));  // key-relative; transpose/capo don't change numbers
     } else {
         body.innerHTML = formatChart(displayedChart);
     }
@@ -2378,7 +2401,7 @@ function renderMedley(mainSong, keyIdx, capo) {
         var song = songById(m.songId);
         if (!song) return;
         var steps = m.keyOption === 'match' ? getStepsToReach(song.key, noteName(keyIdx)) : 0;
-        var dispKey = noteName((getNoteIndex(song.key) + steps + 12) % 12);
+        var dispKey = keyLabel((getNoteIndex(keyRoot(song.key)) + steps + 12) % 12, isMinorKey(song.key));
         var block = document.createElement('div');
         block.className = 'medley-sep';
         var head = document.createElement('div');
@@ -2412,7 +2435,7 @@ function renderMedley(mainSong, keyIdx, capo) {
         pre.innerHTML = view === 'drummer'
             ? formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo || '—') + ' BPM\n\n' + chartText)
             : state.nashville
-                ? formatChartNashville(chartText, getNoteIndex(song.key))
+                ? formatChartNashville(chartText, getNoteIndex(keyRoot(song.key)), isMinorKey(song.key))
                 : formatChart(transposeChordText(chartText, steps - capo));
         block.appendChild(head); block.appendChild(title); block.appendChild(sub); block.appendChild(pre);
         box.appendChild(block);
@@ -2887,9 +2910,7 @@ function openSongSheet(songId) {
     var song = songId ? songById(songId) : null;
     if (song && !song.custom) return;
     editingSongId = song ? song.id : null;
-    var keyOpts = SHARPS.map(function(k) {
-        return '<option' + (song && song.key === k ? ' selected' : '') + '>' + k + '</option>';
-    }).join('');
+    var keyOpts = keyOptionsHTML(song ? song.key : '');
     var feels = ['Slow Worship', 'Moderate Worship', 'Upbeat Praise', 'Hymn', 'Contemporary'].map(function(f) {
         return '<option' + (song && song.feel === f ? ' selected' : '') + '>' + f + '</option>';
     }).join('');
