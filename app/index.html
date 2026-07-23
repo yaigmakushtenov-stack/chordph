@@ -126,7 +126,14 @@
         .setlist-drag-row .row-main { cursor: grab; }
         /* while lifting/dragging a row, kill text selection + tap highlight everywhere */
         body.dragging, body.dragging * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
-        #setlist-songs { position: relative; }
+        /* drag containers must be positioned — the drop indicator is absolute */
+        #setlist-songs, #setlists-list { position: relative; }
+
+        /* iOS zooms the whole page when a focused control is under 16px and
+           never zooms back — keep every form control at 16px on touch devices. */
+        @media (pointer: coarse) {
+            input, select, textarea, .field, .search, .sort-sel { font-size: 16px !important; }
+        }
         .drag-clone {
             position: fixed;
             z-index: 500;
@@ -1333,7 +1340,10 @@ function onSubTypeChange() {
     var isTab = document.getElementById('sub-type').value === 'tab';
     document.getElementById('sub-instrument').style.display = isTab ? '' : 'none';
 }
-function openRulesSheet() {
+function openRulesSheet(from) {
+    var back = from === 'song'
+        ? '<button class="tap primary" onclick="openSongSheet()">&lsaquo; Back to add song</button>'
+        : '<button class="tap primary" onclick="openSubmitSheet()">Back to submit</button>';
     openSheet(
         '<div class="sheet-title">Submission rules</div>' +
         '<div class="sheet-scroll" style="font-size:13px;line-height:1.65;color:var(--muted);">' +
@@ -1353,7 +1363,7 @@ function openRulesSheet() {
         '<p style="margin-top:10px;"><b style="color:var(--text);">Rejected:</b> duplicates of an existing good version, a missing or mismatched reference, wrong or placeholder chords, spam, or full lyric reprints with no chords.</p>' +
         '<p style="margin-top:10px;">Approved charts can be <b>thumbs-up voted</b>, so the best version of each song rises to the top.</p>' +
         '</div>' +
-        '<div class="sheet-actions"><button class="tap primary" onclick="openSubmitSheet()">Back to submit</button></div>',
+        '<div class="sheet-actions">' + back + '</div>',
         'fit'
     );
 }
@@ -2548,7 +2558,9 @@ function renderMedley(mainSong, keyIdx, capo) {
     state.medley.forEach(function(m, i) {
         var song = songById(m.songId);
         if (!song) return;
-        var steps = m.keyOption === 'match' ? getStepsToReach(song.key, noteName(keyIdx)) : 0;
+        var steps = m.keyOption === 'match' ? getStepsToReach(song.key, noteName(keyIdx))
+                  : m.keyOption === 'custom' && m.targetKey ? getStepsToReach(song.key, m.targetKey)
+                  : 0;
         var dispKey = keyLabel((getNoteIndex(keyRoot(song.key)) + steps + 12) % 12, isMinorKey(song.key));
         var block = document.createElement('div');
         block.className = 'medley-sep';
@@ -2575,7 +2587,8 @@ function renderMedley(mainSong, keyIdx, capo) {
             var names = m.sectionIndices.map(function(idx) { return allSecs[idx] ? allSecs[idx].label : null; }).filter(Boolean);
             if (names.length && names.length < allSecs.length) partsNote = ' · ' + names.join(', ');
         }
-        sub.textContent = song.artist + ' · Key of ' + dispKey + (m.keyOption === 'match' ? ' (matched)' : ' (original)') + partsNote;
+        var keyNote = m.keyOption === 'match' ? ' (matched)' : m.keyOption === 'custom' ? ' (transposed)' : ' (original)';
+        sub.textContent = song.artist + ' · Key of ' + dispKey + keyNote + partsNote;
         var chartText = medleyChartText(song, m.sectionIndices);
         var pre = document.createElement('pre');
         pre.className = 'chart';
@@ -2785,6 +2798,8 @@ function dragRowPointerDown(e, row, pos, cfg) {
 }
 function startDrag(row, pos, startY, cfg) {
     var container = cfg.container;
+    // the drop indicator is absolutely positioned inside the container
+    if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
     var rows = Array.prototype.slice.call(container.querySelectorAll(cfg.selector));
     var rect = row.getBoundingClientRect();
     var clone = row.cloneNode(true);
@@ -3010,7 +3025,10 @@ function medleyStep2(songId) {
         '<div class="section-label" style="margin-top:2px;">Key</div>' +
         '<div class="chip-row">' +
         '<button class="chip on" id="mk-same" onclick="medleyKeyOpt(\'same\')">Keep its key</button>' +
-        '<button class="chip" id="mk-match" onclick="medleyKeyOpt(\'match\')">Match current key</button></div>' +
+        '<button class="chip" id="mk-match" onclick="medleyKeyOpt(\'match\')">Match current key</button>' +
+        '<button class="chip" id="mk-custom" onclick="medleyKeyOpt(\'custom\')">Pick a key</button></div>' +
+        '<select class="field" id="mk-key" style="display:none;" onchange="medleyCustomKey(this.value)">' +
+        keyOptionsHTML(song.key) + '</select>' +
         '<div class="section-label">Which parts? <span style="text-transform:none;letter-spacing:0;">— tap to include/exclude</span></div>' +
         '<div class="chip-row" id="sh-medley-sections">' + chips + '</div>' +
         '<div class="form-error" id="sh-medley-err"></div>' +
@@ -3024,7 +3042,12 @@ function medleyKeyOpt(opt) {
     medleyPick.keyOption = opt;
     document.getElementById('mk-same').classList.toggle('on', opt === 'same');
     document.getElementById('mk-match').classList.toggle('on', opt === 'match');
+    document.getElementById('mk-custom').classList.toggle('on', opt === 'custom');
+    var sel = document.getElementById('mk-key');
+    sel.style.display = opt === 'custom' ? '' : 'none';
+    if (opt === 'custom') medleyPick.targetKey = medleyPick.targetKey || sel.value;
 }
+function medleyCustomKey(v) { if (medleyPick) medleyPick.targetKey = v; }
 function toggleMedleySection(i) {
     if (!medleyPick) return;
     var pos = medleyPick.sections.indexOf(i);
@@ -3045,6 +3068,7 @@ function confirmMedley() {
     state.medley.push({
         songId: medleyPick.songId,
         keyOption: medleyPick.keyOption,
+        targetKey: medleyPick.keyOption === 'custom' ? (medleyPick.targetKey || song.key) : null,
         sectionIndices: chosen.length === total ? null : chosen  // null = whole song
     });
     medleyPick = null;
@@ -3064,7 +3088,10 @@ function openSongSheet(songId) {
     }).join('');
     openSheet(
         '<div class="sheet-head"><div class="sheet-title">' + (song ? 'Edit song' : 'Add song') + '</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Saved on this device. To share it with everyone, use “Submit a chart”.</div></div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Saved on this device. ' +
+        '<button class="tap" style="padding:0;color:var(--accent);font-size:12px;" onclick="openRulesSheet(\'song\')">See the rules</button> — ' +
+        'chords on their own line above the lyric, and label sections like [Verse 1]. ' +
+        'To share it with everyone, use “Submit a chart”.</div></div>' +
         '<div class="sheet-scroll">' +
         '<input class="field" id="sh-song-title" placeholder="Song title *" value="' + (song ? esc(song.title) : '') + '" autocomplete="off">' +
         '<input class="field" id="sh-song-artist" placeholder="Artist / band *" value="' + (song ? esc(song.artist) : '') + '" autocomplete="off">' +
