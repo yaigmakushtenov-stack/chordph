@@ -2321,6 +2321,7 @@ function renderChart() {
         strip.style.display = 'none';
     }
     renderMedley(song, keyIdx, capo);
+    buildTempoZones(song);
 }
 function renderChordStrip(strip, chartText) {
     var names = uniqueChords(chartText);
@@ -2414,6 +2415,7 @@ function toggleScroll() {
             if (acc >= 1) {
                 var px = Math.floor(acc); acc -= px;
                 window.scrollBy(0, px);
+                syncClickToTempoZone();   // re-tempo the click as we scroll into the next song
                 if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2) { stopScroll(); return; }
             }
             state.scroll.raf = requestAnimationFrame(step);
@@ -2485,9 +2487,12 @@ function stopMetro() {
     setMetroToggle(false);
 }
 function toggleMetro() {
+    if (metro.playing) { stopMetro(); return; }
+    var z = activeTempoZone();                       // start at whatever you're reading
     var song = songById(currentSongId);
-    if (metro.playing) stopMetro();
-    else if (song && song.tempo) startMetro(song.tempo, beatsForSong(song));
+    var bpm = (z && z.tempo) || (song && song.tempo);
+    if (bpm) startMetro(bpm, (z && z.beats) || beatsForSong(song));
+    paintClickLabel();
 }
 /* beats-per-bar for a song's Click, from its time signature (default 4/4) */
 function beatsForSong(song) {
@@ -2496,6 +2501,65 @@ function beatsForSong(song) {
     var n = parseInt(String(ts).split('/')[0], 10);
     return n > 0 ? n : 4;
 }
+
+/* ---- tempo zones: the click follows the chart through a medley ----
+   A chart is the host song plus any medley blocks, each of which can have its
+   own BPM. As you scroll (auto or by hand) into the next song, the click
+   re-tempos to it instead of staying on the first song's BPM. */
+var chartTempoZones = [];
+function buildTempoZones(hostSong) {
+    chartTempoZones = [];
+    var body = document.getElementById('chart-body');
+    if (body && hostSong) {
+        chartTempoZones.push({ el: body, tempo: hostSong.tempo || 0,
+                               beats: beatsForSong(hostSong), title: hostSong.title });
+    }
+    var blocks = document.querySelectorAll('#medley-blocks .medley-sep');
+    Array.prototype.forEach.call(blocks, function(el, i) {
+        var m = state.medley[i];
+        var s = m && songById(m.songId);
+        if (s) chartTempoZones.push({ el: el, tempo: s.tempo || 0, beats: beatsForSong(s), title: s.title });
+    });
+    // the Click is usable if the host OR any medley part has a tempo
+    var anyTempo = chartTempoZones.some(function(z) { return !!z.tempo; });
+    var ctl = document.getElementById('ctl-click');
+    if (ctl) ctl.style.display = anyTempo ? 'inline-block' : 'none';
+    if (!anyTempo && state.openLayer === 'click') state.openLayer = null;
+    paintClickLabel();
+}
+/* whichever zone is under the "reading line" ~a third down the screen */
+function activeTempoZone() {
+    if (!chartTempoZones.length) return null;
+    var line = window.innerHeight * 0.35, cur = chartTempoZones[0];
+    chartTempoZones.forEach(function(z) {
+        if (z.el.getBoundingClientRect().top <= line) cur = z;
+    });
+    return cur;
+}
+function paintClickLabel() {
+    var lbl = document.getElementById('click-bpm');
+    if (!lbl) return;
+    var z = activeTempoZone();
+    if (z && z.tempo) {
+        lbl.textContent = z.tempo + ' BPM' + (chartTempoZones.length > 1 ? ' · ' + z.title : '');
+    } else {
+        var song = songById(currentSongId);
+        lbl.textContent = song && song.tempo ? song.tempo + ' BPM' : '—';
+    }
+}
+function syncClickToTempoZone() {
+    if (chartTempoZones.length < 2) return;             // nothing to follow
+    if (!document.getElementById('view-chart').classList.contains('active')) return;
+    var z = activeTempoZone();
+    if (!z || !z.tempo) return;
+    if (metro.playing && (metro.bpm !== z.tempo || metro.beatsPerBar !== z.beats)) {
+        metro.bpm = z.tempo;                            // the scheduler reads this each pass
+        metro.beatsPerBar = z.beats;
+        metro.beat = 0;                                 // land the accent on the new song's "1"
+    }
+    paintClickLabel();
+}
+window.addEventListener('scroll', syncClickToTempoZone, { passive: true });
 
 /* ---- standalone metronome ---- */
 var METRO_SIGS = ['2/4', '3/4', '4/4', '6/8'];
