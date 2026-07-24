@@ -2437,10 +2437,20 @@ function scrollSpeedBy(d) {
 
 /* ---- click / metronome (Web Audio, accent on beat 1 of 4/4) ---- */
 var metro = { playing: false, ctx: null, next: 0, beat: 0, timer: null, bpm: 120, beatsPerBar: 4 };
+/* The OS closes or suspends the audio context when the screen locks, so always
+   check it's usable rather than assuming the one we made earlier still works. */
+function metroCtxReady() {
+    try {
+        if (!metro.ctx || metro.ctx.state === 'closed') {
+            metro.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (metro.ctx.state === 'suspended') metro.ctx.resume();
+        return true;
+    } catch (e) { return false; }
+}
 function startMetro(bpm, beatsPerBar) {
     if (metro.playing || !bpm) return;
-    try { metro.ctx = metro.ctx || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-    if (metro.ctx.state === 'suspended') metro.ctx.resume();
+    if (!metroCtxReady()) return;
     metro.bpm = bpm; metro.beatsPerBar = beatsPerBar || 4;
     metro.beat = 0; metro.next = metro.ctx.currentTime + 0.08; metro.playing = true;
     setMetroToggle(true);
@@ -2448,17 +2458,42 @@ function startMetro(bpm, beatsPerBar) {
 }
 function scheduleMetro() {
     if (!metro.playing) return;
+    if (!metro.ctx || metro.ctx.state === 'closed') { stopMetro(); return; }
+    var now = metro.ctx.currentTime;
+    // If we fell behind (screen locked, tab backgrounded) don't fire a burst of
+    // overdue clicks — re-anchor to now and start a fresh bar.
+    if (metro.next < now - 0.25) { metro.next = now + 0.06; metro.beat = 0; }
     var spb = 60 / metro.bpm;
-    while (metro.next < metro.ctx.currentTime + 0.2) {
+    while (metro.next < now + 0.2) {
         var accent = metro.beat % metro.beatsPerBar === 0;
         clickAt(metro.next, accent);
         (function(t, ac) {
-            setTimeout(function() { pulseClickDot(ac); }, Math.max(0, (t - metro.ctx.currentTime) * 1000));
+            setTimeout(function() { pulseClickDot(ac); }, Math.max(0, (t - now) * 1000));
         })(metro.next, accent);
         metro.next += spb; metro.beat++;
     }
     metro.timer = setTimeout(scheduleMetro, 40);
 }
+/* Coming back from a locked screen: revive the audio context and restart the
+   scheduler. If the browser won't resume audio without a fresh tap, stop
+   cleanly so the button shows Start instead of pretending to play. */
+function reviveMetro() {
+    if (!metro.playing) return;
+    if (!metroCtxReady()) { stopMetro(); return; }
+    function finish() {
+        if (!metro.playing) return;
+        if (metro.ctx.state !== 'running') { stopMetro(); return; }
+        metro.next = metro.ctx.currentTime + 0.06;
+        metro.beat = 0;
+        clearTimeout(metro.timer);
+        scheduleMetro();
+    }
+    var p = metro.ctx.resume ? metro.ctx.resume() : null;
+    if (p && p.then) p.then(finish, function() { stopMetro(); });
+    else finish();
+}
+document.addEventListener('visibilitychange', function() { if (!document.hidden) reviveMetro(); });
+window.addEventListener('pageshow', function() { reviveMetro(); });
 function clickAt(time, accent) {
     var o = metro.ctx.createOscillator(), g = metro.ctx.createGain();
     o.frequency.value = accent ? 1600 : 950;
