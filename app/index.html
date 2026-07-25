@@ -214,6 +214,23 @@
         .sl-nav .sl-arrow { font-size: 20px; color: var(--muted); flex: 0 0 auto; }
         .sl-nav .sl-txt { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         #view-chart.has-navbar .wrap { padding-bottom: 76px; }
+        /* the pad plays continuously across the whole app, so it gets a global
+           floating control that's always reachable while it's running */
+        #pad-chip {
+            position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+            z-index: 300; display: none; align-items: center; gap: 9px;
+            background: rgba(20,24,33,0.92); border: 1px solid var(--accent);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            border-radius: 999px; padding: 6px 8px 6px 14px; font-size: 13px; color: var(--text);
+        }
+        #pad-chip b { color: var(--accent); font-variant-numeric: tabular-nums; }
+        #pad-chip .pad-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+            box-shadow: 0 0 0 0 rgba(79,140,255,0.5); animation: padPulse 2.4s ease-in-out infinite; }
+        #pad-chip button { font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+            background: rgba(79,140,255,0.16); color: var(--accent); border: none; border-radius: 999px; padding: 4px 12px; }
+        @keyframes padPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(79,140,255,0.45); } 50% { box-shadow: 0 0 0 6px rgba(79,140,255,0); } }
+        @media (prefers-reduced-motion: reduce) { #pad-chip .pad-chip-dot { animation: none; } }
+        #ctl-pad.playing { color: var(--accent-2); }
         .btn-google {
             display: flex; align-items: center; justify-content: center; gap: 10px;
             width: 100%; padding: 11px 14px; margin: 2px 0 10px;
@@ -739,6 +756,7 @@
                 <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
                 <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
                 <button class="tap" id="ctl-click" onclick="toggleLayer('click')">Click</button>
+                <button class="tap" id="ctl-pad" onclick="toggleLayer('pad')">Pad</button>
                 <button class="tap" id="ctl-medley" onclick="openMedleySheet()" style="display:none;">Medley</button>
             </div>
 
@@ -773,6 +791,13 @@
                 <button class="tap primary" id="click-toggle" onclick="toggleMetro()">&#9654; Start</button>
                 <span class="lbl" id="click-bpm">&mdash;</span>
                 <span class="click-dot" id="click-dot" aria-hidden="true"></span>
+            </div>
+
+            <div class="layer" id="layer-pad">
+                <button class="tap primary" id="pad-toggle" onclick="togglePad()">&#9654; Play</button>
+                <span class="lbl" id="pad-key">ambient pad</span>
+                <span class="lbl">vol</span>
+                <input type="range" id="pad-vol" min="0" max="100" value="55" oninput="setPadVolume(this.value/100)" aria-label="Pad volume" style="width:90px;vertical-align:middle;accent-color:var(--accent);">
             </div>
         </div>
 
@@ -851,6 +876,12 @@
         </div>
         <div id="mysubs-list"></div>
     </div>
+</div>
+
+<div id="pad-chip" style="display:none;">
+    <span class="pad-chip-dot"></span>
+    <span>Pad &middot; <b id="pad-chip-key">C</b></span>
+    <button onclick="stopPad()" aria-label="Stop pad">Stop</button>
 </div>
 
 <div class="sheet-scrim" id="sheet-scrim" onclick="if (event.target === this) closeSheet()">
@@ -2373,10 +2404,12 @@ function renderChart() {
     document.getElementById('ctl-click').style.display = song.tempo ? 'inline-block' : 'none';
     if (!song.tempo && state.openLayer === 'click') state.openLayer = null;
     document.getElementById('click-bpm').textContent = song.tempo ? song.tempo + ' BPM' : '—';
-    ['transpose', 'capo', 'text', 'scroll', 'click'].forEach(function(l) {
+    ['transpose', 'capo', 'text', 'scroll', 'click', 'pad'].forEach(function(l) {
         document.getElementById('layer-' + l).classList.toggle('open', state.openLayer === l);
         document.getElementById('ctl-' + l).classList.toggle('on', state.openLayer === l);
     });
+    if (pad.playing) setPadKey(keyIdx);   // pad glides to the song you're now reading
+    updatePadUI();
     document.getElementById('ctl-numbers').classList.toggle('on', state.nashville);
     document.getElementById('ctl-diagrams').classList.toggle('on', state.showDiagrams);
 
@@ -2572,8 +2605,8 @@ function reviveMetro() {
     if (p && p.then) p.then(finish, function() { stopMetro(); });
     else finish();
 }
-document.addEventListener('visibilitychange', function() { if (!document.hidden) reviveMetro(); });
-window.addEventListener('pageshow', function() { reviveMetro(); });
+document.addEventListener('visibilitychange', function() { if (!document.hidden) { reviveMetro(); revivePad(); } });
+window.addEventListener('pageshow', function() { reviveMetro(); revivePad(); });
 function clickAt(time, accent) {
     var o = metro.ctx.createOscillator(), g = metro.ctx.createGain();
     o.frequency.value = accent ? 1600 : 950;
@@ -2726,6 +2759,120 @@ function metroTap() {
         var avg = gaps.reduce(function(a, b) { return a + b; }, 0) / gaps.length;
         metroSetBpm(Math.round(60000 / avg));
     }
+}
+
+/* =========================================================
+   AMBIENT PAD — a sustained worship pad synthesised in the song's key.
+   Root + fifth + octaves (no third, so it sits under major OR minor), warm
+   lowpass, slow filter drift and a lush generated reverb. Plays continuously
+   across the whole app and glides to the new key when you change songs.
+   ========================================================= */
+var pad = { ctx: null, playing: false, keyIndex: 0, level: 0.55,
+            master: null, filter: null, lfo: null, voices: [] };
+// midi offsets from the key root at octave 2 (36 = C2); one entry per oscillator
+var PAD_VOICES = [
+    { midi: 36, wave: 'sawtooth', gain: 0.22, detune:  5 },   // root
+    { midi: 36, wave: 'sawtooth', gain: 0.22, detune: -5 },   // root (detuned twin = width)
+    { midi: 43, wave: 'sawtooth', gain: 0.15, detune:  3 },   // fifth
+    { midi: 48, wave: 'triangle', gain: 0.16, detune: -4 },   // octave
+    { midi: 55, wave: 'triangle', gain: 0.09, detune:  4 },   // octave + fifth
+    { midi: 60, wave: 'sine',     gain: 0.06, detune:  0 }     // air (two octaves up)
+];
+function padFreq(midi, key) { return 440 * Math.pow(2, ((midi + key) - 69) / 12); }
+function padReverbIR(ctx, seconds, decay) {
+    var len = Math.floor(ctx.sampleRate * seconds), buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (var ch = 0; ch < 2; ch++) {
+        var d = buf.getChannelData(ch);
+        for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
+}
+function padCtxReady() {
+    try {
+        if (!pad.ctx || pad.ctx.state === 'closed') pad.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (pad.ctx.state === 'suspended') pad.ctx.resume();
+        return true;
+    } catch (e) { return false; }
+}
+function startPad(keyIndex) {
+    if (pad.playing) { setPadKey(keyIndex); return; }
+    if (!padCtxReady()) return;
+    var ctx = pad.ctx, now = ctx.currentTime;
+    pad.keyIndex = keyIndex || 0;
+    pad.master = ctx.createGain(); pad.master.gain.value = 0.0001;
+    var comp = ctx.createDynamicsCompressor();           // gentle limiter so stacked voices never clip
+    pad.master.connect(comp); comp.connect(ctx.destination);
+    pad.filter = ctx.createBiquadFilter(); pad.filter.type = 'lowpass'; pad.filter.frequency.value = 1100; pad.filter.Q.value = 0.6;
+    var dry = ctx.createGain(); dry.gain.value = 0.55;
+    var wet = ctx.createGain(); wet.gain.value = 0.5;
+    var verb = ctx.createConvolver(); verb.buffer = padReverbIR(ctx, 3.2, 2.6);
+    pad.filter.connect(dry); dry.connect(pad.master);
+    pad.filter.connect(verb); verb.connect(wet); wet.connect(pad.master);
+    pad.lfo = ctx.createOscillator(); pad.lfo.frequency.value = 0.06;   // slow filter drift = "movement"
+    var lfoGain = ctx.createGain(); lfoGain.gain.value = 280;
+    pad.lfo.connect(lfoGain); lfoGain.connect(pad.filter.frequency); pad.lfo.start();
+    pad.voices = PAD_VOICES.map(function(v) {
+        var o = ctx.createOscillator(); o.type = v.wave; o.detune.value = v.detune || 0;
+        o.frequency.value = padFreq(v.midi, pad.keyIndex);
+        var g = ctx.createGain(); g.gain.value = v.gain;
+        o.connect(g); g.connect(pad.filter); o.start();
+        return { o: o, g: g, spec: v };
+    });
+    pad.playing = true;
+    pad.master.gain.setValueAtTime(0.0001, now);
+    pad.master.gain.exponentialRampToValueAtTime(pad.level, now + 1.6);   // slow swell in
+    updatePadUI();
+}
+function setPadKey(keyIndex) {
+    if (keyIndex == null) return;
+    if (!pad.playing) { pad.keyIndex = keyIndex; return; }
+    if (keyIndex === pad.keyIndex) return;
+    pad.keyIndex = keyIndex;
+    var ctx = pad.ctx, now = ctx.currentTime, lvl = pad.master.gain.value || pad.level;
+    pad.master.gain.cancelScheduledValues(now);        // brief dip hides the re-pitch
+    pad.master.gain.setValueAtTime(lvl, now);
+    pad.master.gain.linearRampToValueAtTime(0.0001, now + 0.16);
+    var t = now + 0.18;
+    pad.voices.forEach(function(v) { v.o.frequency.setValueAtTime(padFreq(v.spec.midi, keyIndex), t); });
+    pad.master.gain.linearRampToValueAtTime(pad.level, now + 0.95);
+    updatePadUI();
+}
+function stopPad() {
+    if (!pad.playing) { updatePadUI(); return; }
+    pad.playing = false;
+    var ctx = pad.ctx, now = ctx.currentTime, voices = pad.voices, lfo = pad.lfo;
+    try {
+        pad.master.gain.cancelScheduledValues(now);
+        pad.master.gain.setValueAtTime(pad.master.gain.value || pad.level, now);
+        pad.master.gain.linearRampToValueAtTime(0.0001, now + 1.2);       // slow fade out
+    } catch (e) {}
+    setTimeout(function() { try { voices.forEach(function(v) { v.o.stop(); }); lfo.stop(); } catch (e) {} }, 1400);
+    pad.voices = [];
+    updatePadUI();
+}
+function togglePad() {
+    if (pad.playing) stopPad();
+    else { var s = songById(currentSongId); startPad(s ? currentKeyIndex(s) : 0); }
+    updatePadUI();
+}
+function setPadVolume(v) {
+    pad.level = Math.max(0, Math.min(1, v));
+    if (pad.playing && pad.master) pad.master.gain.setTargetAtTime(pad.level, pad.ctx.currentTime, 0.1);
+}
+function updatePadUI() {
+    var t = document.getElementById('pad-toggle');
+    if (t) t.innerHTML = pad.playing ? '&#10074;&#10074; Stop' : '&#9654; Play';
+    var lbl = document.getElementById('pad-key');
+    if (lbl) lbl.textContent = pad.playing ? ('key of ' + noteName(pad.keyIndex)) : 'ambient pad';
+    var ctl = document.getElementById('ctl-pad'); if (ctl) ctl.classList.toggle('playing', pad.playing);
+    var chip = document.getElementById('pad-chip');
+    if (chip) {
+        chip.style.display = pad.playing ? 'flex' : 'none';
+        var k = document.getElementById('pad-chip-key'); if (k) k.textContent = noteName(pad.keyIndex);
+    }
+}
+function revivePad() {   // resume after a screen lock, like the metronome
+    if (pad.playing && pad.ctx && pad.ctx.state === 'suspended') pad.ctx.resume();
 }
 
 /* ---- medley ---- */
