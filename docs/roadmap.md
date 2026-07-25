@@ -12,12 +12,15 @@ Sustained atmospheric pads in the song's key that play under a set — the thing
 worship teams currently pay Pad / Loop Community / Sunday Sounds for — plus
 ambient percussion beds.
 
-- **Planned as the anchor paid feature.**
-- Build path A (first): **synthesised** pads via Web Audio — oscillators +
-  filter + reverb, generated in the current key, auto-following the chart's key.
-  Zero licensing, zero asset weight, works offline.
-- Build path B (later): **sampled** pads for premium quality — needs licensed or
+- ✅ **Synthesised pad — DONE & live** (Web Audio, follows the song's key,
+  plays across the whole app, floating stop chip). Free for now to validate;
+  becomes the anchor paid feature once payments exist.
+- ⏳ **Ambient percussion beds** — still to build (looped ambient percussion
+  under the pad; likely a synth/noise-based groove or short sampled loops).
+- ⏳ **Sampled pads** for premium quality — later; needs licensed or
   self-produced audio, tens of MB of assets.
+- ⏳ Optional: make the pad follow each medley section's key while scrolling
+  (today it follows the open song).
 - ⚠️ Must stay isolated from the analyzer's Essentia/MTG models, which are
   **CC BY-NC-SA (non-commercial)** and cannot sit behind a paywall.
 
