@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0f1117">
     <meta name="mobile-web-app-capable" content="yes">
@@ -30,6 +30,7 @@
             font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
             min-height: 100vh;
             -webkit-font-smoothing: antialiased;
+            touch-action: pan-x pan-y;   /* allow scroll, block double-tap/pinch zoom */
         }
 
         ::selection { background: rgba(79, 140, 255, 0.35); }
@@ -48,10 +49,14 @@
             transition: color .15s;
             background: none; border: none; font: inherit;
         }
-        .tap:hover { color: var(--text); }
+        /* hover only where a real pointer hovers — on touch it "sticks" after a
+           tap and leaves the label white instead of returning to grey */
+        @media (hover: hover) {
+            .tap:hover { color: var(--text); }
+            .tap.primary:hover { color: #7caaff; }
+        }
         .tap.on { color: var(--accent); }
         .tap.primary { color: var(--accent); font-weight: 600; }
-        .tap.primary:hover { color: #7caaff; }
         .tap.danger { color: var(--danger); }
         .tap.big { font-size: 17px; padding: 10px 4px; }
         .tap:disabled { color: var(--faint); cursor: default; }
@@ -192,6 +197,23 @@
         .status-rejected { background:rgba(255,92,92,0.16); color:#ff8a8a; }
         .review-note { font-size:13px; line-height:1.55; color:var(--muted); margin-top:8px; padding:10px 12px; background:rgba(0,0,0,0.2); border-radius:8px; border-left:2px solid var(--border,#263041); }
         .review-note b { color:var(--text); }
+        /* floating prev/next bar at the bottom of a setlist chart */
+        #setlist-navbar {
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+            display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+            background: linear-gradient(to top, rgba(15,17,23,0.97), rgba(15,17,23,0.86));
+            border-top: 1px solid var(--hairline); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        }
+        .sl-nav {
+            flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+            background: var(--panel-2, #171c28); border: 1px solid var(--border, #263041);
+            border-radius: 10px; padding: 9px 12px; color: var(--text); font: inherit; cursor: pointer;
+        }
+        .sl-nav.right { justify-content: flex-end; text-align: right; }
+        .sl-nav:disabled { opacity: 0; pointer-events: none; }
+        .sl-nav .sl-arrow { font-size: 20px; color: var(--muted); flex: 0 0 auto; }
+        .sl-nav .sl-txt { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #view-chart.has-navbar .wrap { padding-bottom: 76px; }
         .share-banner {
             margin-top: 8px; font-size: 13px; color: var(--muted);
             padding: 8px 12px; border-radius: 8px;
@@ -407,6 +429,7 @@
         }
         .sheet-scrim.open { display: flex; }
         .sheet {
+            position: relative;
             width: 100%;
             max-width: 640px;
             max-height: 86vh;
@@ -416,6 +439,12 @@
             border-radius: 18px 18px 0 0;
             padding: 20px 24px 34px;
             animation: sheetUp .22s cubic-bezier(.2, .8, .2, 1);
+            will-change: transform;
+        }
+        /* grab handle: hints that the sheet can be swiped down to dismiss */
+        .sheet::before {
+            content: ''; position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+            width: 38px; height: 4px; border-radius: 2px; background: #39424f; z-index: 6;
         }
         @keyframes sheetUp { from { transform: translateY(40px); opacity: .5; } to { transform: none; opacity: 1; } }
         .sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
@@ -598,6 +627,9 @@
     <div class="chip-row" id="ob-instruments"></div>
     <div class="ob-label">What should we call you?</div>
     <input class="field" id="ob-name" placeholder="Your name" autocomplete="off">
+    <div class="ob-label" id="ob-sync-label">Sync across your devices <span style="text-transform:none;letter-spacing:0;color:var(--faint);">— optional</span></div>
+    <input class="field" id="ob-email" type="email" placeholder="you@email.com — we email a one-tap link" autocomplete="email">
+    <div id="ob-msg" style="font-size:12px;color:var(--accent);min-height:16px;margin:2px 0 4px;"></div>
     <button class="tap primary big" id="ob-go" onclick="finishOnboarding()">Let's play &rarr;</button>
 </div>
 
@@ -733,6 +765,10 @@
         <div class="chord-strip" id="chord-strip" style="display:none;"></div>
         <pre class="chart" id="chart-body"></pre>
         <div id="medley-blocks"></div>
+        <div id="setlist-navbar" style="display:none;">
+            <button class="sl-nav" id="sl-prev" onclick="setlistStep(-1)"><span class="sl-arrow">&lsaquo;</span><span class="sl-txt" id="sl-prev-txt"></span></button>
+            <button class="sl-nav right" id="sl-next" onclick="setlistStep(1)"><span class="sl-txt" id="sl-next-txt"></span><span class="sl-arrow">&rsaquo;</span></button>
+        </div>
     </div>
 </div>
 
@@ -1871,6 +1907,7 @@ function hasAllTags(s, tags) {
     var st = songTags(s);
     return tags.every(function(t) { return st.indexOf(t) !== -1; });
 }
+var songFavOnly = false;   // "★ Favorites" quick filter in the songs view
 function renderTagFilter() {
     var el = document.getElementById('tag-filter');
     if (!el) return;
@@ -1879,13 +1916,14 @@ function renderTagFilter() {
     var tags = Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a] || a.localeCompare(b); });
     // keep any active tag visible even if it momentarily has no matches
     songFilterTags.forEach(function(t) { if (tags.indexOf(t) === -1) tags.push(t); });
-    if (!tags.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
     el.style.display = 'flex';
     var chips = tags.map(function(t) {
         var on = songFilterTags.indexOf(t) !== -1;
         return '<button class="tag-chip' + (on ? ' on' : '') + '" onclick="toggleTagFilter(\'' + esc(t).replace(/'/g, "\\'") + '\')">' + esc(t) + '</button>';
     });
-    if (songFilterTags.length) chips.unshift('<button class="tag-chip" onclick="clearTagFilter()">Clear ✕</button>');
+    // Favorites is always first, so you can see just your starred songs here
+    chips.unshift('<button class="tag-chip' + (songFavOnly ? ' on' : '') + '" onclick="toggleFavFilter()">&#9733; Favorites</button>');
+    if (songFilterTags.length || songFavOnly) chips.push('<button class="tag-chip" onclick="clearTagFilter()">Clear ✕</button>');
     el.innerHTML = chips.join('');
 }
 function toggleTagFilter(t) {
@@ -1893,7 +1931,8 @@ function toggleTagFilter(t) {
     if (i === -1) songFilterTags.push(t); else songFilterTags.splice(i, 1);
     renderSongList();
 }
-function clearTagFilter() { songFilterTags = []; renderSongList(); }
+function toggleFavFilter() { songFavOnly = !songFavOnly; renderSongList(); }
+function clearTagFilter() { songFilterTags = []; songFavOnly = false; renderSongList(); }
 function renderSongList() {
     var q = (document.getElementById('search').value || '').toLowerCase();
     var box = document.getElementById('song-list');
@@ -1901,10 +1940,10 @@ function renderSongList() {
     var sortEl = document.getElementById('songs-sort'); if (sortEl) sortEl.innerHTML = sortSelectHTML();
     box.innerHTML = '';
     var list = applySort(allSongs().filter(function(s) {
-        return matchesQuery(s, q) && hasAllTags(s, songFilterTags);
+        return matchesQuery(s, q) && hasAllTags(s, songFilterTags) && (!songFavOnly || isFav(s.id));
     }));
     if (!list.length) {
-        box.innerHTML = '<div class="empty">No songs match.</div>';
+        box.innerHTML = '<div class="empty">' + (songFavOnly ? 'No favorites match. Tap ☆ on any song.' : 'No songs match.') + '</div>';
         return;
     }
     list.forEach(function(s) { box.appendChild(songRow(s)); });
@@ -2267,15 +2306,11 @@ function renderChart() {
     document.getElementById('chart-share').style.display = readonly ? 'none' : '';
     document.getElementById('chart-edit').style.display = (!readonly && song.custom) ? 'inline-block' : 'none';
 
-    // setlist prev/next
+    // setlist prev/next — top arrows + bottom bar with song names
     var inSetlist = state.chartFrom === 'setlist';
     var prev = document.getElementById('chart-prev'), next = document.getElementById('chart-next');
     prev.style.display = next.style.display = inSetlist ? 'inline-block' : 'none';
-    if (inSetlist) {
-        var sl = setlistById(state.currentSetlistId);
-        prev.disabled = state.setlistPos <= 0;
-        next.disabled = !sl || state.setlistPos >= sl.songIds.length - 1;
-    }
+    renderSetlistNavbar(inSetlist);
 
     // controls: capo only for guitarists
     document.getElementById('ctl-capo').style.display = view === 'guitarist' ? 'inline-block' : 'none';
@@ -2720,7 +2755,7 @@ function renderSetlists() {
     var box = document.getElementById('setlists-list');
     box.innerHTML = '';
     if (!state.setlists.length) {
-        box.innerHTML = '<div class="empty">No setlists yet.<br>Tap &#8943; &rarr; New setlist.</div>';
+        box.innerHTML = '<div class="empty">No setlists yet.<br><button class="tap primary" onclick="openNewSetlistSheet()">＋ Add setlist</button></div>';
         return;
     }
     state.setlists.forEach(function(sl, pos) {
@@ -2971,14 +3006,37 @@ function arrayMove(arr, from, to) {
     if (to > from) to--;
     arr.splice(to, 0, it);
 }
-function setlistStep(dir) {
+/* next/prev playable position in the current setlist (skips missing songs) */
+function setlistNeighbor(dir) {
     var sl = setlistById(state.currentSetlistId);
-    if (!sl) return;
+    if (!sl) return null;
     var pos = state.setlistPos + dir;
     while (pos >= 0 && pos < sl.songIds.length && !songById(sl.songIds[pos])) pos += dir;
-    if (pos < 0 || pos >= sl.songIds.length) return;
-    state.setlistPos = pos;
-    openChart(sl.songIds[pos], 'setlist');
+    if (pos < 0 || pos >= sl.songIds.length) return null;
+    return { pos: pos, song: songById(sl.songIds[pos]) };
+}
+function setlistStep(dir) {
+    var n = setlistNeighbor(dir);
+    if (!n) return;
+    state.setlistPos = n.pos;
+    openChart(n.song.id, 'setlist');
+}
+function renderSetlistNavbar(inSetlist) {
+    var bar = document.getElementById('setlist-navbar');
+    var chartView = document.getElementById('view-chart');
+    if (!inSetlist) { bar.style.display = 'none'; chartView.classList.remove('has-navbar'); return; }
+    var prev = setlistNeighbor(-1), next = setlistNeighbor(1);
+    var pBtn = document.getElementById('sl-prev'), nBtn = document.getElementById('sl-next');
+    pBtn.disabled = !prev; nBtn.disabled = !next;
+    document.getElementById('sl-prev-txt').textContent = prev ? prev.song.title : '';
+    document.getElementById('sl-next-txt').textContent = next ? next.song.title : '';
+    // both ends missing (single-song setlist) → no bar at all
+    if (!prev && !next) { bar.style.display = 'none'; chartView.classList.remove('has-navbar'); return; }
+    bar.style.display = 'flex';
+    chartView.classList.add('has-navbar');
+    // top arrows mirror the same disabled state
+    document.getElementById('chart-prev').disabled = !prev;
+    document.getElementById('chart-next').disabled = !next;
 }
 
 /* =========================================================
@@ -2988,6 +3046,7 @@ function openSheet(html, mode) {
     var sheet = document.getElementById('sheet');
     var cls = mode === 'fit' ? ' sheet-fit' : (mode ? ' sheet-tall' : '');
     sheet.className = 'sheet' + cls;
+    sheet.style.transform = ''; sheet.style.transition = '';   // clear any leftover drag
     sheet.innerHTML = html;
     document.getElementById('sheet-scrim').classList.add('open');
 }
@@ -3382,6 +3441,9 @@ function renderOnboarding() {
         };
         box.appendChild(b);
     });
+    // hide the sync field entirely if cloud sync isn't configured
+    document.getElementById('ob-sync-label').style.display = syncEnabled() ? '' : 'none';
+    document.getElementById('ob-email').style.display = syncEnabled() ? '' : 'none';
     document.body.classList.add('pre-app');
     document.getElementById('view-onboarding').style.display = 'flex';
 }
@@ -3390,6 +3452,17 @@ function finishOnboarding() {
     if (!name || !window.__obInstrument) return;
     state.profile = { name: name, instrument: window.__obInstrument };
     save();
+    // one-time: if they entered an email here, kick off the sign-in now so they
+    // never have to "log in" again in Settings
+    var email = (document.getElementById('ob-email').value || '').trim();
+    if (email && syncEnabled()) {
+        var msg = document.getElementById('ob-msg');
+        msg.textContent = 'Sending sign-in link…';
+        sendMagicLink(email).then(function(err) {
+            msg.textContent = err || 'Check your email for the sign-in link.';
+        });
+        toast('Setup done — check your email to finish syncing.');
+    }
     document.getElementById('view-onboarding').style.display = 'none';
     go('songs');
 }
@@ -3414,6 +3487,65 @@ function setupEdgeSwipe() {
     }, { passive: true });
     document.addEventListener('touchend', function() { tracking = false; }, { passive: true });
 }
+/* Block accidental pinch-zoom — the chart controls its own text size via A-/A+.
+   iOS Safari ignores user-scalable=no, so cancel its gesture events and any
+   two-finger touchmove; double-tap zoom is off via touch-action on <body>. */
+/* Swipe left/right across a setlist chart to move to the next/previous song. */
+function setupChartSwipe() {
+    var view = document.getElementById('view-chart');
+    var sx = 0, sy = 0, on = false;
+    view.addEventListener('touchstart', function(e) {
+        on = false;
+        if (e.touches.length !== 1) return;
+        if (state.chartFrom !== 'setlist') return;
+        var t = e.touches[0];
+        if (t.clientX <= 24) return;              // leave the left edge to the drawer swipe
+        sx = t.clientX; sy = t.clientY; on = true;
+    }, { passive: true });
+    view.addEventListener('touchend', function(e) {
+        if (!on) return; on = false;
+        var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return;   // mostly-horizontal only
+        setlistStep(dx < 0 ? 1 : -1);             // swipe left = next, right = previous
+    }, { passive: true });
+}
+/* Block accidental pinch-zoom — the chart controls its own text size via A-/A+.
+   iOS Safari ignores user-scalable=no, so cancel its gesture events and any
+   two-finger touchmove; double-tap zoom is off via touch-action on <body>. */
+/* Swipe a bottom-sheet downward to dismiss it (only when its content is already
+   scrolled to the top, so mid-scroll gestures still scroll). */
+function setupSheetSwipe() {
+    var sheet = document.getElementById('sheet');
+    var startY = 0, dy = 0, dragging = false, scroller = null;
+    sheet.addEventListener('touchstart', function(e) {
+        if (e.touches.length !== 1) { dragging = false; return; }
+        scroller = sheet.querySelector('.sheet-scroll') || sheet;
+        if (scroller.scrollTop > 0) { dragging = false; return; }   // let it scroll first
+        startY = e.touches[0].clientY; dy = 0; dragging = true;
+        sheet.style.transition = 'none';
+    }, { passive: true });
+    sheet.addEventListener('touchmove', function(e) {
+        if (!dragging) return;
+        dy = e.touches[0].clientY - startY;
+        if (dy < 0) { dy = 0; return; }
+        if (scroller.scrollTop > 0) { dragging = false; sheet.style.transform = ''; return; }
+        sheet.style.transform = 'translateY(' + dy + 'px)';
+    }, { passive: true });
+    sheet.addEventListener('touchend', function() {
+        if (!dragging) return; dragging = false;
+        sheet.style.transition = 'transform .2s ease';
+        if (dy > 110) { closeSheet(); setTimeout(function() { sheet.style.transform = ''; sheet.style.transition = ''; }, 220); }
+        else { sheet.style.transform = ''; }
+    }, { passive: true });
+}
+function blockPinchZoom() {
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function(ev) {
+        document.addEventListener(ev, function(e) { e.preventDefault(); });
+    });
+    document.addEventListener('touchmove', function(e) {
+        if (e.touches && e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+}
 function init() {
     migrate();
     load();
@@ -3423,6 +3555,9 @@ function init() {
     fetchLibrary();     // shared cloud library — cache already painted, refresh in background
     initSync();
     setupEdgeSwipe();
+    setupChartSwipe();
+    setupSheetSwipe();
+    blockPinchZoom();
 }
 init();
 </script>
