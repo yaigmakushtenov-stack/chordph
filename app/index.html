@@ -367,14 +367,23 @@
         .capo-opt span { color: var(--faint); font-size: 12px; }
 
         /* ---- the chart itself: the hero, no box ---- */
-        pre.chart {
+        /* The chart is rendered as one block per line so a chord line can sit
+           TIGHT above its own lyric, with the gap placed BEFORE each chord line
+           (separating it from the previous pair) — chords group with their lyric
+           instead of floating midway between two lines. */
+        .chart {
             font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
             font-size: 16px;
-            line-height: 1.9;
-            white-space: pre-wrap;
             color: var(--text);
-            padding: 18px 0 10px;
+            padding: 12px 0 10px;
         }
+        .chart > div { white-space: pre-wrap; line-height: 1.5; }
+        .chart .chord-line { color: var(--accent); font-weight: 700; line-height: 1.25; margin-top: 0.95em; }
+        .chart .lyric-line { line-height: 1.5; }
+        .chart .chart-gap { height: 0.4em; }
+        .chart > div:first-child { margin-top: 0; }
+        /* right after a section header, don't add the big pre-chord gap */
+        .chart .sec-head + .chord-line, .chart .sec-head + .lyric-line { margin-top: 0.35em; }
         /* guitar chord diagram reference strip */
         .chord-strip {
             display: flex; gap: 14px; overflow-x: auto;
@@ -384,13 +393,14 @@
         .chord-dia { flex-shrink: 0; text-align: center; }
         .cd-name { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 3px; }
         .chord-strip .cd-missing { font-size: 11px; color: var(--faint); align-self: center; }
-        pre.chart .chord-line { color: var(--accent); font-weight: 700; }
-        pre.chart .sec-head {
+        .chart .sec-head {
             color: var(--accent-2);
             font-weight: 700;
             font-size: 0.82em;
             letter-spacing: 1.6px;
             text-transform: uppercase;
+            margin-top: 1.3em;
+            margin-bottom: 0.1em;
         }
 
         .medley-sep {
@@ -607,7 +617,9 @@
            DESKTOP: persistent sidebar, centered reading column
            ========================================================= */
         /* ============ TABLET — a roomier single column ============ */
-        @media (min-width: 700px) and (max-width: 979px) {
+        /* min-height keeps a LANDSCAPE PHONE (wide but short) on the compact
+           phone tier, so sizing stays uniform when you rotate a phone. */
+        @media (min-width: 700px) and (max-width: 979px) and (min-height: 600px) {
             :root { --gutter: 34px; --col: 700px; }
             .bar { padding: 20px 0 12px; }
             .search { font-size: 17px; padding: 12px 2px; }
@@ -615,7 +627,7 @@
             .row-title { font-size: 16.5px; }
             .chart-title { font-size: 27px; }
             .controls { gap: 22px; font-size: 15px; padding: 11px 0; }
-            pre.chart { font-size: 18px; line-height: 2.0; }
+            .chart { font-size: 18px; }
             .sheet { max-width: 560px; border-radius: 18px; margin-bottom: 0; }
         }
 
@@ -647,8 +659,11 @@
             }
             /* onboarding + logged-out: no sidebar */
             body.pre-app .drawer { display: none; }
+            /* the fixed prev/next bar must start after the sidebar, not under it */
+            #setlist-navbar { left: 250px; padding-left: 24px; padding-right: 24px; }
+            body.pre-app #setlist-navbar { left: 0; }
             .chart-title { font-size: 28px; }
-            pre.chart { font-size: 17px; }
+            .chart { font-size: 17px; }
             .row { padding: 16px 4px; border-radius: 10px; padding-left: 10px; padding-right: 10px; transition: background .12s; }
             .row:hover { background: rgba(255,255,255,0.028); }
             .row:hover .row-title { color: var(--accent); }
@@ -840,7 +855,7 @@
         </div>
 
         <div class="chord-strip" id="chord-strip" style="display:none;"></div>
-        <pre class="chart" id="chart-body"></pre>
+        <div class="chart" id="chart-body"></div>
         <div id="medley-blocks"></div>
         <div id="setlist-navbar" style="display:none;">
             <button class="sl-nav" id="sl-prev" onclick="setlistStep(-1)"><span class="sl-arrow">&lsaquo;</span><span class="sl-txt" id="sl-prev-txt"></span></button>
@@ -1061,11 +1076,11 @@ function isChordLine(line) {
 }
 function formatChart(text) {
     return text.split('\n').map(function(line) {
-        var e = esc(line);
-        if (/^\s*\[.*\]\s*$/.test(line)) return '<span class="sec-head">' + e + '</span>';
-        if (isChordLine(line)) return '<span class="chord-line">' + e + '</span>';
-        return e;
-    }).join('\n');
+        if (/^\s*\[.*\]\s*$/.test(line)) return '<div class="sec-head">' + esc(line) + '</div>';
+        if (line.trim() === '') return '<div class="chart-gap"></div>';
+        if (isChordLine(line)) return '<div class="chord-line">' + esc(line) + '</div>';
+        return '<div class="lyric-line">' + esc(line) + '</div>';
+    }).join('');
 }
 /* Vocalist mode: drop the chord lines, keep lyrics + [Section] headers, and
    collapse the blank space the chords left behind. */
@@ -1083,10 +1098,11 @@ function stripChords(text) {
 // numbers (which aren't [A-G] so isChordLine can't detect them post-hoc).
 function formatChartNashville(text, keyRootIndex, minor) {
     return text.split('\n').map(function(line) {
-        if (/^\s*\[.*\]\s*$/.test(line)) return '<span class="sec-head">' + esc(line) + '</span>';
-        if (isChordLine(line)) return '<span class="chord-line">' + esc(toNashville(line, keyRootIndex, minor)) + '</span>';
-        return esc(line);
-    }).join('\n');
+        if (/^\s*\[.*\]\s*$/.test(line)) return '<div class="sec-head">' + esc(line) + '</div>';
+        if (line.trim() === '') return '<div class="chart-gap"></div>';
+        if (isChordLine(line)) return '<div class="chord-line">' + esc(toNashville(line, keyRootIndex, minor)) + '</div>';
+        return '<div class="lyric-line">' + esc(line) + '</div>';
+    }).join('');
 }
 
 /* =========================================================
@@ -3147,7 +3163,7 @@ function renderMedley(mainSong, keyIdx, capo) {
         var keyNote = m.keyOption === 'match' ? ' (matched)' : m.keyOption === 'custom' ? ' (transposed)' : ' (original)';
         sub.textContent = song.artist + ' · Key of ' + dispKey + keyNote + partsNote;
         var chartText = medleyChartText(song, m.sectionIndices);
-        var pre = document.createElement('pre');
+        var pre = document.createElement('div');
         pre.className = 'chart';
         pre.style.fontSize = state.fontSize + 'px';
         pre.innerHTML = view === 'drummer'
