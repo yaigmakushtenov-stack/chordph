@@ -2208,37 +2208,78 @@ function b64urlDecode(str) {
     while (b.length % 4) b += '=';
     return JSON.parse(decodeURIComponent(escape(atob(b))));
 }
-function shareUrl(url, title) {
-    if (navigator.share) { navigator.share({ title: title, url: url }).catch(function () {}); return; }
+function copyLink(url) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(function () { toast('Link copied — paste to share.'); },
                                                 function () { window.prompt('Copy this link:', url); });
+    } else window.prompt('Copy this link:', url);
+}
+function shareUrl(url, title) {
+    if (navigator.share) {
+        navigator.share({ title: title, url: url }).catch(function (e) {
+            if (!e || e.name !== 'AbortError') copyLink(url);   // cancelled = fine; anything else = copy
+        });
         return;
     }
-    window.prompt('Copy this link:', url);
+    copyLink(url);
 }
 function songSnapshot(s) {
     return { title: s.title, artist: s.artist, key: s.key, tempo: s.tempo || 0, feel: s.feel || '',
              tags: s.tags || [], chart: s.chart, transpose: state.transpose[s.id] || 0, capo: state.capo[s.id] || 0 };
 }
-function shareSong(id) {
-    var s = songById(id); if (!s) return;
-    shareUrl(location.origin + '/app/#share=' + b64urlEncode({ v: 1, type: 'song', song: songSnapshot(s) }), s.title);
+/* Short links: store the payload in the cloud and put only a short code in the
+   URL. Falls back to the old self-contained link if the user isn't signed in or
+   the shares table isn't set up yet — so sharing always works. */
+function shortId() {
+    var c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789', s = '';
+    for (var i = 0; i < 9; i++) s += c[Math.floor(Math.random() * c.length)];
+    return s;
 }
-function shareSetlist(id) {
+async function shareLinkFor(payload) {
+    if (supa && currentUser) {
+        var id = shortId();
+        try {
+            var res = await supa.from('shares').insert({ id: id, data: payload, created_by: currentUser.id });
+            if (!res.error) return location.origin + '/app/#s=' + id;
+        } catch (e) {}
+    }
+    return location.origin + '/app/#share=' + b64urlEncode(payload);   // self-contained fallback
+}
+async function shareSong(id) {
+    var s = songById(id); if (!s) return;
+    var url = await shareLinkFor({ v: 1, type: 'song', song: songSnapshot(s) });
+    shareUrl(url, s.title);
+}
+async function shareSetlist(id) {
     var sl = setlistById(id); if (!sl) return;
     var songs = sl.songIds.map(songById).filter(Boolean).map(songSnapshot);
     if (!songs.length) { toast('This setlist is empty — nothing to share yet.'); return; }
-    shareUrl(location.origin + '/app/#share=' + b64urlEncode({ v: 1, type: 'setlist', name: sl.name, songs: songs }), sl.name);
+    var url = await shareLinkFor({ v: 1, type: 'setlist', name: sl.name, songs: songs });
+    shareUrl(url, sl.name);
+}
+function openSharedPayload(p) {
+    if (p && p.type === 'song' && p.song) { openSharedSong(p.song); return true; }
+    if (p && p.type === 'setlist' && p.songs && p.songs.length) { openSharedSetlist(p); return true; }
+    return false;
+}
+function loadShortShare(id) {
+    var url = SUPABASE_CONFIG.url + '/rest/v1/shares?select=data&id=eq.' + encodeURIComponent(id);
+    fetch(url, { headers: { apikey: SUPABASE_CONFIG.anonKey, Authorization: 'Bearer ' + SUPABASE_CONFIG.anonKey } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (rows) {
+            if (rows && rows[0] && rows[0].data) openSharedPayload(rows[0].data);
+            else { toast('This shared link is unavailable.'); go('songs'); }
+        })
+        .catch(function () { toast('Couldn’t open the shared link.'); go('songs'); });
 }
 function checkSharedLink() {
-    var m = (location.hash || '').match(/^#share=(.+)$/);
-    if (!m) return false;
-    try {
-        var p = b64urlDecode(m[1]);
-        if (p && p.type === 'song' && p.song) { openSharedSong(p.song); return true; }
-        if (p && p.type === 'setlist' && p.songs && p.songs.length) { openSharedSetlist(p); return true; }
-    } catch (e) { console.warn('bad share link', e); }
+    var hash = location.hash || '';
+    var mShort = hash.match(/^#s=([A-Za-z0-9]+)$/);
+    if (mShort) { loadShortShare(mShort[1]); return true; }
+    var m = hash.match(/^#share=(.+)$/);   // legacy self-contained links still open
+    if (m) {
+        try { return openSharedPayload(b64urlDecode(m[1])); } catch (e) { console.warn('bad share link', e); }
+    }
     return false;
 }
 function registerSharedSong(snap, idx) {
