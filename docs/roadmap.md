@@ -34,8 +34,13 @@ correct for 3/4 and 6/8 songs.
 Big text, minimal chrome, and ideally **band-follows-leader** sync across
 devices. A key OnSong differentiator.
 
-### 4. Team / band private libraries
-A church-private library, separate from the public community one.
+### 4. Team / band sync
+- ✅ **v1 DONE & live** — owner creates a band, invites by email, publishes
+  setlists; members auto-join on sign-in and see "Band setlists". (`teams.sql`)
+- ⏳ Later: live 2-way sync, member editing rights, a shared band *song library*
+  (not just setlists), roster display, multi-band active switcher.
+- Monetisation: free personal sync + **paid team sync** is the intended paywall
+  (so we don't need to cap devices per account).
 
 ---
 
