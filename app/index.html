@@ -753,6 +753,7 @@
                 <button class="tap" id="ctl-capo" onclick="toggleLayer('capo')">Capo</button>
                 <button class="tap" id="ctl-numbers" onclick="toggleNashville()">Numbers</button>
                 <button class="tap" id="ctl-diagrams" onclick="toggleDiagrams()">Chords</button>
+                <button class="tap" id="ctl-lyrics" onclick="toggleLyrics()">Lyrics</button>
                 <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
                 <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
                 <button class="tap" id="ctl-click" onclick="toggleLayer('click')">Click</button>
@@ -1029,6 +1030,18 @@ function formatChart(text) {
         return e;
     }).join('\n');
 }
+/* Vocalist mode: drop the chord lines, keep lyrics + [Section] headers, and
+   collapse the blank space the chords left behind. */
+function stripChords(text) {
+    var out = [];
+    text.split('\n').forEach(function(line) {
+        var isHeader = /^\s*\[.*\]\s*$/.test(line);
+        if (!isHeader && isChordLine(line)) return;          // drop pure chord lines
+        if (line.trim() === '' && out.length && out[out.length - 1].trim() === '') return;  // no double blanks
+        out.push(line);
+    });
+    return out.join('\n').replace(/^\n+|\n+$/g, '');
+}
 // Chord lines detected on the ORIGINAL text, then rewritten as Nashville
 // numbers (which aren't [A-G] so isChordLine can't detect them post-hoc).
 function formatChartNashville(text, keyRootIndex, minor) {
@@ -1144,6 +1157,7 @@ var state = {
     useFlats: false,
     nashville: false,           // show chords as Nashville numbers
     showDiagrams: false,        // guitar chord-diagram reference strip
+    lyricsOnly: null,           // vocalist mode: null = auto (on for Vocalists), else explicit
     view: 'songs',
     chartFrom: 'songs',         // where Back returns to
     currentSetlistId: null,
@@ -1165,7 +1179,7 @@ function save() {
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
     queuePush();
 }
@@ -1194,6 +1208,7 @@ function load() {
         if (s.useFlats) state.useFlats = s.useFlats;
         if (s.nashville) state.nashville = s.nashville;
         if (s.showDiagrams) state.showDiagrams = s.showDiagrams;
+        if ('lyricsOnly' in s) state.lyricsOnly = s.lyricsOnly;   // tri-state (null/true/false)
         state.updatedAt = parseInt(localStorage.getItem('chordph2_updated') || '0', 10);
         LIBRARY = JSON.parse(localStorage.getItem('chordph2_library') || '[]');
     } catch (e) { console.warn('load failed', e); }
@@ -1228,7 +1243,7 @@ function localSnapshot() {
         setlists: state.setlists,
         transpose: state.transpose,
         capo: state.capo,
-        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams },
+        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly },
         updated_at: state.updatedAt || 0
     };
 }
@@ -1244,6 +1259,7 @@ function applySnapshot(snap) {
         state.useFlats = !!snap.settings.useFlats;
         state.nashville = !!snap.settings.nashville;
         state.showDiagrams = !!snap.settings.showDiagrams;
+        if ('lyricsOnly' in snap.settings) state.lyricsOnly = snap.settings.lyricsOnly;
     }
     state.updatedAt = snap.updated_at || Date.now();
     // persist without bumping the timestamp or re-queueing a push
@@ -1253,7 +1269,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
 }
 
@@ -2451,8 +2467,10 @@ function renderChart() {
     });
     if (pad.playing) setPadKey(keyIdx);   // pad glides to the song you're now reading
     updatePadUI();
+    var lyricsOnly = lyricsActive();
     document.getElementById('ctl-numbers').classList.toggle('on', state.nashville);
     document.getElementById('ctl-diagrams').classList.toggle('on', state.showDiagrams);
+    document.getElementById('ctl-lyrics').classList.toggle('on', lyricsOnly);
 
     // body
     var body = document.getElementById('chart-body');
@@ -2460,6 +2478,8 @@ function renderChart() {
     var displayedChart = transposeChordText(song.chart, displaySteps);
     if (view === 'drummer') {
         body.innerHTML = formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo ? song.tempo + ' BPM' : '—') + '\n\n' + song.chart);
+    } else if (lyricsOnly) {
+        body.innerHTML = formatChart(stripChords(song.chart));   // vocalist: lyrics only
     } else if (state.nashville) {
         body.innerHTML = formatChartNashville(song.chart, getNoteIndex(keyRoot(song.key)), isMinorKey(song.key));  // key-relative; transpose/capo don't change numbers
     } else {
@@ -2468,7 +2488,7 @@ function renderChart() {
 
     // chord diagram strip (guitar fingering for each unique fingered chord)
     var strip = document.getElementById('chord-strip');
-    if (state.showDiagrams && view !== 'drummer' && !state.nashville) {
+    if (state.showDiagrams && view !== 'drummer' && !state.nashville && !lyricsOnly) {
         renderChordStrip(strip, displayedChart);
         strip.style.display = 'flex';
     } else {
@@ -2487,12 +2507,22 @@ function renderChordStrip(strip, chartText) {
 }
 function toggleNashville() {
     state.nashville = !state.nashville;
-    if (state.nashville) state.showDiagrams = false;  // numbers + fingerings don't mix
+    if (state.nashville) { state.showDiagrams = false; state.lyricsOnly = false; }  // numbers ARE chords
     save(); renderChart();
 }
 function toggleDiagrams() {
     state.showDiagrams = !state.showDiagrams;
-    if (state.showDiagrams) state.nashville = false;
+    if (state.showDiagrams) { state.nashville = false; state.lyricsOnly = false; }
+    save(); renderChart();
+}
+/* Vocalist mode. Defaults ON for the Vocalist instrument (state.lyricsOnly ===
+   null = "auto"), overridable per user. */
+function lyricsActive() {
+    return state.lyricsOnly == null ? (viewFor() === 'vocalist') : !!state.lyricsOnly;
+}
+function toggleLyrics() {
+    state.lyricsOnly = !lyricsActive();
+    if (state.lyricsOnly) { state.nashville = false; state.showDiagrams = false; }  // no chords to show
     save(); renderChart();
 }
 
@@ -2962,9 +2992,11 @@ function renderMedley(mainSong, keyIdx, capo) {
         pre.style.fontSize = state.fontSize + 'px';
         pre.innerHTML = view === 'drummer'
             ? formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo || '—') + ' BPM\n\n' + chartText)
-            : state.nashville
-                ? formatChartNashville(chartText, getNoteIndex(keyRoot(song.key)), isMinorKey(song.key))
-                : formatChart(transposeChordText(chartText, steps - capo));
+            : lyricsActive()
+                ? formatChart(stripChords(chartText))
+                : state.nashville
+                    ? formatChartNashville(chartText, getNoteIndex(keyRoot(song.key)), isMinorKey(song.key))
+                    : formatChart(transposeChordText(chartText, steps - capo));
         block.appendChild(head); block.appendChild(title); block.appendChild(sub); block.appendChild(pre);
         box.appendChild(block);
     });
