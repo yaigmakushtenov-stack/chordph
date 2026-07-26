@@ -99,6 +99,14 @@ numbers, and the Filipino worship focus.
 
 ---
 
+## Appearance settings (parked)
+
+A UI/appearance settings panel: **light / dark / auto theme**, **font family**
+choice, base **text size**, maybe accent colour. The app is dark-only today and
+text size is per-chart (A−/A+); this would make it app-wide and user-chosen.
+
+---
+
 ## Smaller open questions
 
 - **Capo scoping** — transpose is now per-setlist (library opens reset). Capo is
