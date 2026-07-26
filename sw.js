@@ -1,4 +1,4 @@
-var CACHE_NAME = 'chordph-v25';
+var CACHE_NAME = 'chordph-v26';
 var URLS_TO_CACHE = [
     '/',
     '/index.html'

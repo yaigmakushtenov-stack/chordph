@@ -1308,13 +1308,13 @@ function initSync() {
         currentUser = res.data.session ? res.data.session.user : null;
         updateAuthUI();
         refreshAdminFlag();
-        if (currentUser) syncNow().then(ensureProfileFromAuth);
+        if (currentUser) { syncNow().then(ensureProfileFromAuth); initTeams(); }
     });
     supa.auth.onAuthStateChange(function(event, session) {
         currentUser = session ? session.user : null;
         updateAuthUI();
         refreshAdminFlag();
-        if (event === 'SIGNED_IN') syncNow().then(ensureProfileFromAuth);
+        if (event === 'SIGNED_IN') { syncNow().then(ensureProfileFromAuth); initTeams(); }
     });
 }
 /* One-tap Google onboarding: if there's no local profile after signing in,
@@ -1398,7 +1398,9 @@ async function signOut() {
     await supa.auth.signOut();
     currentUser = null;
     isAdminUser = false;
+    myTeams = []; teamSetlists = []; teamsReady = false;
     updateAuthUI();
+    if (document.getElementById('view-setlists').classList.contains('active')) renderSetlists();
 }
 function updateAuthUI() {
     updateContribUI();   // admin-only Review item + submit availability follow auth
@@ -2212,6 +2214,116 @@ function importChordProFiles(ev) {
 }
 
 /* =========================================================
+   BANDS (team sync) — a band owner invites members by email; the band's
+   setlists sync to everyone. Cloud-native (Supabase); degrades to nothing
+   when signed out or the tables aren't set up yet.
+   ========================================================= */
+var myTeams = [], teamSetlists = [], teamsReady = false;
+function ownedTeams() { return myTeams.filter(function(t) { return t.isOwner; }); }
+function initTeams() {
+    if (!supa || !currentUser) { myTeams = []; teamSetlists = []; teamsReady = false; return; }
+    acceptTeamInvites().then(refreshTeams);
+}
+async function acceptTeamInvites() {
+    try {
+        var inv = await supa.from('team_invites').select('team_id');
+        if (inv.error || !inv.data || !inv.data.length) return;
+        for (var i = 0; i < inv.data.length; i++) {
+            var tid = inv.data[i].team_id;
+            var m = await supa.from('team_members').insert({ team_id: tid, user_id: currentUser.id, email: currentUser.email, role: 'member' });
+            if (!m.error) await supa.from('team_invites').delete().eq('team_id', tid).eq('email', (currentUser.email || '').toLowerCase());
+        }
+        toast('You joined a band.');
+    } catch (e) {}
+}
+async function refreshTeams() {
+    if (!supa || !currentUser) return;
+    try {
+        var t = await supa.from('teams').select('id,name,owner_id');
+        myTeams = (t.data || []).map(function(x) { return { id: x.id, name: x.name, owner_id: x.owner_id, isOwner: x.owner_id === currentUser.id }; });
+        var s = await supa.from('team_setlists').select('id,team_id,name,data,updated_at').order('updated_at', { ascending: false });
+        teamSetlists = s.data || [];
+        teamsReady = true;
+        refreshBandUI();
+        if (document.getElementById('view-setlists').classList.contains('active')) renderSetlists();
+    } catch (e) {}
+}
+function refreshBandUI() {
+    var el = document.getElementById('band-status');
+    if (el) el.innerHTML = renderBandSection();
+}
+function renderBandSection() {
+    if (!currentUser) return '<div style="font-size:13px;color:var(--muted);">Sign in first to create or join a band.</div>';
+    if (!teamsReady) return '<div style="font-size:13px;color:var(--muted);">Loading…</div>';
+    if (!myTeams.length) {
+        return '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Create a band to share setlists with your whole team — build the set once, it shows up on everyone\'s device.</div>' +
+            '<button class="tap primary" onclick="promptCreateTeam()">Create a band</button>';
+    }
+    return myTeams.map(function(t) {
+        var manage = t.isOwner
+            ? '<div style="display:flex;gap:20px;margin-top:4px;"><button class="tap" onclick="promptInvite(\'' + t.id + '\')">Invite member</button>' +
+              '<button class="tap danger" onclick="deleteTeam(\'' + t.id + '\')">Delete band</button></div>'
+            : '<div style="margin-top:4px;"><button class="tap danger" onclick="leaveTeam(\'' + t.id + '\')">Leave band</button></div>';
+        return '<div style="margin-bottom:12px;"><b style="color:var(--text);">' + esc(t.name) + '</b> ' +
+            '<span style="font-size:12px;color:var(--faint);">· ' + (t.isOwner ? 'you\'re the admin' : 'member') + '</span>' + manage + '</div>';
+    }).join('');
+}
+function promptCreateTeam() {
+    var n = window.prompt('Name your band (e.g. Sunday Team):');
+    if (n && n.trim()) createTeam(n.trim());
+}
+function promptInvite(teamId) {
+    var e = window.prompt('Invite a bandmate by email:');
+    if (e && e.trim()) inviteToTeam(teamId, e.trim());
+}
+async function createTeam(name) {
+    if (!supa || !currentUser) return;
+    var t = await supa.from('teams').insert({ name: name, owner_id: currentUser.id }).select('id').single();
+    if (t.error) { toast('Couldn’t create band: ' + t.error.message); return; }
+    await supa.from('team_members').insert({ team_id: t.data.id, user_id: currentUser.id, email: currentUser.email, role: 'owner' });
+    toast('Band “' + name + '” created.');
+    await refreshTeams();
+}
+async function inviteToTeam(teamId, email) {
+    email = (email || '').trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(email)) { toast('Enter a valid email.'); return; }
+    var r = await supa.from('team_invites').insert({ team_id: teamId, email: email });
+    if (r.error) toast(/duplicate|unique/i.test(r.error.message) ? 'Already invited.' : 'Invite failed: ' + r.error.message);
+    else toast('Invited ' + email + '. They join automatically when they sign in.');
+}
+async function leaveTeam(teamId) {
+    if (!confirm('Leave this band?')) return;
+    await supa.from('team_members').delete().eq('team_id', teamId).eq('user_id', currentUser.id);
+    await refreshTeams();
+}
+async function deleteTeam(teamId) {
+    if (!confirm('Delete this band for everyone? Its shared setlists are removed.')) return;
+    await supa.from('teams').delete().eq('id', teamId);
+    await refreshTeams();
+}
+/* owner publishes a personal setlist to the band */
+function shareSetlistToBand(setlistId) {
+    var owned = ownedTeams();
+    if (!owned.length) { toast('Create a band first (Settings → Band).'); return; }
+    if (owned.length === 1) return publishSetlistToTeam(setlistId, owned[0].id);
+    var names = owned.map(function(t, i) { return (i + 1) + '. ' + t.name; }).join('\n');
+    var pick = window.prompt('Publish to which band?\n' + names, '1');
+    var idx = parseInt(pick, 10) - 1;
+    if (owned[idx]) publishSetlistToTeam(setlistId, owned[idx].id);
+}
+async function publishSetlistToTeam(setlistId, teamId) {
+    var sl = setlistById(setlistId); if (!sl) return;
+    var songs = sl.songIds.map(songById).filter(Boolean).map(songSnapshot);
+    if (!songs.length) { toast('This setlist is empty.'); return; }
+    var r = await supa.from('team_setlists').insert({ team_id: teamId, name: sl.name, data: { songs: songs }, updated_by: currentUser.id });
+    if (r.error) toast('Publish failed: ' + r.error.message);
+    else { toast('Shared “' + sl.name + '” with the band.'); refreshTeams(); }
+}
+function openTeamSetlist(ts) {
+    openSharedSetlist({ name: ts.name, songs: (ts.data && ts.data.songs) || [] });
+}
+
+/* =========================================================
    SHARE — read-only links (song / setlist), self-contained in the URL
    ========================================================= */
 var sharedSongs = {};       // transient id -> shared song object
@@ -3009,6 +3121,22 @@ function setlistById(id) {
     for (var i = 0; i < state.setlists.length; i++) if (state.setlists[i].id === id) return state.setlists[i];
     return null;
 }
+function renderBandSetlists(box) {
+    if (!teamSetlists.length) return;
+    var lbl = document.createElement('div'); lbl.className = 'section-label'; lbl.textContent = 'Band setlists';
+    box.appendChild(lbl);
+    teamSetlists.forEach(function(ts) {
+        var teamName = (myTeams.filter(function(t) { return t.id === ts.team_id; })[0] || {}).name || 'your band';
+        var n = (ts.data && ts.data.songs || []).length;
+        var row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = '<div class="row-main"><div class="row-title">' + esc(ts.name) + '</div>' +
+            '<div class="row-sub">' + n + ' song' + (n !== 1 ? 's' : '') + ' · from ' + esc(teamName) + '</div></div>' +
+            '<span class="tap" style="font-size:12px;color:var(--accent);">Open ›</span>';
+        row.onclick = function() { openTeamSetlist(ts); };
+        box.appendChild(row);
+    });
+}
 function renderSetlists() {
     var editing = state.setlistsEdit;
     var menuBtn = document.getElementById('setlists-menu-btn');
@@ -3019,9 +3147,17 @@ function renderSetlists() {
     hint.textContent = editing && state.setlists.length ? 'Hold & drag to reorder' : '';
     var box = document.getElementById('setlists-list');
     box.innerHTML = '';
+    renderBandSetlists(box);   // the band's shared setlists appear above your own
     if (!state.setlists.length) {
-        box.innerHTML = '<div class="empty">No setlists yet.<br><button class="tap primary" onclick="openNewSetlistSheet()">＋ Add setlist</button></div>';
+        var empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.innerHTML = 'No setlists of your own yet.<br><button class="tap primary" onclick="openNewSetlistSheet()">＋ Add setlist</button>';
+        box.appendChild(empty);
         return;
+    }
+    if (teamSetlists.length) {
+        var lbl = document.createElement('div'); lbl.className = 'section-label'; lbl.textContent = 'Your setlists';
+        box.appendChild(lbl);
     }
     state.setlists.forEach(function(sl, pos) {
         var row = document.createElement('div');
@@ -3134,7 +3270,8 @@ function openSetlistMenu() {
     openMenu([
         { label: 'Add song', icon: '＋', onClick: openAddToSetlistSheet },
         { label: 'Reorder & edit songs', icon: '⇅', onClick: enterSetlistEdit },
-        { label: 'Share setlist', icon: '↗', onClick: function() { shareSetlist(state.currentSetlistId); } },
+        { label: 'Share setlist (link)', icon: '↗', onClick: function() { shareSetlist(state.currentSetlistId); } },
+        { label: 'Publish to band', icon: '👥', onClick: function() { shareSetlistToBand(state.currentSetlistId); } },
         { label: 'Rename setlist', icon: '✎', onClick: renameSetlistPrompt },
         { label: 'Delete setlist', icon: '🗑', danger: true, onClick: deleteSetlistFromDetail }
     ], document.getElementById('setlist-menu-btn'));
@@ -3601,6 +3738,7 @@ function openSettings() {
         '<input class="field" id="sh-profile-name" placeholder="Your name" value="' + esc(p.name) + '" autocomplete="off">' +
         '<div class="chip-row" id="sh-instruments">' + chips + '</div>' +
         (syncEnabled() ? '<div class="section-label">Sync</div><div id="sync-status">' + renderSyncSection() + '</div>' : '') +
+        (syncEnabled() && currentUser ? '<div class="section-label">Band</div><div id="band-status">' + renderBandSection() + '</div>' : '') +
         '<div class="section-label">Backup</div>' +
         '<div style="display:flex;gap:24px;">' +
         '<button class="tap" onclick="exportBackup()">Export data</button>' +
