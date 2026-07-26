@@ -2261,7 +2261,8 @@ function renderBandSection() {
     }
     return myTeams.map(function(t) {
         var manage = t.isOwner
-            ? '<div style="display:flex;gap:20px;margin-top:4px;"><button class="tap" onclick="promptInvite(\'' + t.id + '\')">Invite member</button>' +
+            ? '<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:4px;"><button class="tap" onclick="promptInvite(\'' + t.id + '\')">Invite member</button>' +
+              '<button class="tap" onclick="promptRenameTeam(\'' + t.id + '\')">Rename</button>' +
               '<button class="tap danger" onclick="deleteTeam(\'' + t.id + '\')">Delete band</button></div>'
             : '<div style="margin-top:4px;"><button class="tap danger" onclick="leaveTeam(\'' + t.id + '\')">Leave band</button></div>';
         return '<div style="margin-bottom:12px;"><b style="color:var(--text);">' + esc(t.name) + '</b> ' +
@@ -2283,6 +2284,16 @@ async function createTeam(name) {
     await supa.from('team_members').insert({ team_id: t.data.id, user_id: currentUser.id, email: currentUser.email, role: 'owner' });
     toast('Band “' + name + '” created.');
     await refreshTeams();
+}
+function promptRenameTeam(teamId) {
+    var t = myTeams.filter(function(x) { return x.id === teamId; })[0];
+    var n = window.prompt('Rename band:', t ? t.name : '');
+    if (n && n.trim()) renameTeam(teamId, n.trim());
+}
+async function renameTeam(teamId, name) {
+    var r = await supa.from('teams').update({ name: name }).eq('id', teamId);
+    if (r.error) toast('Rename failed: ' + r.error.message);
+    else { toast('Band renamed.'); await refreshTeams(); }
 }
 async function inviteToTeam(teamId, email) {
     email = (email || '').trim().toLowerCase();
