@@ -58,8 +58,10 @@ alter table public.team_setlists  enable row level security;
 -- teams: create your own; read teams you belong to; owner updates/deletes
 drop policy if exists "teams_insert" on public.teams;
 create policy "teams_insert" on public.teams for insert with check (auth.uid() = owner_id);
+-- invitees may read the band NAME while they hold an invite (accept/decline UI)
 drop policy if exists "teams_select" on public.teams;
-create policy "teams_select" on public.teams for select using (owner_id = auth.uid() or public.is_team_member(id));
+create policy "teams_select" on public.teams for select
+    using (owner_id = auth.uid() or public.is_team_member(id) or public.has_team_invite(id));
 drop policy if exists "teams_owner_update" on public.teams;
 create policy "teams_owner_update" on public.teams for update using (owner_id = auth.uid());
 drop policy if exists "teams_owner_delete" on public.teams;

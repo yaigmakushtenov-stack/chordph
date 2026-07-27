@@ -2333,29 +2333,59 @@ function importChordProFiles(ev) {
    setlists sync to everyone. Cloud-native (Supabase); degrades to nothing
    when signed out or the tables aren't set up yet.
    ========================================================= */
-var myTeams = [], teamSetlists = [], teamsReady = false;
+var myTeams = [], teamSetlists = [], teamsReady = false, myInvites = [];
 function ownedTeams() { return myTeams.filter(function(t) { return t.isOwner; }); }
 function initTeams() {
-    if (!supa || !currentUser) { myTeams = []; teamSetlists = []; teamsReady = false; return; }
-    acceptTeamInvites().then(refreshTeams);
+    if (!supa || !currentUser) { myTeams = []; teamSetlists = []; teamsReady = false; myInvites = []; return; }
+    refreshTeams();   // v2: no more auto-join — invites are accepted/declined in Settings → Band
 }
-async function acceptTeamInvites() {
+/* pending invites addressed to me, with the band name (needs teams_v2.sql) */
+async function loadMyInvites() {
     try {
-        var inv = await supa.from('team_invites').select('team_id');
-        if (inv.error || !inv.data || !inv.data.length) return;
-        for (var i = 0; i < inv.data.length; i++) {
-            var tid = inv.data[i].team_id;
-            var m = await supa.from('team_members').insert({ team_id: tid, user_id: currentUser.id, email: currentUser.email, role: 'member' });
-            if (!m.error) await supa.from('team_invites').delete().eq('team_id', tid).eq('email', (currentUser.email || '').toLowerCase());
-        }
-        toast('You joined a band.');
-    } catch (e) {}
+        var inv = await supa.from('team_invites').select('team_id, teams(name)');
+        var mine = {};
+        myTeams.forEach(function(t) { mine[t.id] = true; });   // already a member — hide
+        myInvites = (inv.data || [])
+            .filter(function(x) { return !mine[x.team_id]; })
+            .map(function(x) { return { team_id: x.team_id, name: (x.teams && x.teams.name) || 'a band' }; });
+    } catch (e) { myInvites = []; }
+}
+async function acceptInvite(teamId) {
+    var m = await supa.from('team_members').insert({ team_id: teamId, user_id: currentUser.id, email: currentUser.email, role: 'member' });
+    if (m.error) { toast('Couldn’t join: ' + m.error.message); return; }
+    await supa.from('team_invites').delete().eq('team_id', teamId).eq('email', (currentUser.email || '').toLowerCase());
+    toast('You joined the band.');
+    await refreshTeams();
+}
+async function declineInvite(teamId) {
+    var inv = myInvites.filter(function(x) { return x.team_id === teamId; })[0];
+    if (!confirm('Decline the invite' + (inv ? ' from ' + inv.name : '') + '?')) return;
+    await supa.from('team_invites').delete().eq('team_id', teamId).eq('email', (currentUser.email || '').toLowerCase());
+    toast('Invite declined.');
+    await refreshTeams();
 }
 async function refreshTeams() {
     if (!supa || !currentUser) return;
     try {
         var t = await supa.from('teams').select('id,name,owner_id');
-        myTeams = (t.data || []).map(function(x) { return { id: x.id, name: x.name, owner_id: x.owner_id, isOwner: x.owner_id === currentUser.id }; });
+        myTeams = (t.data || []).map(function(x) { return { id: x.id, name: x.name, owner_id: x.owner_id, isOwner: x.owner_id === currentUser.id, members: [], pending: [] }; });
+        var ids = myTeams.map(function(x) { return x.id; });
+        if (ids.length) {
+            var mem = await supa.from('team_members').select('team_id,user_id,email,role').in('team_id', ids);
+            (mem.data || []).forEach(function(r) {
+                var tm = myTeams.filter(function(x) { return x.id === r.team_id; })[0];
+                if (tm) tm.members.push({ user_id: r.user_id, email: r.email, role: r.role });
+            });
+            var owned = myTeams.filter(function(x) { return x.isOwner; }).map(function(x) { return x.id; });
+            if (owned.length) {
+                var pend = await supa.from('team_invites').select('team_id,email').in('team_id', owned);
+                (pend.data || []).forEach(function(r) {
+                    var tm = myTeams.filter(function(x) { return x.id === r.team_id; })[0];
+                    if (tm) tm.pending.push(r.email);
+                });
+            }
+        }
+        await loadMyInvites();
         var s = await supa.from('team_setlists').select('id,team_id,name,data,updated_at').order('updated_at', { ascending: false });
         teamSetlists = s.data || [];
         teamsReady = true;
@@ -2370,19 +2400,63 @@ function refreshBandUI() {
 function renderBandSection() {
     if (!currentUser) return '<div style="font-size:13px;color:var(--muted);">Sign in first to create or join a band.</div>';
     if (!teamsReady) return '<div style="font-size:13px;color:var(--muted);">Loading…</div>';
-    if (!myTeams.length) {
-        return '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Create a band to share setlists with your whole team — build the set once, it shows up on everyone\'s device.</div>' +
-            '<button class="tap primary" onclick="promptCreateTeam()">Create a band</button>';
+    var html = '';
+    // pending invites addressed to me — accept or decline (v2, no more auto-join)
+    if (myInvites.length) {
+        html += myInvites.map(function(iv) {
+            return '<div style="border:1px solid rgba(91,140,255,.28);background:rgba(91,140,255,.08);border-radius:12px;padding:12px 14px;margin-bottom:12px;">' +
+                '<div style="font-size:13.5px;color:var(--text);margin-bottom:8px;"><b>' + esc(iv.name) + '</b> invited you to their band.</div>' +
+                '<div style="display:flex;gap:10px;"><button class="tap primary" onclick="acceptInvite(\'' + iv.team_id + '\')">Accept</button>' +
+                '<button class="tap" onclick="declineInvite(\'' + iv.team_id + '\')">Decline</button></div></div>';
+        }).join('');
     }
-    return myTeams.map(function(t) {
+    if (!myTeams.length) {
+        html += '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Create a band to share setlists with your whole team — build the set once, it shows up on everyone\'s device.</div>' +
+            '<button class="tap primary" onclick="promptCreateTeam()">Create a band</button>';
+        return html;
+    }
+    html += myTeams.map(function(t) {
+        var roster = renderRoster(t);
         var manage = t.isOwner
-            ? '<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:4px;"><button class="tap" onclick="promptInvite(\'' + t.id + '\')">Invite member</button>' +
+            ? '<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:6px;"><button class="tap" onclick="promptInvite(\'' + t.id + '\')">Invite member</button>' +
               '<button class="tap" onclick="promptRenameTeam(\'' + t.id + '\')">Rename</button>' +
               '<button class="tap danger" onclick="deleteTeam(\'' + t.id + '\')">Delete band</button></div>'
-            : '<div style="margin-top:4px;"><button class="tap danger" onclick="leaveTeam(\'' + t.id + '\')">Leave band</button></div>';
-        return '<div style="margin-bottom:12px;"><b style="color:var(--text);">' + esc(t.name) + '</b> ' +
-            '<span style="font-size:12px;color:var(--faint);">· ' + (t.isOwner ? 'you\'re the admin' : 'member') + '</span>' + manage + '</div>';
+            : '<div style="margin-top:6px;"><button class="tap danger" onclick="leaveTeam(\'' + t.id + '\')">Leave band</button></div>';
+        return '<div style="margin-bottom:16px;"><b style="color:var(--text);">' + esc(t.name) + '</b> ' +
+            '<span style="font-size:12px;color:var(--faint);">· ' + (t.isOwner ? 'you\'re the admin' : 'member') + '</span>' + roster + manage + '</div>';
     }).join('');
+    return html;
+}
+/* member + pending-invite roster shown under each band */
+function renderRoster(t) {
+    var rows = (t.members || []).slice().sort(function(a, b) {
+        return (a.role === 'owner' ? 0 : 1) - (b.role === 'owner' ? 0 : 1);
+    }).map(function(m) {
+        var me = m.user_id === currentUser.id;
+        var who = esc(m.email || 'member') + (me ? ' (you)' : '');
+        var tag = m.role === 'owner' ? ' · admin' : '';
+        var kick = (t.isOwner && !me) ? ' <button class="tap danger" style="font-size:12px;padding:0;" onclick="removeMember(\'' + t.id + '\',\'' + m.user_id + '\')">Remove</button>' : '';
+        return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;">' +
+            '<span>' + who + '<span style="color:var(--faint);">' + tag + '</span></span>' + kick + '</div>';
+    });
+    if (t.isOwner) rows = rows.concat((t.pending || []).map(function(email) {
+        return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;color:var(--muted);">' +
+            '<span>' + esc(email) + ' <span style="color:var(--faint);">· invited</span></span>' +
+            '<button class="tap danger" style="font-size:12px;padding:0;" onclick="cancelInvite(\'' + t.id + '\',\'' + esc(email) + '\')">Cancel</button></div>';
+    }));
+    if (!rows.length) return '';
+    return '<div style="font-size:13px;color:var(--muted);margin:8px 0 2px;border-top:1px solid var(--hair);padding-top:8px;">' + rows.join('') + '</div>';
+}
+async function removeMember(teamId, userId) {
+    if (!confirm('Remove this member from the band?')) return;
+    var r = await supa.from('team_members').delete().eq('team_id', teamId).eq('user_id', userId);
+    if (r.error) toast('Remove failed: ' + r.error.message);
+    else { toast('Member removed.'); await refreshTeams(); }
+}
+async function cancelInvite(teamId, email) {
+    var r = await supa.from('team_invites').delete().eq('team_id', teamId).eq('email', (email || '').toLowerCase());
+    if (r.error) toast('Couldn’t cancel: ' + r.error.message);
+    else { toast('Invite cancelled.'); await refreshTeams(); }
 }
 function promptCreateTeam() {
     var n = window.prompt('Name your band (e.g. Sunday Team):');
@@ -2413,9 +2487,14 @@ async function renameTeam(teamId, name) {
 async function inviteToTeam(teamId, email) {
     email = (email || '').trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email)) { toast('Enter a valid email.'); return; }
+    var t = myTeams.filter(function(x) { return x.id === teamId; })[0];
+    if (t) {
+        if ((t.members || []).some(function(m) { return (m.email || '').toLowerCase() === email; })) { toast('They’re already in the band.'); return; }
+        if ((t.pending || []).some(function(e) { return (e || '').toLowerCase() === email; })) { toast('Already invited — waiting for them to accept.'); return; }
+    }
     var r = await supa.from('team_invites').insert({ team_id: teamId, email: email });
     if (r.error) toast(/duplicate|unique/i.test(r.error.message) ? 'Already invited.' : 'Invite failed: ' + r.error.message);
-    else toast('Invited ' + email + '. They join automatically when they sign in.');
+    else { toast('Invited ' + email + '. They’ll see it in Settings → Band to accept.'); await refreshTeams(); }
 }
 async function leaveTeam(teamId) {
     if (!confirm('Leave this band?')) return;
