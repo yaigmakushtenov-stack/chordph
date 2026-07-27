@@ -528,6 +528,16 @@
         @keyframes sheetUp { from { transform: translateY(40px); opacity: .5; } to { transform: none; opacity: 1; } }
         .sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
         .sheet-actions { display: flex; justify-content: flex-end; gap: 22px; margin-top: 18px; }
+        /* collapsible settings sections — keep the sheet tidy as it grows */
+        .set-group { border: 1px solid var(--border, var(--hairline)); border-radius: 12px; margin-bottom: 10px; overflow: hidden; background: rgba(255,255,255,0.018); }
+        .set-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 14px 15px; background: none; border: none; color: var(--text); font: inherit; font-size: 15px; font-weight: 650; cursor: pointer; text-align: left; }
+        .set-head .set-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+        .set-head .chev { color: var(--muted); transition: transform .18s; font-size: 20px; line-height: 1; }
+        .set-group.open .set-head .chev { transform: rotate(90deg); }
+        .set-body { display: none; padding: 0 15px 15px; }
+        .set-group.open .set-body { display: block; }
+        .set-body .section-label:first-child { margin-top: 2px; }
         /* sticky header inside a scrolling sheet (long lists keep Done in reach) */
         .sheet-head {
             position: sticky; top: 0; z-index: 5;
@@ -4041,26 +4051,47 @@ function openSettings() {
     var chips = INSTRUMENTS.map(function(ins) {
         return '<button class="chip' + (p.instrument === ins ? ' on' : '') + '" onclick="pickInstrument(this, \'' + ins + '\')">' + ins + '</button>';
     }).join('');
-    openSheet(
-        '<div class="sheet-title">Settings</div>' +
-        '<div class="section-label" style="margin-top:4px;">Profile</div>' +
+    var profileBody =
         '<input class="field" id="sh-profile-name" placeholder="Your name" value="' + esc(p.name) + '" autocomplete="off">' +
-        '<div class="chip-row" id="sh-instruments">' + chips + '</div>' +
-        '<div class="section-label">Appearance</div>' +
+        '<div class="chip-row" id="sh-instruments">' + chips + '</div>';
+    var appearanceBody =
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
         '<span style="font-size:14px;">Labels under the chart icons</span>' +
-        '<button class="tap" id="toggle-labels" onclick="toggleControlLabels()">' + (state.iconLabels ? 'Shown' : 'Hidden') + '</button></div>' +
-        (syncEnabled() ? '<div class="section-label">Sync</div><div id="sync-status">' + renderSyncSection() + '</div>' : '') +
-        (syncEnabled() && currentUser ? '<div class="section-label">Band</div><div id="band-status">' + renderBandSection() + '</div>' : '') +
-        '<div class="section-label">Backup</div>' +
+        '<button class="tap" id="toggle-labels" onclick="toggleControlLabels()">' + (state.iconLabels ? 'Shown' : 'Hidden') + '</button></div>';
+    var backupBody =
         '<div style="display:flex;gap:24px;">' +
         '<button class="tap" onclick="exportBackup()">Export data</button>' +
-        '<button class="tap" onclick="document.getElementById(\'import-input\').click()">Import data</button></div>' +
+        '<button class="tap" onclick="document.getElementById(\'import-input\').click()">Import data</button></div>';
+
+    // account sub-label so you can tell at a glance if you're signed in
+    var acctSub = currentUser ? esc(currentUser.email || 'signed in') : 'signed out';
+    var inviteCount = (typeof myInvites !== 'undefined' && myInvites) ? myInvites.length : 0;
+    var bandSub = !currentUser ? 'sign in first' : (inviteCount ? inviteCount + ' invite' + (inviteCount > 1 ? 's' : '') : (myTeams.length ? myTeams.length + ' band' + (myTeams.length > 1 ? 's' : '') : 'none yet'));
+
+    var html =
+        '<div class="sheet-title">Settings</div>' +
+        setGroup('profile', 'Profile', esc(p.instrument || ''), profileBody, true) +
+        setGroup('appearance', 'Appearance', '', appearanceBody, false) +
+        (syncEnabled() ? setGroup('account', 'Account & sync', acctSub, '<div id="sync-status">' + renderSyncSection() + '</div>', false) : '') +
+        (syncEnabled() && currentUser ? setGroup('band', 'Band', bandSub, '<div id="band-status">' + renderBandSection() + '</div>', !!inviteCount) : '') +
+        setGroup('backup', 'Backup', '', backupBody, false) +
         '<div class="sheet-actions">' +
         '<button class="tap" onclick="closeSheet()">Cancel</button>' +
-        '<button class="tap primary" onclick="saveSettings()">Save</button></div>'
-    );
+        '<button class="tap primary" onclick="saveSettings()">Save</button></div>';
+    openSheet(html);
     window.__pickedInstrument = p.instrument;
+}
+/* one collapsible settings section */
+function setGroup(id, title, sub, bodyHtml, open) {
+    return '<div class="set-group' + (open ? ' open' : '') + '" id="setg-' + id + '">' +
+        '<button class="set-head" onclick="toggleSettingsGroup(\'' + id + '\')">' +
+        '<span>' + title + (sub ? '<span class="set-sub">' + sub + '</span>' : '') + '</span>' +
+        '<span class="chev">&rsaquo;</span></button>' +
+        '<div class="set-body">' + bodyHtml + '</div></div>';
+}
+function toggleSettingsGroup(id) {
+    var g = document.getElementById('setg-' + id);
+    if (g) g.classList.toggle('open');
 }
 function renderSyncSection() {
     if (!syncEnabled()) return '';
