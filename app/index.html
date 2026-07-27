@@ -3537,14 +3537,17 @@ function onSetlistMenuBtn() {
     else openSetlistMenu();
 }
 function openSetlistMenu() {
-    openMenu([
+    var items = [
         { label: 'Add song', icon: '＋', onClick: openAddToSetlistSheet },
         { label: 'Reorder & edit songs', icon: '⇅', onClick: enterSetlistEdit },
-        { label: 'Share setlist (link)', icon: '↗', onClick: function() { shareSetlist(state.currentSetlistId); } },
-        { label: 'Publish to band', icon: '👥', onClick: function() { shareSetlistToBand(state.currentSetlistId); } },
-        { label: 'Rename setlist', icon: '✎', onClick: renameSetlistPrompt },
-        { label: 'Delete setlist', icon: '🗑', danger: true, onClick: deleteSetlistFromDetail }
-    ], document.getElementById('setlist-menu-btn'));
+        { label: 'Share setlist (link)', icon: '↗', onClick: function() { shareSetlist(state.currentSetlistId); } }
+    ];
+    // only offer "Publish to band" when you actually own a band — otherwise it's
+    // confusing (it would just toast "create a band first")
+    if (ownedTeams().length) items.push({ label: 'Publish to band', icon: '👥', onClick: function() { shareSetlistToBand(state.currentSetlistId); } });
+    items.push({ label: 'Rename setlist', icon: '✎', onClick: renameSetlistPrompt });
+    items.push({ label: 'Delete setlist', icon: '🗑', danger: true, onClick: deleteSetlistFromDetail });
+    openMenu(items, document.getElementById('setlist-menu-btn'));
 }
 function enterSetlistEdit() { state.setlistEdit = true; renderSetlistDetail(); }
 function renameSetlistPrompt() {
