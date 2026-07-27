@@ -335,29 +335,33 @@
         /* one tidy scrolling toolbar instead of a cramped two-row wrap */
         .controls {
             display: flex;
-            gap: 20px;
+            gap: 4px;
             flex-wrap: nowrap;
             overflow-x: auto;
             scrollbar-width: none;
             -webkit-overflow-scrolling: touch;
-            padding: 9px 0;
+            padding: 7px 0;
             border-top: 1px solid var(--hairline);
             border-bottom: 1px solid var(--hairline);
-            font-size: 14px;
-            -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent);
-            mask-image: linear-gradient(90deg, #000 92%, transparent);
+            -webkit-mask-image: linear-gradient(90deg, #000 94%, transparent);
+            mask-image: linear-gradient(90deg, #000 94%, transparent);
         }
         .controls::-webkit-scrollbar { display: none; }
-        .controls .tap { white-space: nowrap; flex: 0 0 auto; }
-        .controls .tap.on { position: relative; }
-        .controls .tap.on::after {
-            content: "";
-            position: absolute;
-            left: 0; right: 0; bottom: -9px;
-            height: 2px;
-            background: var(--accent);
-            border-radius: 2px 2px 0 0;
+        /* icon controls: glyph over a small label */
+        .ctl {
+            flex: 0 0 auto;
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            background: none; border: none; color: var(--muted); font: inherit; font-size: 11px;
+            cursor: pointer; border-radius: 11px; padding: 7px 10px; min-width: 56px;
+            transition: background .12s, color .12s;
         }
+        .ctl svg { width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.7; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+        @media (hover: hover) { .ctl:hover { background: rgba(255,255,255,.045); color: var(--text); } }
+        .ctl.on { color: var(--accent); background: rgba(91,140,255,.13); }
+        #ctl-pad.playing { color: var(--accent-2); }
+        /* labels off (set in Appearance settings) — icons only, tighter */
+        body.icons-only .ctl span { display: none; }
+        body.icons-only .ctl { min-width: 0; padding: 8px 9px; }
 
         /* ---- disclosure layer: appears under the control words ---- */
         .layer {
@@ -826,16 +830,16 @@
 
         <div class="control-dock">
             <div class="controls" id="chart-controls">
-                <button class="tap" id="ctl-transpose" onclick="toggleLayer('transpose')">Transpose</button>
-                <button class="tap" id="ctl-capo" onclick="toggleLayer('capo')">Capo</button>
-                <button class="tap" id="ctl-numbers" onclick="toggleNashville()">Numbers</button>
-                <button class="tap" id="ctl-diagrams" onclick="toggleDiagrams()">Chords</button>
-                <button class="tap" id="ctl-lyrics" onclick="toggleLyrics()">Lyrics</button>
-                <button class="tap" id="ctl-text" onclick="toggleLayer('text')">Text</button>
-                <button class="tap" id="ctl-scroll" onclick="toggleLayer('scroll')">Scroll</button>
-                <button class="tap" id="ctl-click" onclick="toggleLayer('click')">Click</button>
-                <button class="tap" id="ctl-pad" onclick="toggleLayer('pad')">Pad</button>
-                <button class="tap" id="ctl-medley" onclick="openMedleySheet()" style="display:none;">Medley</button>
+                <button class="ctl" id="ctl-transpose" onclick="toggleLayer('transpose')" aria-label="Transpose"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v16M8 4l-3 3M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3"/></svg><span>Transpose</span></button>
+                <button class="ctl" id="ctl-capo" onclick="toggleLayer('capo')" aria-label="Capo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M12 4v16M17 4v16"/><rect x="3" y="8.5" width="18" height="3.4" rx="1.5"/></svg><span>Capo</span></button>
+                <button class="ctl" id="ctl-numbers" onclick="toggleNashville()" aria-label="Nashville numbers"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v16M16 4v16M4 9h16M4 15h16"/></svg><span>Numbers</span></button>
+                <button class="ctl" id="ctl-diagrams" onclick="toggleDiagrams()" aria-label="Chord diagrams"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14M5 9h14M5 14h14M5 19h14M9 4v15M15 4v15"/><circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/></svg><span>Chords</span></button>
+                <button class="ctl" id="ctl-lyrics" onclick="toggleLyrics()" aria-label="Lyrics only"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 10h14M5 14h9M5 18h11"/></svg><span>Lyrics</span></button>
+                <button class="ctl" id="ctl-text" onclick="toggleLayer('text')" aria-label="Text size"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l4.5-12 4.5 12M4.6 14h5.8M15 18l2.5-7 2.5 7M16 16h3"/></svg><span>Text</span></button>
+                <button class="ctl" id="ctl-scroll" onclick="toggleLayer('scroll')" aria-label="Auto-scroll"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l5 5 5-5M7 12l5 5 5-5"/></svg><span>Scroll</span></button>
+                <button class="ctl" id="ctl-click" onclick="toggleLayer('click')" aria-label="Metronome click"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l3 16H6zM12 4v9M12 13l4-3"/></svg><span>Click</span></button>
+                <button class="ctl" id="ctl-pad" onclick="toggleLayer('pad')" aria-label="Ambient pad"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-6 3 13 3-16 3 12 2-3h3"/></svg><span>Pad</span></button>
+                <button class="ctl" id="ctl-medley" onclick="openMedleySheet()" style="display:none;" aria-label="Medley"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h10a2 2 0 0 1 2 2v10M16 8H6a1.8 1.8 0 0 0-1.8 1.8V19a1.8 1.8 0 0 0 1.8 1.8h9.5A1.8 1.8 0 0 0 17.3 19V9.8A1.8 1.8 0 0 0 15.5 8Z"/></svg><span>Medley</span></button>
             </div>
 
             <div class="layer" id="layer-transpose">
@@ -1236,6 +1240,7 @@ var state = {
     nashville: false,           // show chords as Nashville numbers
     showDiagrams: false,        // guitar chord-diagram reference strip
     lyricsOnly: null,           // vocalist mode: null = auto (on for Vocalists), else explicit
+    iconLabels: true,           // show the small labels under the chart control icons
     view: 'songs',
     chartFrom: 'songs',         // where Back returns to
     currentSetlistId: null,
@@ -1257,7 +1262,7 @@ function save() {
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
     queuePush();
 }
@@ -1287,6 +1292,7 @@ function load() {
         if (s.nashville) state.nashville = s.nashville;
         if (s.showDiagrams) state.showDiagrams = s.showDiagrams;
         if ('lyricsOnly' in s) state.lyricsOnly = s.lyricsOnly;   // tri-state (null/true/false)
+        if ('iconLabels' in s) state.iconLabels = s.iconLabels;
         state.updatedAt = parseInt(localStorage.getItem('chordph2_updated') || '0', 10);
         LIBRARY = JSON.parse(localStorage.getItem('chordph2_library') || '[]');
     } catch (e) { console.warn('load failed', e); }
@@ -1321,7 +1327,7 @@ function localSnapshot() {
         setlists: state.setlists,
         transpose: state.transpose,
         capo: state.capo,
-        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly },
+        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels },
         updated_at: state.updatedAt || 0
     };
 }
@@ -1338,6 +1344,7 @@ function applySnapshot(snap) {
         state.nashville = !!snap.settings.nashville;
         state.showDiagrams = !!snap.settings.showDiagrams;
         if ('lyricsOnly' in snap.settings) state.lyricsOnly = snap.settings.lyricsOnly;
+        if ('iconLabels' in snap.settings) state.iconLabels = snap.settings.iconLabels;
     }
     state.updatedAt = snap.updated_at || Date.now();
     // persist without bumping the timestamp or re-queueing a push
@@ -1347,7 +1354,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
 }
 
@@ -2630,7 +2637,7 @@ function renderChart() {
         renderChartVersions(song.id);
     }
     // Medley control lives with the other controls; only meaningful inside a setlist
-    document.getElementById('ctl-medley').style.display = (cf === 'setlist') ? 'inline-block' : 'none';
+    document.getElementById('ctl-medley').style.display = (cf === 'setlist') ? '' : 'none';
     if (readonly) document.getElementById('medley-blocks').innerHTML = '';
 
     var star = document.getElementById('chart-star');
@@ -2647,7 +2654,7 @@ function renderChart() {
     renderSetlistNavbar(inSetlist);
 
     // controls: capo only for guitarists
-    document.getElementById('ctl-capo').style.display = view === 'guitarist' ? 'inline-block' : 'none';
+    document.getElementById('ctl-capo').style.display = view === 'guitarist' ? '' : 'none';
     if (view !== 'guitarist' && state.openLayer === 'capo') state.openLayer = null;
 
     // layers — show transpose as the shortest signed move (−5..+6), not a raw counter
@@ -2659,7 +2666,7 @@ function renderChart() {
     document.getElementById('scroll-val').textContent = fmtScroll(state.scroll.speed);
     renderCapoLayer(song, keyIdx);
     // Click control needs a tempo; hide it (and its layer) on tempo-less songs
-    document.getElementById('ctl-click').style.display = song.tempo ? 'inline-block' : 'none';
+    document.getElementById('ctl-click').style.display = song.tempo ? '' : 'none';
     if (!song.tempo && state.openLayer === 'click') state.openLayer = null;
     document.getElementById('click-bpm').textContent = song.tempo ? song.tempo + ' BPM' : '—';
     ['transpose', 'capo', 'text', 'scroll', 'click', 'pad'].forEach(function(l) {
@@ -2725,6 +2732,14 @@ function toggleLyrics() {
     state.lyricsOnly = !lyricsActive();
     if (state.lyricsOnly) { state.nashville = false; state.showDiagrams = false; }  // no chords to show
     save(); renderChart();
+}
+/* Appearance: the small labels under the chart control icons can be hidden once
+   you know the glyphs, for more room. */
+function applyIconLabels() { document.body.classList.toggle('icons-only', !state.iconLabels); }
+function toggleControlLabels() {
+    state.iconLabels = !state.iconLabels;
+    applyIconLabels(); save();
+    var b = document.getElementById('toggle-labels'); if (b) b.textContent = state.iconLabels ? 'Shown' : 'Hidden';
 }
 
 /* Capo picker. keyIdx = sounding key. Capo keeps the sounding key; it only
@@ -2943,7 +2958,7 @@ function buildTempoZones(hostSong) {
     // the Click is usable if the host OR any medley part has a tempo
     var anyTempo = chartTempoZones.some(function(z) { return !!z.tempo; });
     var ctl = document.getElementById('ctl-click');
-    if (ctl) ctl.style.display = anyTempo ? 'inline-block' : 'none';
+    if (ctl) ctl.style.display = anyTempo ? '' : 'none';
     if (!anyTempo && state.openLayer === 'click') state.openLayer = null;
     paintClickLabel();
 }
@@ -3826,6 +3841,10 @@ function openSettings() {
         '<div class="section-label" style="margin-top:4px;">Profile</div>' +
         '<input class="field" id="sh-profile-name" placeholder="Your name" value="' + esc(p.name) + '" autocomplete="off">' +
         '<div class="chip-row" id="sh-instruments">' + chips + '</div>' +
+        '<div class="section-label">Appearance</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
+        '<span style="font-size:14px;">Labels under the chart icons</span>' +
+        '<button class="tap" id="toggle-labels" onclick="toggleControlLabels()">' + (state.iconLabels ? 'Shown' : 'Hidden') + '</button></div>' +
         (syncEnabled() ? '<div class="section-label">Sync</div><div id="sync-status">' + renderSyncSection() + '</div>' : '') +
         (syncEnabled() && currentUser ? '<div class="section-label">Band</div><div id="band-status">' + renderBandSection() + '</div>' : '') +
         '<div class="section-label">Backup</div>' +
@@ -4053,6 +4072,7 @@ function init() {
     if (checkSharedLink()) { /* opened a read-only shared link — skip normal routing */ }
     else if (state.profile && state.profile.name) go('songs');
     else renderOnboarding();
+    applyIconLabels();
     fetchLibrary();     // shared cloud library — cache already painted, refresh in background
     initSync();
     setupEdgeSwipe();
