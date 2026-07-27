@@ -66,13 +66,15 @@ numbers, and the Filipino worship focus.
 
 ## Platform & distribution
 
-- **APK / iOS packaging** — *to discuss.*
-  - Free today: **Add to Home Screen** runs it standalone and kills the
-    browser's back-swipe gesture.
-  - Android: **PWABuilder** wraps the existing PWA into a signed APK/AAB
-    (one-time $25 Play fee). No rewrite needed.
-  - iOS: needs a **$99/yr Apple Developer account** + a Mac; Apple scrutinises
-    thin web wrappers.
+- **Installers (parked, user requested July 27):**
+  - **PC .exe installer** — wrap the PWA in a desktop shell (e.g. Tauri or
+    Electron/PWABuilder) to produce a Windows `.exe`.
+  - **Android .apk installer** — **PWABuilder** wraps the existing PWA into a
+    signed APK/AAB (one-time $25 Play fee). No rewrite needed.
+  - **iPhone iOS installer** — needs a **$99/yr Apple Developer account** + a
+    Mac; Apple scrutinises thin web wrappers.
+  - Free today without any of the above: **Add to Home Screen** runs it
+    standalone and kills the browser's back-swipe gesture.
 
 ---
 

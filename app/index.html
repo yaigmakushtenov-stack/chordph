@@ -26,6 +26,14 @@
             --danger: #f0546c;
             --gold: #f5c518;
             --grad: linear-gradient(90deg, var(--accent), var(--accent-2));
+            /* surfaces that used to be hardcoded — tokenised so light mode works */
+            --surface: #141821;                 /* sheets, menus, selects, pad chip */
+            --drawer-bg: var(--drawer-bg);
+            --hover: rgba(255, 255, 255, 0.045); /* subtle row/button hover */
+            --inset: rgba(0, 0, 0, 0.22);        /* recessed panels (chart preview, notes) */
+            --scrim: rgba(5, 7, 12, 0.62);       /* modal/drawer backdrop */
+            --accent-soft: rgba(91, 140, 255, 0.14);
+            --chord-color: var(--accent);        /* chord ink — overridable for colour-blindness */
             /* form language */
             --radius: 14px;
             --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.28);
@@ -34,6 +42,37 @@
             --gutter: 20px;
             --col: 640px;
         }
+        /* ---- LIGHT THEME (forced) ---- */
+        :root[data-theme="light"] {
+            --bg: #f5f7fb; --bg-2: #ffffff;
+            --panel: #ffffff; --panel-2: #f1f4fa;
+            --border: #dbe1ec; --hairline: rgba(15, 23, 42, 0.10);
+            --text: #161b26; --muted: #5a6474; --faint: #97a0b2;
+            --accent: #2f68ff; --accent-2: #7a45ff; --danger: #e03a54; --gold: #c9960a;
+            --surface: #ffffff; --drawer-bg: rgba(255, 255, 255, 0.97);
+            --hover: rgba(15, 23, 42, 0.05); --inset: rgba(15, 23, 42, 0.045);
+            --scrim: rgba(20, 26, 40, 0.34); --accent-soft: rgba(47, 104, 255, 0.12);
+            --shadow-sm: 0 2px 10px rgba(30, 45, 90, 0.10); --shadow: 0 16px 40px rgba(30, 45, 90, 0.18);
+        }
+        /* ---- AUTO: follow the OS when the user hasn't forced a theme ---- */
+        @media (prefers-color-scheme: light) {
+            :root[data-theme="auto"] {
+                --bg: #f5f7fb; --bg-2: #ffffff;
+                --panel: #ffffff; --panel-2: #f1f4fa;
+                --border: #dbe1ec; --hairline: rgba(15, 23, 42, 0.10);
+                --text: #161b26; --muted: #5a6474; --faint: #97a0b2;
+                --accent: #2f68ff; --accent-2: #7a45ff; --danger: #e03a54; --gold: #c9960a;
+                --surface: #ffffff; --drawer-bg: rgba(255, 255, 255, 0.97);
+                --hover: rgba(15, 23, 42, 0.05); --inset: rgba(15, 23, 42, 0.045);
+                --scrim: rgba(20, 26, 40, 0.34); --accent-soft: rgba(47, 104, 255, 0.12);
+                --shadow-sm: 0 2px 10px rgba(30, 45, 90, 0.10); --shadow: 0 16px 40px rgba(30, 45, 90, 0.18);
+            }
+        }
+        /* ---- colour-blind / preference chord-ink options (applied via --chord-color) ---- */
+        :root[data-chord="amber"]   { --chord-color: #e6902a; }
+        :root[data-chord="teal"]    { --chord-color: #12a6b8; }
+        :root[data-chord="magenta"] { --chord-color: #d84bc4; }
+        :root[data-chord="mono"]    { --chord-color: var(--text); }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -105,7 +144,7 @@
             padding: 14px 0 8px;
             position: sticky;
             top: 0;
-            background: rgba(15, 17, 23, 0.88);
+            background: var(--drawer-bg);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             z-index: 50;
@@ -168,7 +207,7 @@
             z-index: 500;
             margin: 0;
             pointer-events: none;
-            background: #1b2130;
+            background: var(--panel-2);
             border: 1px solid var(--accent);
             border-radius: 12px;
             box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
@@ -207,7 +246,7 @@
         }
         .sub-card pre.sc-chart {
             white-space: pre-wrap; font-size: 12px; line-height: 1.5; max-height: 220px; overflow: auto;
-            background: rgba(0,0,0,0.22); border-radius: 8px; padding: 10px; margin: 6px 0;
+            background: var(--inset); border-radius: 8px; padding: 10px; margin: 6px 0;
         }
         .sub-card .sc-actions { display: flex; gap: 18px; margin-top: 8px; }
         .vote-btn {
@@ -220,7 +259,7 @@
         .status-pending  { background:rgba(255,196,84,0.16); color:#ffc454; }
         .status-approved { background:rgba(74,201,126,0.16); color:#63d29a; }
         .status-rejected { background:rgba(255,92,92,0.16); color:#ff8a8a; }
-        .review-note { font-size:13px; line-height:1.55; color:var(--muted); margin-top:8px; padding:10px 12px; background:rgba(0,0,0,0.2); border-radius:8px; border-left:2px solid var(--border,#263041); }
+        .review-note { font-size:13px; line-height:1.55; color:var(--muted); margin-top:8px; padding:10px 12px; background:var(--inset); border-radius:8px; border-left:2px solid var(--border,#263041); }
         .review-note b { color:var(--text); }
         /* floating prev/next bar at the bottom of a setlist chart */
         #setlist-navbar {
@@ -244,7 +283,7 @@
         #pad-chip {
             position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
             z-index: 300; display: none; align-items: center; gap: 9px;
-            background: rgba(20,24,33,0.92); border: 1px solid var(--accent);
+            background: var(--surface); border: 1px solid var(--accent);
             box-shadow: 0 8px 24px rgba(0,0,0,0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
             border-radius: 999px; padding: 6px 8px 6px 14px; font-size: 13px; color: var(--text);
         }
@@ -271,7 +310,7 @@
             background: rgba(79,140,255,0.10); border: 1px solid rgba(79,140,255,0.28);
         }
         .metro-wrap { display:flex; flex-direction:column; align-items:center; gap:22px; padding:28px 0; max-width:420px; margin:0 auto; }
-        .metro-dot { width:26px; height:26px; border-radius:50%; background:#2a3040; transition:background .05s; }
+        .metro-dot { width:26px; height:26px; border-radius:50%; background:var(--faint); transition:background .05s; }
         .metro-dot.pulse { animation:clickPulse .16s ease-out; }
         .metro-bpm { display:flex; align-items:baseline; gap:8px; }
         .metro-bpm #metro-bpm { font-size:64px; font-weight:800; letter-spacing:-2px; }
@@ -291,7 +330,7 @@
         .tag-chip {
             flex: 0 0 auto; font: inherit; font-size: 12px; cursor: pointer;
             padding: 5px 12px; border-radius: 999px; white-space: nowrap;
-            background: rgba(255,255,255,0.04); border: 1px solid var(--border, #263041); color: var(--muted);
+            background: var(--hover); border: 1px solid var(--border, #263041); color: var(--muted);
         }
         .tag-chip.on { background: rgba(79,140,255,0.15); border-color: var(--accent); color: var(--accent); }
         .sort-row { display: flex; justify-content: flex-end; padding: 0 0 8px; }
@@ -303,7 +342,7 @@
         .sort-lbl { font-size: 12px; color: var(--faint); display: inline-flex; align-items: center; gap: 6px; }
         #app-toast {
             position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
-            background: #10141d; border: 1px solid var(--border, #263041); color: var(--text, #e8ecf3);
+            background: var(--surface); border: 1px solid var(--border, #263041); color: var(--text, #e8ecf3);
             padding: 11px 18px; border-radius: 999px; font-size: 13px; max-width: 88vw; text-align: center;
             box-shadow: 0 12px 30px rgba(0,0,0,0.5); opacity: 0; pointer-events: none;
             transition: opacity .2s, transform .2s; z-index: 900;
@@ -358,7 +397,7 @@
             transition: background .12s, color .12s;
         }
         .ctl svg { width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.7; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-        @media (hover: hover) { .ctl:hover { background: rgba(255,255,255,.045); color: var(--text); } }
+        @media (hover: hover) { .ctl:hover { background: var(--hover); color: var(--text); } }
         .ctl.on { color: var(--accent); background: rgba(91,140,255,.13); }
         #ctl-pad.playing { color: var(--accent-2); }
         /* labels off (set in Appearance settings) — icons only, tighter */
@@ -380,7 +419,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
         .layer .val { color: var(--text); font-weight: 650; min-width: 30px; text-align: center; display: inline-block; }
         .layer .lbl { color: var(--faint); font-size: 12px; }
-        .click-dot { width: 14px; height: 14px; border-radius: 50%; background: #2a3040; display: inline-block; transition: background .05s; }
+        .click-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--faint); display: inline-block; transition: background .05s; }
         .click-dot.pulse { animation: clickPulse .16s ease-out; }
         @keyframes clickPulse { 0% { transform: scale(1.7); } 100% { transform: scale(1); } }
         .capo-opt { padding: 8px 4px; }
@@ -400,7 +439,7 @@
             padding: 12px 0 10px;
         }
         .chart > div { white-space: pre-wrap; line-height: 1.5; }
-        .chart .chord-line { color: var(--accent); font-weight: 700; line-height: 1.25; margin-top: 0.95em; }
+        .chart .chord-line { color: var(--chord-color); font-weight: 700; line-height: 1.25; margin-top: 0.95em; }
         .chart .lyric-line { line-height: 1.5; }
         .chart .chart-gap { height: 0.4em; }
         .chart > div:first-child { margin-top: 0; }
@@ -413,7 +452,7 @@
             border-bottom: 1px solid var(--hairline);
         }
         .chord-dia { flex-shrink: 0; text-align: center; }
-        .cd-name { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 3px; }
+        .cd-name { font-size: 12px; font-weight: 700; color: var(--chord-color); margin-bottom: 3px; }
         .chord-strip .cd-missing { font-size: 11px; color: var(--faint); align-self: center; }
         .chart .sec-head {
             color: var(--accent-2);
@@ -439,7 +478,7 @@
         .scrim {
             display: none;
             position: fixed; inset: 0;
-            background: rgba(5, 7, 12, 0.6);
+            background: var(--scrim);
             backdrop-filter: blur(2px);
             -webkit-backdrop-filter: blur(2px);
             z-index: 200;
@@ -451,7 +490,7 @@
             top: 0; left: -280px;
             width: 250px;
             height: 100%;
-            background: rgba(18, 21, 30, 0.97);
+            background: var(--drawer-bg);
             backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
             border-right: 1px solid var(--hairline);
@@ -482,7 +521,7 @@
             text-align: left;
             transition: background .15s;
         }
-        .drawer-profile:hover { background: rgba(255, 255, 255, 0.03); }
+        .drawer-profile:hover { background: var(--hover); }
         .dp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
         .dp-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .dp-instrument { font-size: 12px; color: var(--faint); margin-top: 1px; }
@@ -502,7 +541,7 @@
         .sheet-scrim {
             display: none;
             position: fixed; inset: 0;
-            background: rgba(5, 7, 12, 0.65);
+            background: var(--scrim);
             backdrop-filter: blur(3px);
             -webkit-backdrop-filter: blur(3px);
             z-index: 400;
@@ -538,7 +577,7 @@
         .sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
         .sheet-actions { display: flex; justify-content: flex-end; gap: 22px; margin-top: 18px; }
         /* collapsible settings sections — keep the sheet tidy as it grows */
-        .set-group { border: 1px solid var(--border, var(--hairline)); border-radius: 12px; margin-bottom: 10px; overflow: hidden; background: rgba(255,255,255,0.018); }
+        .set-group { border: 1px solid var(--border, var(--hairline)); border-radius: 12px; margin-bottom: 10px; overflow: hidden; background: var(--hover); }
         .set-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
             padding: 14px 15px; background: none; border: none; color: var(--text); font: inherit; font-size: 15px; font-weight: 650; cursor: pointer; text-align: left; }
         .set-head .set-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
@@ -547,10 +586,17 @@
         .set-body { display: none; padding: 0 15px 15px; }
         .set-group.open .set-body { display: block; }
         .set-body .section-label:first-child { margin-top: 2px; }
+        /* segmented pickers (theme, chord colour) */
+        .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+        .seg-btn { display: inline-flex; align-items: center; gap: 7px; background: none; cursor: pointer;
+            border: 1px solid var(--border); color: var(--muted); font: inherit; font-size: 13px;
+            padding: 7px 12px; border-radius: 999px; transition: border-color .15s, color .15s, background .15s; }
+        .seg-btn.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+        .seg-btn .swatch { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 1px var(--hairline); }
         /* sticky header inside a scrolling sheet (long lists keep Done in reach) */
         .sheet-head {
             position: sticky; top: 0; z-index: 5;
-            background: #141821;
+            background: var(--surface);
             margin: -20px -24px 4px; padding: 16px 24px 8px;
             border-bottom: 1px solid var(--hairline);
         }
@@ -586,7 +632,7 @@
         .menu-scrim.open { display: block; }
         .menu-pop {
             position: fixed; min-width: 210px; max-width: 82vw;
-            background: #141821; border: 1px solid var(--hairline);
+            background: var(--surface); border: 1px solid var(--hairline);
             border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
             padding: 6px; transform-origin: top right;
             animation: menuDrop .15s cubic-bezier(.2, .8, .2, 1);
@@ -597,7 +643,7 @@
             padding: 12px 12px; background: none; border: none; color: var(--text);
             font-size: 15px; text-align: left; cursor: pointer; border-radius: 8px;
         }
-        .menu-item:hover { background: rgba(255, 255, 255, 0.05); }
+        .menu-item:hover { background: var(--hover); }
         .menu-item.danger { color: var(--danger); }
         .menu-item .mi-ico { width: 18px; text-align: center; flex-shrink: 0; color: var(--muted); }
         .menu-item.danger .mi-ico { color: var(--danger); }
@@ -616,7 +662,7 @@
         }
         .field:focus { border-bottom-color: var(--accent); }
         .field::placeholder { color: var(--faint); }
-        select.field { color: var(--text); background-color: #141821; }
+        select.field { color: var(--text); background-color: var(--surface); }
         select.field:invalid, select.field option[value=""] { color: var(--faint); }
         textarea.field {
             font-family: "Cascadia Mono", Consolas, monospace;
@@ -686,7 +732,7 @@
                 left: 0;
                 transition: none;
                 box-shadow: none;
-                background: linear-gradient(180deg, rgba(23,28,40,0.5), rgba(15,17,23,0.5));
+                background: linear-gradient(180deg, var(--bg-2), var(--bg));
                 border-right: 1px solid var(--hairline);
             }
             .drawer .drawer-nav .tap { font-size: 15px; padding: 10px 0; }
@@ -720,7 +766,7 @@
             .chart-title { font-size: 28px; }
             .chart { font-size: 17px; }
             .row { padding: 16px 4px; border-radius: 10px; padding-left: 10px; padding-right: 10px; transition: background .12s; }
-            .row:hover { background: rgba(255,255,255,0.028); }
+            .row:hover { background: var(--hover); }
             .row:hover .row-title { color: var(--accent); }
         }
 
@@ -1265,6 +1311,8 @@ var state = {
     showDiagrams: false,        // guitar chord-diagram reference strip
     lyricsOnly: null,           // vocalist mode: null = auto (on for Vocalists), else explicit
     iconLabels: true,           // show the small labels under the chart control icons
+    theme: 'dark',              // 'dark' | 'light' | 'auto' (follow OS)
+    chordColor: 'default',      // chord ink: default | amber | teal | magenta | mono (colour-blind friendly)
     overrides: {},              // { libraryId: {edited fields} } — personal local edits of shared songs
     deleted: { setlists: {}, customs: {} },  // tombstones {id: deletedAt} so a delete syncs instead of resurrecting
     view: 'songs',
@@ -1290,7 +1338,7 @@ function save() {
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
     localStorage.setItem('chordph2_deleted', JSON.stringify(state.deleted));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels, theme: state.theme, chordColor: state.chordColor }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
     queuePush();
 }
@@ -1325,6 +1373,8 @@ function load() {
         if (s.showDiagrams) state.showDiagrams = s.showDiagrams;
         if ('lyricsOnly' in s) state.lyricsOnly = s.lyricsOnly;   // tri-state (null/true/false)
         if ('iconLabels' in s) state.iconLabels = s.iconLabels;
+        if (s.theme) state.theme = s.theme;
+        if (s.chordColor) state.chordColor = s.chordColor;
         state.updatedAt = parseInt(localStorage.getItem('chordph2_updated') || '0', 10);
         LIBRARY = JSON.parse(localStorage.getItem('chordph2_library') || '[]');
     } catch (e) { console.warn('load failed', e); }
@@ -1361,7 +1411,7 @@ function localSnapshot() {
         overrides: state.overrides,
         deleted: state.deleted,
         capo: state.capo,
-        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels },
+        settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels, theme: state.theme, chordColor: state.chordColor },
         updated_at: state.updatedAt || 0
     };
 }
@@ -1383,6 +1433,8 @@ function applySnapshot(snap) {
         state.showDiagrams = !!snap.settings.showDiagrams;
         if ('lyricsOnly' in snap.settings) state.lyricsOnly = snap.settings.lyricsOnly;
         if ('iconLabels' in snap.settings) state.iconLabels = snap.settings.iconLabels;
+        if (snap.settings.theme) state.theme = snap.settings.theme;
+        if (snap.settings.chordColor) state.chordColor = snap.settings.chordColor;
     }
     state.updatedAt = snap.updated_at || Date.now();
     // persist without bumping the timestamp or re-queueing a push
@@ -1394,8 +1446,9 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
     localStorage.setItem('chordph2_deleted', JSON.stringify(state.deleted));
-    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels }));
+    localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels, theme: state.theme, chordColor: state.chordColor }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
+    applyIconLabels(); applyTheme();   // a synced-in theme/labels change takes effect now
 }
 
 /* Union merge: never drops a song/setlist from either side; for the same
@@ -2948,6 +3001,35 @@ function toggleLyrics() {
 /* Appearance: the small labels under the chart control icons can be hidden once
    you know the glyphs, for more room. */
 function applyIconLabels() { document.body.classList.toggle('icons-only', !state.iconLabels); }
+/* theme (dark/light/auto) + colour-blind chord ink — driven by attributes on <html> */
+function applyTheme() {
+    document.documentElement.setAttribute('data-theme', state.theme || 'dark');
+    applyChordColor();
+    // keep the mobile browser chrome in step with the theme
+    var lightNow = state.theme === 'light' ||
+        (state.theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', lightNow ? '#f5f7fb' : '#0f1117');
+}
+function applyChordColor() {
+    if (state.chordColor && state.chordColor !== 'default')
+        document.documentElement.setAttribute('data-chord', state.chordColor);
+    else document.documentElement.removeAttribute('data-chord');
+}
+function setTheme(t) { state.theme = t; applyTheme(); save(); refreshThemeButtons(); }
+function setChordColor(c) { state.chordColor = c; applyChordColor(); save(); refreshThemeButtons(); }
+function refreshThemeButtons() {
+    ['dark', 'light', 'auto'].forEach(function(t) {
+        var b = document.getElementById('theme-' + t); if (b) b.classList.toggle('on', state.theme === t);
+    });
+    ['default', 'amber', 'teal', 'magenta', 'mono'].forEach(function(c) {
+        var b = document.getElementById('chordc-' + c); if (b) b.classList.toggle('on', (state.chordColor || 'default') === c);
+    });
+}
+// react to OS theme flips while in auto mode
+if (window.matchMedia) window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function() {
+    if (state.theme === 'auto') applyTheme();
+});
 function toggleControlLabels() {
     state.iconLabels = !state.iconLabels;
     applyIconLabels(); save();
@@ -4115,7 +4197,20 @@ function openSettings() {
     var profileBody =
         '<input class="field" id="sh-profile-name" placeholder="Your name" value="' + esc(p.name) + '" autocomplete="off">' +
         '<div class="chip-row" id="sh-instruments">' + chips + '</div>';
+    var themeOpts = [['dark', 'Dark'], ['light', 'Light'], ['auto', 'Auto']];
+    var chordOpts = [['default', 'Default', 'var(--accent)'], ['amber', 'Amber', '#e6902a'],
+                     ['teal', 'Teal', '#12a6b8'], ['magenta', 'Magenta', '#d84bc4'], ['mono', 'Mono', 'var(--text)']];
     var appearanceBody =
+        '<div style="font-size:14px;margin-bottom:8px;">Theme</div>' +
+        '<div class="seg" style="margin-bottom:16px;">' + themeOpts.map(function(t) {
+            return '<button class="seg-btn' + (state.theme === t[0] ? ' on' : '') + '" id="theme-' + t[0] + '" onclick="setTheme(\'' + t[0] + '\')">' + t[1] + '</button>';
+        }).join('') + '</div>' +
+        '<div style="font-size:14px;margin-bottom:4px;">Chord colour</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Pick a hue that\'s easy for you to read (helps with colour-blindness).</div>' +
+        '<div class="seg" style="margin-bottom:16px;">' + chordOpts.map(function(c) {
+            return '<button class="seg-btn' + ((state.chordColor || 'default') === c[0] ? ' on' : '') + '" id="chordc-' + c[0] + '" onclick="setChordColor(\'' + c[0] + '\')">' +
+                '<span class="swatch" style="background:' + c[2] + '"></span>' + c[1] + '</button>';
+        }).join('') + '</div>' +
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
         '<span style="font-size:14px;">Labels under the chart icons</span>' +
         '<button class="tap" id="toggle-labels" onclick="toggleControlLabels()">' + (state.iconLabels ? 'Shown' : 'Hidden') + '</button></div>';
@@ -4396,6 +4491,7 @@ function init() {
     else if (state.profile && state.profile.name) go('songs');
     else renderOnboarding();
     applyIconLabels();
+    applyTheme();
     fetchLibrary();     // shared cloud library — cache already painted, refresh in background
     initSync();
     setupEdgeSwipe();
