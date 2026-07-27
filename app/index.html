@@ -295,6 +295,23 @@
         @keyframes padPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(79,140,255,0.45); } 50% { box-shadow: 0 0 0 6px rgba(79,140,255,0); } }
         @media (prefers-reduced-motion: reduce) { #pad-chip .pad-chip-dot { animation: none; } }
         #ctl-pad.playing { color: var(--accent-2); }
+        /* floating autoscroll button — quick play/pause without opening the Scroll control */
+        #scroll-fab {
+            position: fixed; z-index: 250;
+            right: calc(16px + env(safe-area-inset-right));
+            bottom: calc(22px + env(safe-area-inset-bottom));
+            width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer;
+            background: var(--grad); color: #fff;
+            box-shadow: 0 10px 26px rgba(47, 104, 255, 0.42);
+            display: flex; align-items: center; justify-content: center;
+            transition: transform .12s ease, bottom .2s ease;
+        }
+        #scroll-fab:active { transform: scale(0.9); }
+        #scroll-fab svg { width: 24px; height: 24px; fill: currentColor; }
+        #scroll-fab.playing { background: var(--surface); color: var(--accent); border: 1px solid var(--accent);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4); }
+        /* lift it above the setlist prev/next bar when that's showing */
+        body.chart-navbar #scroll-fab { bottom: calc(112px + env(safe-area-inset-bottom)); }
         .btn-google {
             display: flex; align-items: center; justify-content: center; gap: 10px;
             width: 100%; padding: 11px 14px; margin: 2px 0 10px;
@@ -1035,6 +1052,11 @@
     <span>Pad &middot; <b id="pad-chip-key">C</b></span>
     <button onclick="stopPad()" aria-label="Stop pad">Stop</button>
 </div>
+
+<!-- quick-access autoscroll toggle, floats over the chart -->
+<button id="scroll-fab" onclick="toggleScroll()" aria-label="Play autoscroll" style="display:none;">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+</button>
 
 <div class="sheet-scrim" id="sheet-scrim" onclick="if (event.target === this) closeSheet()">
     <div class="sheet" id="sheet"></div>
@@ -2098,6 +2120,11 @@ function show(viewId) {
     document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
     document.getElementById('view-' + viewId).classList.add('active');
     window.scrollTo(0, 0);
+    // the floating autoscroll button lives on the chart only
+    var fab = document.getElementById('scroll-fab');
+    if (fab) fab.style.display = (viewId === 'chart') ? 'flex' : 'none';
+    if (viewId !== 'chart') document.body.classList.remove('chart-navbar');
+    updateScrollFab();
 }
 function updateProfileRow() {
     document.getElementById('profile-name').textContent = state.profile ? state.profile.name : 'Set up profile';
@@ -3111,11 +3138,22 @@ function updateWakeLock() {
 document.addEventListener('visibilitychange', function() { if (!document.hidden) updateWakeLock(); });
 
 /* ---- autoscroll ---- */
+function updateScrollFab() {
+    var fab = document.getElementById('scroll-fab');
+    if (!fab) return;
+    var playing = state.scroll.playing;
+    fab.classList.toggle('playing', playing);
+    fab.setAttribute('aria-label', playing ? 'Pause autoscroll' : 'Play autoscroll');
+    fab.innerHTML = playing
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+}
 function toggleScroll() {
     if (state.scroll.playing) stopScroll();
     else {
         state.scroll.playing = true;
         updateWakeLock();
+        updateScrollFab();
         document.getElementById('scroll-toggle').innerHTML = '&#10074;&#10074; Pause';
         var acc = 0, last = 0;
         // Time-based so the speed is identical on a 60Hz phone and a 120Hz+ PC
@@ -3142,6 +3180,7 @@ function stopScroll() {
     if (state.scroll.raf) cancelAnimationFrame(state.scroll.raf);
     var b = document.getElementById('scroll-toggle');
     if (b) b.innerHTML = '&#9654; Play';
+    updateScrollFab();
     updateWakeLock();
 }
 function fmtScroll(s) { return (s % 1 === 0) ? String(s) : s.toFixed(1); }
@@ -3862,16 +3901,18 @@ function setlistStep(dir) {
 function renderSetlistNavbar(inSetlist) {
     var bar = document.getElementById('setlist-navbar');
     var chartView = document.getElementById('view-chart');
-    if (!inSetlist) { bar.style.display = 'none'; chartView.classList.remove('has-navbar'); return; }
+    function setNav(on) { document.body.classList.toggle('chart-navbar', on); }   // lifts the scroll FAB
+    if (!inSetlist) { bar.style.display = 'none'; chartView.classList.remove('has-navbar'); setNav(false); return; }
     var prev = setlistNeighbor(-1), next = setlistNeighbor(1);
     var pBtn = document.getElementById('sl-prev'), nBtn = document.getElementById('sl-next');
     pBtn.disabled = !prev; nBtn.disabled = !next;
     document.getElementById('sl-prev-txt').textContent = prev ? prev.song.title : '';
     document.getElementById('sl-next-txt').textContent = next ? next.song.title : '';
     // both ends missing (single-song setlist) → no bar at all
-    if (!prev && !next) { bar.style.display = 'none'; chartView.classList.remove('has-navbar'); return; }
+    if (!prev && !next) { bar.style.display = 'none'; chartView.classList.remove('has-navbar'); setNav(false); return; }
     bar.style.display = 'flex';
     chartView.classList.add('has-navbar');
+    setNav(true);
 }
 
 /* =========================================================
