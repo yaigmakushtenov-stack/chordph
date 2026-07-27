@@ -99,6 +99,21 @@ numbers, and the Filipino worship focus.
 
 ---
 
+## Parked features (soon)
+
+- **Nashville number trainer** — a practice/learn mode for the number system.
+- **Chord detection from audio** — premium; heavy ML (audio → chords).
+- **Edit song from the setlist view** — with local-edit + resync-to-original,
+  and an "submit change to the shared library for approval" option.
+- **Connect to Spotify** — auto-detect the practised song and play in-app
+  (Premium + Web Playback SDK), or play from a provided Spotify link.
+- **Tap-tempo / BPM-linked auto-scroll** — scroll speed derived from the song's
+  BPM (needs a words-per-beat calibration; BPM alone doesn't map to scroll rate).
+- **Floating play/scroll button** — quick-access scroll toggle (bottom-right).
+- **Band invites v2** — accept/decline instead of auto-join; duplicate-invite
+  guard; show band rosters; setlists grouped per band.
+- **Settings categories** — group the settings page into sections as it grows.
+
 ## Appearance settings (parked)
 
 A UI/appearance settings panel: **light / dark / auto theme**, **font family**
