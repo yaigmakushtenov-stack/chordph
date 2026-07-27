@@ -103,6 +103,12 @@ numbers, and the Filipino worship focus.
 
 - **Nashville number trainer** — a practice/learn mode for the number system.
 - **Chord detection from audio** — premium; heavy ML (audio → chords).
+- **Premium metronome redesign** — the standalone Metronome view looks generic;
+  make it feel premium (big animated beat/pendulum, nicer BPM dial, polished
+  time-sig chips, tactile Start/Stop). Engine already works — this is visual.
+- **Notification center** — full in-app list ("your chart was edited", "band
+  setlist updated", invite accepted) + optional email (needs SMTP). The red
+  gear/hamburger dot for pending band invites is the first piece, already live.
 - ✅ **Edit song from the setlist view** — DONE. Personal local override
   (`state.overrides`), "Reset to original", and "Submit to library" (prefills the
   Submit sheet, linked by `song_id`, for review — no duplicate custom).

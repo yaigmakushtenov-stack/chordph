@@ -2378,12 +2378,23 @@ function importChordProFiles(ev) {
    setlists sync to everyone. Cloud-native (Supabase); degrades to nothing
    when signed out or the tables aren't set up yet.
    ========================================================= */
-var myTeams = [], teamSetlists = [], teamsReady = false, myInvites = [];
+var myTeams = [], teamSetlists = [], teamsReady = false, myInvites = [], lastTeamsRefresh = 0;
 function ownedTeams() { return myTeams.filter(function(t) { return t.isOwner; }); }
 function initTeams() {
-    if (!supa || !currentUser) { myTeams = []; teamSetlists = []; teamsReady = false; myInvites = []; return; }
+    if (!supa || !currentUser) { myTeams = []; teamSetlists = []; teamsReady = false; myInvites = []; updateNotifBadge(); return; }
     refreshTeams();   // v2: no more auto-join — invites are accepted/declined in Settings → Band
 }
+/* pick up new band invites (and their notification dot) without a manual reload:
+   refresh when the app returns to the foreground, and on a light 60s timer */
+function maybeRefreshTeams() {
+    if (!supa || !currentUser || document.hidden) return;
+    var now = Date.now();
+    if (now - lastTeamsRefresh < 4000) return;   // throttle focus/visibility double-fires
+    refreshTeams();
+}
+document.addEventListener('visibilitychange', maybeRefreshTeams);
+window.addEventListener('focus', maybeRefreshTeams);
+setInterval(maybeRefreshTeams, 60000);
 /* pending invites addressed to me, with the band name (needs teams_v2.sql) */
 async function loadMyInvites() {
     try {
@@ -2411,6 +2422,7 @@ async function declineInvite(teamId) {
 }
 async function refreshTeams() {
     if (!supa || !currentUser) return;
+    lastTeamsRefresh = Date.now();
     try {
         var t = await supa.from('teams').select('id,name,owner_id');
         myTeams = (t.data || []).map(function(x) { return { id: x.id, name: x.name, owner_id: x.owner_id, isOwner: x.owner_id === currentUser.id, members: [], pending: [] }; });
