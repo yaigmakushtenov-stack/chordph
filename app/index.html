@@ -236,7 +236,7 @@
         .sl-nav:disabled { opacity: 0; pointer-events: none; }
         .sl-nav .sl-arrow { font-size: 20px; color: var(--muted); flex: 0 0 auto; }
         .sl-nav .sl-txt { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #view-chart.has-navbar .wrap { padding-bottom: 76px; }
+        #view-chart.has-navbar .wrap { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
         /* the pad plays continuously across the whole app, so it gets a global
            floating control that's always reachable while it's running */
         #pad-chip {
@@ -615,6 +615,11 @@
         .chip-row { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 6px 0 10px; }
         .chip { color: var(--muted); cursor: pointer; padding: 8px 2px; font-size: 15px; background: none; border: none; }
         .chip.on { color: var(--accent); font-weight: 650; }
+        /* form validation feedback */
+        @keyframes shakeX { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-5px)} 40%,60%{transform:translateX(5px)} }
+        .invalid { animation: shakeX .4s cubic-bezier(.36,.07,.19,.97); }
+        .field.invalid { border-color: var(--danger) !important; }
+        .chip-row.invalid { outline: 1px dashed var(--danger); outline-offset: 6px; border-radius: 8px; }
 
         /* ---- onboarding ---- */
         #view-onboarding {
@@ -736,6 +741,7 @@
     <div class="ob-tagline">Your chords. Your key. Your music.</div>
     <div class="ob-label">What do you play?</div>
     <div class="chip-row" id="ob-instruments"></div>
+    <input class="field" id="ob-other" placeholder="Name your instrument" autocomplete="off" style="display:none;max-width:280px;margin:0 auto 10px;text-align:center;">
     <div class="ob-label">What should we call you?</div>
     <input class="field" id="ob-name" placeholder="Your name" autocomplete="off">
     <div class="ob-label" id="ob-sync-label">Sync across your devices <span style="text-transform:none;letter-spacing:0;color:var(--faint);">— optional</span></div>
@@ -811,10 +817,7 @@
                 <button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
                 <button class="tap" id="chart-back" onclick="chartBack()">&lsaquo; Songs</button>
             </span>
-            <span style="display:flex;gap:14px;">
-                <button class="tap" id="chart-prev" onclick="setlistStep(-1)" style="display:none;" aria-label="Previous song">&larr;</button>
-                <button class="tap" id="chart-next" onclick="setlistStep(1)" style="display:none;" aria-label="Next song">&rarr;</button>
-            </span>
+            <span></span>
             <span class="bar-side right">
                 <button class="tap" id="chart-edit" onclick="openSongSheet(currentSongId)" style="display:none;">Edit</button>
                 <button class="tap glyph" id="chart-share" onclick="shareSong(currentSongId)" aria-label="Share song">&#8599;</button>
@@ -985,7 +988,7 @@ var CAPO_SHAPES = [
     { shape: 'E', index: 4 }, { shape: 'D', index: 2 }, { shape: 'C', index: 0 },
     { shape: 'A', index: 9 }, { shape: 'G', index: 7 }
 ];
-var INSTRUMENTS = ['Lead Guitar', 'Rhythm Guitar', 'Bass', 'Keyboard', 'Drums', 'Vocalist'];
+var INSTRUMENTS = ['Lead Guitar', 'Rhythm Guitar', 'Bass', 'Keyboard', 'Drums', 'Vocalist', 'Other'];
 var INSTRUMENT_VIEWS = {
     'Lead Guitar': 'guitarist', 'Rhythm Guitar': 'guitarist', 'Bass': 'bassist',
     'Keyboard': 'keys', 'Drums': 'drummer', 'Vocalist': 'vocalist'
@@ -1986,7 +1989,7 @@ function go(view) {
     });
     if (view === 'songs') { renderSongList(); show('songs'); }
     if (view === 'favorites') { renderFavorites(); show('favorites'); }
-    if (view === 'setlists') { state.setlistEdit = false; state.setlistsEdit = false; renderSetlists(); show('setlists'); }
+    if (view === 'setlists') { state.setlistEdit = false; state.setlistsEdit = false; renderSetlists(); show('setlists'); if (supa && currentUser) refreshTeams(); }
     if (view === 'review') { renderReview(); show('review'); }
     if (view === 'mysubs') { renderMySubs(); show('mysubs'); }
     if (view === 'metronome') { show('metronome'); renderMetronome(); }
@@ -2647,10 +2650,8 @@ function renderChart() {
     document.getElementById('chart-share').style.display = readonly ? 'none' : '';
     document.getElementById('chart-edit').style.display = (!readonly && song.custom) ? 'inline-block' : 'none';
 
-    // setlist prev/next — top arrows + bottom bar with song names
+    // setlist prev/next now lives only in the bottom bar (top arrows removed)
     var inSetlist = state.chartFrom === 'setlist';
-    var prev = document.getElementById('chart-prev'), next = document.getElementById('chart-next');
-    prev.style.display = next.style.display = inSetlist ? 'inline-block' : 'none';
     renderSetlistNavbar(inSetlist);
 
     // controls: capo only for guitarists
@@ -2802,11 +2803,26 @@ function fontBy(d) {
     save(); renderChart();
 }
 
+/* ---- keep the screen awake while performing (scroll / click / pad) ---- */
+var wakeLock = null;
+function wakeLockNeeded() { return state.scroll.playing || metro.playing || pad.playing; }
+function updateWakeLock() {
+    if (wakeLockNeeded()) {
+        if (!wakeLock && 'wakeLock' in navigator) {
+            navigator.wakeLock.request('screen').then(function(w) {
+                wakeLock = w; w.addEventListener('release', function() { wakeLock = null; });
+            }).catch(function() {});
+        }
+    } else if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+}
+document.addEventListener('visibilitychange', function() { if (!document.hidden) updateWakeLock(); });
+
 /* ---- autoscroll ---- */
 function toggleScroll() {
     if (state.scroll.playing) stopScroll();
     else {
         state.scroll.playing = true;
+        updateWakeLock();
         document.getElementById('scroll-toggle').innerHTML = '&#10074;&#10074; Pause';
         var acc = 0;
         function step() {
@@ -2828,6 +2844,7 @@ function stopScroll() {
     if (state.scroll.raf) cancelAnimationFrame(state.scroll.raf);
     var b = document.getElementById('scroll-toggle');
     if (b) b.innerHTML = '&#9654; Play';
+    updateWakeLock();
 }
 function fmtScroll(s) { return (s % 1 === 0) ? String(s) : s.toFixed(1); }
 function scrollSpeedBy(d) {
@@ -2855,6 +2872,7 @@ function startMetro(bpm, beatsPerBar) {
     metro.beat = 0; metro.next = metro.ctx.currentTime + 0.08; metro.playing = true;
     setMetroToggle(true);
     scheduleMetro();
+    updateWakeLock();
 }
 function scheduleMetro() {
     if (!metro.playing) return;
@@ -2920,6 +2938,7 @@ function stopMetro() {
     metro.playing = false;
     if (metro.timer) clearTimeout(metro.timer);
     setMetroToggle(false);
+    updateWakeLock();
 }
 function toggleMetro() {
     if (metro.playing) { stopMetro(); return; }
@@ -3106,6 +3125,7 @@ function startPad(keyIndex) {
         return { o: o, g: g, spec: v };
     });
     pad.playing = true;
+    updateWakeLock();
     pad.master.gain.setValueAtTime(0.0001, now);
     pad.master.gain.exponentialRampToValueAtTime(pad.level, now + 1.6);   // slow swell in
     updatePadUI();
@@ -3136,6 +3156,7 @@ function stopPad() {
     setTimeout(function() { try { voices.forEach(function(v) { v.o.stop(); }); lfo.stop(); } catch (e) {} }, 1400);
     pad.voices = [];
     updatePadUI();
+    updateWakeLock();
 }
 function togglePad() {
     if (pad.playing) stopPad();
@@ -3540,9 +3561,6 @@ function renderSetlistNavbar(inSetlist) {
     if (!prev && !next) { bar.style.display = 'none'; chartView.classList.remove('has-navbar'); return; }
     bar.style.display = 'flex';
     chartView.classList.add('has-navbar');
-    // top arrows mirror the same disabled state
-    document.getElementById('chart-prev').disabled = !prev;
-    document.getElementById('chart-next').disabled = !next;
 }
 
 /* =========================================================
@@ -3953,6 +3971,10 @@ function renderOnboarding() {
             window.__obInstrument = ins;
             box.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('on'); });
             b.classList.add('on');
+            box.classList.remove('invalid');
+            var oth = document.getElementById('ob-other');
+            oth.style.display = ins === 'Other' ? '' : 'none';
+            if (ins === 'Other') oth.focus();
         };
         box.appendChild(b);
     });
@@ -3964,10 +3986,26 @@ function renderOnboarding() {
     document.body.classList.add('pre-app');
     document.getElementById('view-onboarding').style.display = 'flex';
 }
+function flashInvalid(el) {
+    el.classList.remove('invalid'); void el.offsetWidth; el.classList.add('invalid');
+    setTimeout(function() { el.classList.remove('invalid'); }, 1600);
+}
 function finishOnboarding() {
-    var name = document.getElementById('ob-name').value.trim();
-    if (!name || !window.__obInstrument) return;
-    state.profile = { name: name, instrument: window.__obInstrument };
+    var nameEl = document.getElementById('ob-name');
+    var name = nameEl.value.trim();
+    var instrument = window.__obInstrument;
+    var msg = document.getElementById('ob-msg');
+    if (instrument === 'Other') {
+        var other = document.getElementById('ob-other').value.trim();
+        if (!other) { flashInvalid(document.getElementById('ob-other')); msg.style.color = 'var(--danger)'; msg.textContent = 'Name your instrument.'; return; }
+        instrument = other;
+    }
+    var bad = false;
+    if (!instrument) { flashInvalid(document.getElementById('ob-instruments')); bad = true; }
+    if (!name) { flashInvalid(nameEl); bad = true; }
+    if (bad) { msg.style.color = 'var(--danger)'; msg.textContent = !instrument && !name ? 'Pick an instrument and enter your name.' : !instrument ? 'Pick what you play.' : 'Enter your name.'; return; }
+    msg.textContent = '';
+    state.profile = { name: name, instrument: instrument };
     save();
     // one-time: if they entered an email here, kick off the sign-in now so they
     // never have to "log in" again in Settings
@@ -3984,25 +4022,31 @@ function finishOnboarding() {
     go('songs');
 }
 
-/* Left-edge swipe opens the drawer — so nav is reachable even when the top
-   bar has scrolled away. Mobile only (desktop keeps the persistent sidebar).
-   Passive listeners, so page scrolling is never blocked. */
+/* Left-edge swipe opens the drawer; swipe-left closes it again. Mobile only
+   (desktop keeps the persistent sidebar). */
+function drawerOpen() { return document.getElementById('drawer').classList.contains('open'); }
 function setupEdgeSwipe() {
-    var sx = 0, sy = 0, tracking = false;
+    var sx = 0, sy = 0, tracking = false, mode = null;
     document.addEventListener('touchstart', function(e) {
-        tracking = false;
+        tracking = false; mode = null;
         if (window.innerWidth >= 980) return;
-        if (document.getElementById('drawer').classList.contains('open')) return;
-        if (document.body.classList.contains('pre-app')) return;
         var t = e.touches[0];
-        if (t.clientX <= 22) { sx = t.clientX; sy = t.clientY; tracking = true; }
+        if (drawerOpen()) { sx = t.clientX; sy = t.clientY; tracking = true; mode = 'close'; }
+        else if (!document.body.classList.contains('pre-app') && t.clientX <= 22) {
+            sx = t.clientX; sy = t.clientY; tracking = true; mode = 'open';
+        }
     }, { passive: true });
     document.addEventListener('touchmove', function(e) {
         if (!tracking) return;
         var t = e.touches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-        if (dx > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) { tracking = false; openDrawer(); }
+        if (mode === 'open' && dx > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) { tracking = false; openDrawer(); }
+        else if (mode === 'close' && dx < -45 && Math.abs(dx) > Math.abs(dy) * 1.2) { tracking = false; closeDrawer(); }
     }, { passive: true });
     document.addEventListener('touchend', function() { tracking = false; }, { passive: true });
+    // freeze the page behind an open drawer so the blurred list doesn't scroll
+    document.addEventListener('touchmove', function(e) {
+        if (drawerOpen() && !e.target.closest('.drawer') && e.cancelable) e.preventDefault();
+    }, { passive: false });
 }
 /* Block accidental pinch-zoom — the chart controls its own text size via A-/A+.
    iOS Safari ignores user-scalable=no, so cancel its gesture events and any
