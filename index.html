@@ -149,6 +149,12 @@
         width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--hairline);
         border-radius: 10px; color: var(--text); font: inherit; font-size: 15px; padding: 11px 13px;
     }
+    /* the native dropdown popup inherits these — force dark bg + light text so the
+       options aren't white-on-white on desktop Chrome/Edge */
+    .cf-field select { -webkit-appearance: none; appearance: none; color-scheme: dark;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8adba' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");
+        background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+    .cf-field select option { background: #171a22; color: var(--text); }
     .cf-field textarea { min-height: 120px; resize: vertical; }
     .cf-field input:focus, .cf-field select:focus, .cf-field textarea:focus { outline: none; border-color: var(--accent); }
     .cf-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }  /* honeypot */

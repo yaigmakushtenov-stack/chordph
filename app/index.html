@@ -94,6 +94,8 @@
             -webkit-text-fill-color: transparent;
             width: fit-content;
         }
+        .wordmark[role="link"] { cursor: pointer; }
+        .wordmark[role="link"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 
         /* ---- top bar: quiet ---- */
         .bar {
@@ -714,7 +716,7 @@
 <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
 
 <nav class="drawer" id="drawer">
-    <div class="wordmark">Chord.ph</div>
+    <div class="wordmark" role="link" tabindex="0" title="Go to chord.ph home" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">Chord.ph</div>
     <div class="drawer-nav">
         <button class="tap" id="nav-songs" onclick="go('songs')">Songs</button>
         <button class="tap" id="nav-favorites" onclick="go('favorites')">Favorites</button>
@@ -755,7 +757,7 @@
     <div class="wrap">
         <div class="bar">
             <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
-            <span class="wordmark">Chord.ph</span>
+            <span class="wordmark" role="link" tabindex="0" title="Go to chord.ph home" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">Chord.ph</span>
             <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()" aria-label="Add song">+</button></span>
         </div>
         <input class="search" id="search" placeholder="Search songs, artists, tags&hellip;" oninput="renderSongList()" autocomplete="off">
@@ -1245,6 +1247,7 @@ var state = {
     lyricsOnly: null,           // vocalist mode: null = auto (on for Vocalists), else explicit
     iconLabels: true,           // show the small labels under the chart control icons
     overrides: {},              // { libraryId: {edited fields} } — personal local edits of shared songs
+    deleted: { setlists: {}, customs: {} },  // tombstones {id: deletedAt} so a delete syncs instead of resurrecting
     view: 'songs',
     chartFrom: 'songs',         // where Back returns to
     currentSetlistId: null,
@@ -1267,6 +1270,7 @@ function save() {
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
+    localStorage.setItem('chordph2_deleted', JSON.stringify(state.deleted));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
     queuePush();
@@ -1291,6 +1295,9 @@ function load() {
         state.setlists = JSON.parse(localStorage.getItem('chordph2_setlists') || '[]');
         state.transpose = JSON.parse(localStorage.getItem('chordph2_transpose') || '{}');
         state.overrides = JSON.parse(localStorage.getItem('chordph2_overrides') || '{}');
+        state.deleted = JSON.parse(localStorage.getItem('chordph2_deleted') || '{"setlists":{},"customs":{}}');
+        if (!state.deleted.setlists) state.deleted.setlists = {};
+        if (!state.deleted.customs) state.deleted.customs = {};
         state.capo = JSON.parse(localStorage.getItem('chordph2_capo') || '{}');
         var s = JSON.parse(localStorage.getItem('chordph2_settings') || '{}');
         if (s.fontSize) state.fontSize = s.fontSize;
@@ -1333,6 +1340,7 @@ function localSnapshot() {
         setlists: state.setlists,
         transpose: state.transpose,
         overrides: state.overrides,
+        deleted: state.deleted,
         capo: state.capo,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels },
         updated_at: state.updatedAt || 0
@@ -1345,6 +1353,9 @@ function applySnapshot(snap) {
     state.setlists = snap.setlists || [];
     state.transpose = snap.transpose || {};
     state.overrides = snap.overrides || {};
+    state.deleted = snap.deleted || { setlists: {}, customs: {} };
+    if (!state.deleted.setlists) state.deleted.setlists = {};
+    if (!state.deleted.customs) state.deleted.customs = {};
     state.capo = snap.capo || {};
     if (snap.settings) {
         state.fontSize = snap.settings.fontSize || 16;
@@ -1363,6 +1374,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
+    localStorage.setItem('chordph2_deleted', JSON.stringify(state.deleted));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
 }
@@ -1375,19 +1387,31 @@ function mergeData(local, cloud) {
     var localNewer = (local.updated_at || 0) >= (cloud.updated_at || 0);
     var newer = localNewer ? local : cloud;
     var older = localNewer ? cloud : local;
-    function mergeById(arrNewer, arrOlder) {
+    var newerTs = newer.updated_at || 0, olderTs = older.updated_at || 0;
+    // union the two tombstone maps, keeping the newest deletion time per id
+    function mergeTomb(key) {
+        var out = {};
+        var a = (older.deleted && older.deleted[key]) || {}, b = (newer.deleted && newer.deleted[key]) || {};
+        Object.keys(a).forEach(function(id) { out[id] = a[id]; });
+        Object.keys(b).forEach(function(id) { if (!out[id] || b[id] > out[id]) out[id] = b[id]; });
+        return out;
+    }
+    var tombSet = mergeTomb('setlists'), tombCus = mergeTomb('customs');
+    // an item survives unless it was deleted AFTER the snapshot it came from was last saved
+    function mergeById(arrNewer, arrOlder, tomb) {
         var map = {};
-        (arrOlder || []).forEach(function(x) { if (x && x.id) map[x.id] = x; });
-        (arrNewer || []).forEach(function(x) { if (x && x.id) map[x.id] = x; });
+        (arrOlder || []).forEach(function(x) { if (x && x.id && !(tomb[x.id] && tomb[x.id] >= olderTs)) map[x.id] = x; });
+        (arrNewer || []).forEach(function(x) { if (x && x.id && !(tomb[x.id] && tomb[x.id] >= newerTs)) map[x.id] = x; });
         return Object.keys(map).map(function(k) { return map[k]; });
     }
     return {
         profile: newer.profile || older.profile,
-        customs: mergeById(newer.customs, older.customs),
-        setlists: mergeById(newer.setlists, older.setlists),
+        customs: mergeById(newer.customs, older.customs, tombCus),
+        setlists: mergeById(newer.setlists, older.setlists, tombSet),
         favorites: Array.from(new Set((local.favorites || []).concat(cloud.favorites || []))),
         transpose: Object.assign({}, older.transpose, newer.transpose),
         overrides: Object.assign({}, older.overrides, newer.overrides),
+        deleted: { setlists: tombSet, customs: tombCus },
         capo: Object.assign({}, older.capo, newer.capo),
         settings: newer.settings || older.settings,
         updated_at: Math.max(local.updated_at || 0, cloud.updated_at || 0)
@@ -1430,7 +1454,9 @@ async function signInWithGoogle() {
     if (!supa) return;
     var res = await supa.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: location.origin + '/app/' }
+        // prompt=select_account forces Google to show the account picker instead of
+        // silently reusing the last session (the iPhone "stuck on old email" bug)
+        options: { redirectTo: location.origin + '/app/', queryParams: { prompt: 'select_account' } }
     });
     if (res && res.error) toast('Google sign-in failed: ' + res.error.message);
 }
@@ -2342,12 +2368,12 @@ function initTeams() {
 /* pending invites addressed to me, with the band name (needs teams_v2.sql) */
 async function loadMyInvites() {
     try {
-        var inv = await supa.from('team_invites').select('team_id, teams(name)');
+        var inv = await supa.from('team_invites').select('team_id, invited_by, teams(name)');
         var mine = {};
         myTeams.forEach(function(t) { mine[t.id] = true; });   // already a member — hide
         myInvites = (inv.data || [])
             .filter(function(x) { return !mine[x.team_id]; })
-            .map(function(x) { return { team_id: x.team_id, name: (x.teams && x.teams.name) || 'a band' }; });
+            .map(function(x) { return { team_id: x.team_id, name: (x.teams && x.teams.name) || 'a band', by: x.invited_by || '' }; });
     } catch (e) { myInvites = []; }
 }
 async function acceptInvite(teamId) {
@@ -2404,8 +2430,11 @@ function renderBandSection() {
     // pending invites addressed to me — accept or decline (v2, no more auto-join)
     if (myInvites.length) {
         html += myInvites.map(function(iv) {
+            var line = iv.by
+                ? '<b>' + esc(iv.by) + '</b> invited you to <b>' + esc(iv.name) + '</b>.'
+                : 'You\'re invited to <b>' + esc(iv.name) + '</b>.';
             return '<div style="border:1px solid rgba(91,140,255,.28);background:rgba(91,140,255,.08);border-radius:12px;padding:12px 14px;margin-bottom:12px;">' +
-                '<div style="font-size:13.5px;color:var(--text);margin-bottom:8px;"><b>' + esc(iv.name) + '</b> invited you to their band.</div>' +
+                '<div style="font-size:13.5px;color:var(--text);margin-bottom:8px;">' + line + '</div>' +
                 '<div style="display:flex;gap:10px;"><button class="tap primary" onclick="acceptInvite(\'' + iv.team_id + '\')">Accept</button>' +
                 '<button class="tap" onclick="declineInvite(\'' + iv.team_id + '\')">Decline</button></div></div>';
         }).join('');
@@ -2492,7 +2521,8 @@ async function inviteToTeam(teamId, email) {
         if ((t.members || []).some(function(m) { return (m.email || '').toLowerCase() === email; })) { toast('They’re already in the band.'); return; }
         if ((t.pending || []).some(function(e) { return (e || '').toLowerCase() === email; })) { toast('Already invited — waiting for them to accept.'); return; }
     }
-    var r = await supa.from('team_invites').insert({ team_id: teamId, email: email });
+    var inviter = (state.profile && state.profile.name) || (currentUser && currentUser.email) || '';
+    var r = await supa.from('team_invites').insert({ team_id: teamId, email: email, invited_by: inviter });
     if (r.error) toast(/duplicate|unique/i.test(r.error.message) ? 'Already invited.' : 'Invite failed: ' + r.error.message);
     else { toast('Invited ' + email + '. They’ll see it in Settings → Band to accept.'); await refreshTeams(); }
 }
@@ -2933,10 +2963,15 @@ function toggleScroll() {
         state.scroll.playing = true;
         updateWakeLock();
         document.getElementById('scroll-toggle').innerHTML = '&#10074;&#10074; Pause';
-        var acc = 0;
-        function step() {
+        var acc = 0, last = 0;
+        // Time-based so the speed is identical on a 60Hz phone and a 120Hz+ PC
+        // monitor (frame-based scrolling ran twice as fast on high-refresh screens).
+        // ~6 px/s per speed step: speed 3 ≈ 18 px/s — a slow, singable read.
+        function step(ts) {
             if (!state.scroll.playing) return;
-            acc += state.scroll.speed * 0.18;   // gentler: speed 1 crawls, 5 is a moderate read
+            if (!last) last = ts;
+            var dt = Math.min(ts - last, 100); last = ts;   // clamp after tab was hidden
+            acc += state.scroll.speed * 6 * (dt / 1000);
             if (acc >= 1) {
                 var px = Math.floor(acc); acc -= px;
                 window.scrollBy(0, px);
@@ -3415,6 +3450,7 @@ function renderSetlists() {
             del.onclick = function(e) {
                 e.stopPropagation();
                 if (confirm('Delete "' + sl.name + '"?')) {
+                    state.deleted.setlists[sl.id] = Date.now();
                     state.setlists = state.setlists.filter(function(x) { return x.id !== sl.id; });
                     save(); renderSetlists();
                 }
@@ -3530,6 +3566,7 @@ function doRenameSetlist() {
 function deleteSetlistFromDetail() {
     var sl = setlistById(state.currentSetlistId);
     if (!confirm('Delete "' + sl.name + '"?')) return;
+    state.deleted.setlists[sl.id] = Date.now();
     state.setlists = state.setlists.filter(function(x) { return x.id !== sl.id; });
     save(); closeSheet(); go('setlists');
 }
@@ -3962,6 +3999,7 @@ function submitEditToLibrary() {
 function deleteSong() {
     if (!editingSongId || !confirm('Delete this song permanently?')) return;
     var id = editingSongId;
+    state.deleted.customs[id] = Date.now();
     state.customs = state.customs.filter(function(c) { return c.id !== id; });
     state.favorites = state.favorites.filter(function(f) { return f !== id; });
     state.setlists.forEach(function(sl) {

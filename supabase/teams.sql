@@ -20,9 +20,11 @@ create table if not exists public.team_members (
 create table if not exists public.team_invites (
     team_id    uuid not null references public.teams(id) on delete cascade,
     email      text not null,
+    invited_by text,                                 -- inviter's display name (for the invite card)
     created_at timestamptz not null default now(),
     primary key (team_id, email)
 );
+alter table public.team_invites add column if not exists invited_by text;
 
 create table if not exists public.team_setlists (
     id         uuid primary key default gen_random_uuid(),
