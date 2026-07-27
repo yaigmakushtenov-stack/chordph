@@ -486,8 +486,17 @@
         .dp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
         .dp-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .dp-instrument { font-size: 12px; color: var(--faint); margin-top: 1px; }
-        .dp-gear { font-size: 17px; color: var(--muted); flex-shrink: 0; transition: color .2s, transform .3s; }
+        .dp-gear { font-size: 17px; color: var(--muted); flex-shrink: 0; transition: color .2s, transform .3s; position: relative; }
         .drawer-profile:hover .dp-gear { color: var(--accent); transform: rotate(40deg); }
+        /* red notification dot — something needs your action (e.g. a band invite).
+           Shown on the gear and, so it's visible without opening the drawer, on the
+           hamburger menu button too. */
+        .notif-dot { position: relative; }
+        body.has-notif .notif-dot::after {
+            content: ''; position: absolute; top: -2px; right: -3px;
+            width: 9px; height: 9px; border-radius: 50%;
+            background: var(--danger, #ff5a5f); box-shadow: 0 0 0 2px var(--bg, #0e1016);
+        }
 
         /* ---- bottom sheet: modals without boxes-in-boxes ---- */
         .sheet-scrim {
@@ -744,7 +753,7 @@
             <span class="dp-name" id="profile-name"></span>
             <span class="dp-instrument" id="profile-instrument"></span>
         </span>
-        <span class="dp-gear">&#9881;</span>
+        <span class="dp-gear notif-dot">&#9881;</span>
     </button>
 </nav>
 
@@ -766,7 +775,7 @@
 <div class="view" id="view-songs">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
+            <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
             <span class="wordmark" role="link" tabindex="0" title="Go to chord.ph home" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">Chord.ph</span>
             <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()" aria-label="Add song">+</button></span>
         </div>
@@ -780,7 +789,7 @@
 <div class="view" id="view-favorites">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
+            <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
             <span class="wordmark">Favorites</span>
             <span class="bar-side right"></span>
         </div>
@@ -793,7 +802,7 @@
 <div class="view" id="view-setlists">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
+            <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
             <span class="wordmark">Setlists</span>
             <span class="bar-side right"><button class="tap glyph" id="setlists-menu-btn" onclick="onSetlistsMenuBtn()" aria-label="Setlist options">&#8943;</button></span>
         </div>
@@ -806,7 +815,7 @@
     <div class="wrap">
         <div class="bar">
             <span class="bar-side" style="display:flex;gap:6px;">
-                <button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
+                <button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
                 <button class="tap" onclick="go('setlists')">&lsaquo; Setlists</button>
             </span>
             <span></span>
@@ -826,7 +835,7 @@
     <div class="wrap">
         <div class="bar">
             <span class="bar-side" style="display:flex;gap:6px;">
-                <button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
+                <button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
                 <button class="tap" id="chart-back" onclick="chartBack()">&lsaquo; Songs</button>
             </span>
             <span></span>
@@ -927,7 +936,7 @@
 <div class="view" id="view-metronome">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
+            <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
             <span class="wordmark">Metronome</span>
             <span class="bar-side right"></span>
         </div>
@@ -956,7 +965,7 @@
 <div class="view" id="view-review">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
+            <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
             <span class="wordmark">Review queue</span>
             <span class="bar-side right"><button class="tap" onclick="renderReview()" aria-label="Refresh">&#8635;</button></span>
         </div>
@@ -967,7 +976,7 @@
 <div class="view" id="view-mysubs">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
+            <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
             <span class="wordmark">My submissions</span>
             <span class="bar-side right"><button class="tap" onclick="renderMySubs()" aria-label="Refresh">&#8635;</button></span>
         </div>
@@ -2432,6 +2441,13 @@ async function refreshTeams() {
 function refreshBandUI() {
     var el = document.getElementById('band-status');
     if (el) el.innerHTML = renderBandSection();
+    updateNotifBadge();
+}
+/* red dot on the gear + hamburger when something needs the user's action —
+   right now that's a pending band invite */
+function updateNotifBadge() {
+    var pending = (typeof myInvites !== 'undefined' && myInvites) ? myInvites.length : 0;
+    document.body.classList.toggle('has-notif', pending > 0);
 }
 function renderBandSection() {
     if (!currentUser) return '<div style="font-size:13px;color:var(--muted);">Sign in first to create or join a band.</div>';
@@ -2481,7 +2497,7 @@ function renderRoster(t) {
     if (t.isOwner) rows = rows.concat((t.pending || []).map(function(email) {
         return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;color:var(--muted);">' +
             '<span>' + esc(email) + ' <span style="color:var(--faint);">· invited</span></span>' +
-            '<button class="tap danger" style="font-size:12px;padding:0;" onclick="cancelInvite(\'' + t.id + '\',\'' + esc(email) + '\')">Cancel</button></div>';
+            '<button class="tap danger" style="font-size:12px;padding:0;" onclick="cancelInvite(\'' + t.id + '\',\'' + esc(email) + '\')">Remove</button></div>';
     }));
     if (!rows.length) return '';
     return '<div style="font-size:13px;color:var(--muted);margin:8px 0 2px;border-top:1px solid var(--hair);padding-top:8px;">' + rows.join('') + '</div>';
@@ -2493,9 +2509,10 @@ async function removeMember(teamId, userId) {
     else { toast('Member removed.'); await refreshTeams(); }
 }
 async function cancelInvite(teamId, email) {
+    if (!confirm('Remove the invite for ' + email + '?')) return;
     var r = await supa.from('team_invites').delete().eq('team_id', teamId).eq('email', (email || '').toLowerCase());
-    if (r.error) toast('Couldn’t cancel: ' + r.error.message);
-    else { toast('Invite cancelled.'); await refreshTeams(); }
+    if (r.error) toast('Couldn’t remove: ' + r.error.message);
+    else { toast('Invite removed.'); await refreshTeams(); }
 }
 function promptCreateTeam() {
     var n = window.prompt('Name your band (e.g. Sunday Team):');
@@ -2538,8 +2555,14 @@ async function inviteToTeam(teamId, email) {
 }
 async function leaveTeam(teamId) {
     if (!confirm('Leave this band?')) return;
-    await supa.from('team_members').delete().eq('team_id', teamId).eq('user_id', currentUser.id);
+    var r = await supa.from('team_members').delete().eq('team_id', teamId).eq('user_id', currentUser.id);
+    if (r.error) { toast('Couldn’t leave: ' + r.error.message); return; }
     await refreshTeams();
+    // a blocked delete returns no error but removes 0 rows — if the band is still
+    // listed, tell the user instead of silently doing nothing
+    if (myTeams.some(function(t) { return t.id === teamId; }))
+        toast('Couldn’t leave — if you created this band, use “Delete band” instead.');
+    else toast('You left the band.');
 }
 async function deleteTeam(teamId) {
     if (!confirm('Delete this band for everyone? Its shared setlists are removed.')) return;
