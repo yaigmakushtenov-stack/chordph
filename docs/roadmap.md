@@ -1,7 +1,7 @@
 # Chord.ph — roadmap & parked work
 
 Everything discussed but not yet built. Kept here so nothing gets lost.
-Last updated: 2026-07-24.
+Last updated: 2026-07-27.
 
 ---
 
@@ -35,10 +35,11 @@ Big text, minimal chrome, and ideally **band-follows-leader** sync across
 devices. A key OnSong differentiator.
 
 ### 4. Team / band sync
-- ✅ **v1 DONE & live** — owner creates a band, invites by email, publishes
-  setlists; members auto-join on sign-in and see "Band setlists". (`teams.sql`)
+- ✅ **v1 + v2 DONE & live** — owner creates a band, invites by email (accept/
+  decline, not auto-join), roster with remove/cancel, publishes setlists that
+  members play in place. (`teams.sql` + `teams_v2.sql`)
 - ⏳ Later: live 2-way sync, member editing rights, a shared band *song library*
-  (not just setlists), roster display, multi-band active switcher.
+  (not just setlists), multi-band active switcher.
 - Monetisation: free personal sync + **paid team sync** is the intended paywall
   (so we don't need to cap devices per account).
 
@@ -83,8 +84,8 @@ numbers, and the Filipino worship focus.
 - **Google sign-in** — after email sign-in is proven.
 - **Admin: re-tag library songs in-app** — today tags are set at submission or
   via the Supabase table editor.
-- **Delete tombstones** — the union-merge sync can resurrect a delete if the
-  same account edits offline on two devices. Known limitation.
+- ✅ **Delete tombstones — DONE** (`state.deleted`), so deleting a setlist/song
+  syncs the delete instead of the union-merge resurrecting it.
 
 ---
 
@@ -121,7 +122,8 @@ numbers, and the Filipino worship focus.
   (members + pending) under each band; admin remove-member / cancel-invite;
   duplicate-invite guard. Setlists already group per band ("Band setlists").
   Needs `supabase/teams_v2.sql` run once (invitee reads band name pre-join).
-- **Settings categories** — group the settings page into sections as it grows.
+- ✅ **Settings categories — DONE** (collapsible Profile / Appearance / Account /
+  Band / Backup sections).
 
 ## Appearance settings (parked)
 
