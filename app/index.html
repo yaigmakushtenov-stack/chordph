@@ -2672,7 +2672,7 @@ function renderSharedSetlist() {
     if (!sharedSetlist) { go('songs'); return; }
     document.getElementById('shared-name').textContent = sharedSetlist.name;
     document.getElementById('shared-count').textContent =
-        sharedSetlist.ids.length + ' song' + (sharedSetlist.ids.length !== 1 ? 's' : '') + ' · shared with you, read-only';
+        sharedSetlist.ids.length + ' song' + (sharedSetlist.ids.length !== 1 ? 's' : '') + ' · tap a song to play through — swipe to change songs';
     var box = document.getElementById('shared-list');
     box.innerHTML = '';
     sharedSetlist.ids.forEach(function (sid, pos) {
@@ -2789,8 +2789,9 @@ function renderChart() {
     document.getElementById('chart-edit').style.display = editable ? '' : 'none';
     document.getElementById('chart-edit').textContent = song && song.edited ? 'Edited' : 'Edit';
 
-    // setlist prev/next now lives only in the bottom bar (top arrows removed)
-    var inSetlist = state.chartFrom === 'setlist';
+    // setlist prev/next now lives only in the bottom bar (top arrows removed);
+    // also show it for a shared/band setlist so it plays through in place
+    var inSetlist = state.chartFrom === 'setlist' || state.chartFrom === 'shared-set';
     renderSetlistNavbar(inSetlist);
 
     // controls: capo only for guitarists
@@ -3683,19 +3684,27 @@ function arrayMove(arr, from, to) {
     arr.splice(to, 0, it);
 }
 /* next/prev playable position in the current setlist (skips missing songs) */
+/* the ordered song ids for whichever setlist context the chart is in — your own
+   setlist OR a shared/band setlist (so you can flip through a band set without
+   saving it locally first) */
+function activeSetlistIds() {
+    if (state.chartFrom === 'shared-set' && sharedSetlist) return sharedSetlist.ids;
+    if (state.currentSetlistId) { var sl = setlistById(state.currentSetlistId); return sl ? sl.songIds : null; }
+    return null;
+}
 function setlistNeighbor(dir) {
-    var sl = setlistById(state.currentSetlistId);
-    if (!sl) return null;
+    var ids = activeSetlistIds();
+    if (!ids) return null;
     var pos = state.setlistPos + dir;
-    while (pos >= 0 && pos < sl.songIds.length && !songById(sl.songIds[pos])) pos += dir;
-    if (pos < 0 || pos >= sl.songIds.length) return null;
-    return { pos: pos, song: songById(sl.songIds[pos]) };
+    while (pos >= 0 && pos < ids.length && !songById(ids[pos])) pos += dir;
+    if (pos < 0 || pos >= ids.length) return null;
+    return { pos: pos, song: songById(ids[pos]) };
 }
 function setlistStep(dir) {
     var n = setlistNeighbor(dir);
     if (!n) return;
     state.setlistPos = n.pos;
-    openChart(n.song.id, 'setlist');
+    openChart(n.song.id, state.chartFrom === 'shared-set' ? 'shared-set' : 'setlist');
 }
 function renderSetlistNavbar(inSetlist) {
     var bar = document.getElementById('setlist-navbar');
@@ -4236,7 +4245,7 @@ function setupChartSwipe() {
     view.addEventListener('touchstart', function(e) {
         on = false;
         if (e.touches.length !== 1) return;
-        if (state.chartFrom !== 'setlist') return;
+        if (state.chartFrom !== 'setlist' && state.chartFrom !== 'shared-set') return;
         // don't treat scrolling the control toolbar / chord strip / sliders as a song swipe
         if (e.target.closest('.control-dock') || e.target.closest('.chord-strip') || e.target.closest('input')) return;
         var t = e.touches[0];

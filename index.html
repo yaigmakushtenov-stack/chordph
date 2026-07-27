@@ -54,6 +54,7 @@
     nav .links a:hover { color: var(--text); }
     .btn {
         display: inline-block; border-radius: 10px; font-weight: 600; cursor: pointer;
+        white-space: nowrap;
         transition: filter .15s, transform .1s, border-color .15s, color .15s;
     }
     .btn:active { transform: scale(.98); }
@@ -62,6 +63,14 @@
     .btn-ghost { border: 1px solid var(--hairline); color: var(--text); padding: 10px 18px; }
     .btn-ghost:hover { border-color: var(--accent); }
     nav .btn-primary { padding: 8px 16px; font-size: 14px; }
+    /* on phones the four links + button overflow and squash "Open app" onto two
+       lines — keep just the brand and the Open app button (other links live in
+       the page + footer) */
+    @media (max-width: 640px) {
+        nav .wrap { padding: 0 18px; }
+        nav .links { gap: 0; }
+        nav .links a:not(.btn) { display: none; }
+    }
 
     /* hero */
     .hero { text-align: center; padding: 74px 0 40px; }
