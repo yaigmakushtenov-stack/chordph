@@ -103,15 +103,18 @@ numbers, and the Filipino worship focus.
 
 - **Nashville number trainer** — a practice/learn mode for the number system.
 - **Chord detection from audio** — premium; heavy ML (audio → chords).
-- **Edit song from the setlist view** — with local-edit + resync-to-original,
-  and an "submit change to the shared library for approval" option.
+- ✅ **Edit song from the setlist view** — DONE. Personal local override
+  (`state.overrides`), "Reset to original", and "Submit to library" (prefills the
+  Submit sheet, linked by `song_id`, for review — no duplicate custom).
 - **Connect to Spotify** — auto-detect the practised song and play in-app
   (Premium + Web Playback SDK), or play from a provided Spotify link.
 - **Tap-tempo / BPM-linked auto-scroll** — scroll speed derived from the song's
   BPM (needs a words-per-beat calibration; BPM alone doesn't map to scroll rate).
 - **Floating play/scroll button** — quick-access scroll toggle (bottom-right).
-- **Band invites v2** — accept/decline instead of auto-join; duplicate-invite
-  guard; show band rosters; setlists grouped per band.
+- ✅ **Band invites v2** — DONE. Accept/decline instead of auto-join; roster
+  (members + pending) under each band; admin remove-member / cancel-invite;
+  duplicate-invite guard. Setlists already group per band ("Band setlists").
+  Needs `supabase/teams_v2.sql` run once (invitee reads band name pre-join).
 - **Settings categories** — group the settings page into sections as it grows.
 
 ## Appearance settings (parked)
