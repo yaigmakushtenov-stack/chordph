@@ -2424,24 +2424,43 @@ async function refreshTeams() {
     if (!supa || !currentUser) return;
     lastTeamsRefresh = Date.now();
     try {
+        // Build into a LOCAL var and publish once at the end. If two refreshes run
+        // concurrently (focus + timer + a direct call), each fills its own copy —
+        // otherwise they'd both push the same rows into the shared objects and the
+        // roster would show every member/invite twice.
         var t = await supa.from('teams').select('id,name,owner_id');
-        myTeams = (t.data || []).map(function(x) { return { id: x.id, name: x.name, owner_id: x.owner_id, isOwner: x.owner_id === currentUser.id, members: [], pending: [] }; });
-        var ids = myTeams.map(function(x) { return x.id; });
+        var teams = (t.data || []).map(function(x) { return { id: x.id, name: x.name, owner_id: x.owner_id, isOwner: x.owner_id === currentUser.id, members: [], pending: [] }; });
+        var ids = teams.map(function(x) { return x.id; });
         if (ids.length) {
             var mem = await supa.from('team_members').select('team_id,user_id,email,role').in('team_id', ids);
+            var seen = {};
             (mem.data || []).forEach(function(r) {
-                var tm = myTeams.filter(function(x) { return x.id === r.team_id; })[0];
+                var key = r.team_id + '|' + r.user_id;
+                if (seen[key]) return; seen[key] = 1;   // belt-and-braces de-dupe
+                var tm = teams.filter(function(x) { return x.id === r.team_id; })[0];
                 if (tm) tm.members.push({ user_id: r.user_id, email: r.email, role: r.role });
             });
-            var owned = myTeams.filter(function(x) { return x.isOwner; }).map(function(x) { return x.id; });
+            var owned = teams.filter(function(x) { return x.isOwner; }).map(function(x) { return x.id; });
             if (owned.length) {
                 var pend = await supa.from('team_invites').select('team_id,email').in('team_id', owned);
+                var seenP = {};
                 (pend.data || []).forEach(function(r) {
-                    var tm = myTeams.filter(function(x) { return x.id === r.team_id; })[0];
+                    var key = r.team_id + '|' + (r.email || '');
+                    if (seenP[key]) return; seenP[key] = 1;
+                    var tm = teams.filter(function(x) { return x.id === r.team_id; })[0];
                     if (tm) tm.pending.push(r.email);
                 });
             }
         }
+        // teams_v2 lets you SELECT a band you're only invited to (so the invite
+        // card can show its name) — but such a band must NOT count as one of "your"
+        // bands. Keep only ones you own or are actually a member of; otherwise a
+        // pending invite would show as "member / Leave band" and hide the
+        // Accept/Decline prompt.
+        teams = teams.filter(function(x) {
+            return x.isOwner || x.members.some(function(m) { return m.user_id === currentUser.id; });
+        });
+        myTeams = teams;   // publish the fully-built roster atomically
         await loadMyInvites();
         var s = await supa.from('team_setlists').select('id,team_id,name,data,updated_at').order('updated_at', { ascending: false });
         teamSetlists = s.data || [];
