@@ -312,6 +312,27 @@
             box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4); }
         /* lift it above the setlist prev/next bar when that's showing */
         body.chart-navbar #scroll-fab { bottom: calc(112px + env(safe-area-inset-bottom)); }
+        body.stage-mode.chart-navbar #scroll-fab { bottom: calc(22px + env(safe-area-inset-bottom)); }
+        /* ---- stage / performance mode: big text, minimal chrome ---- */
+        #stage-exit { position: fixed; z-index: 260; display: none;
+            top: calc(10px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right));
+            font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+            background: var(--surface); color: var(--text); border: 1px solid var(--border);
+            border-radius: 999px; padding: 7px 14px; box-shadow: var(--shadow-sm); }
+        body.stage-mode #stage-exit { display: block; }
+        body.stage-mode #view-chart .bar,
+        body.stage-mode .control-dock,
+        body.stage-mode .chart-meta,
+        body.stage-mode #chart-versions,
+        body.stage-mode #share-banner,
+        body.stage-mode #setlist-navbar { display: none !important; }
+        body.stage-mode .drawer { display: none !important; }
+        body.stage-mode #view-chart .wrap { max-width: none; margin: 0 auto; padding: 14px 20px 90px; }
+        body.stage-mode .chart-title { font-size: 1.5em; margin-bottom: 12px; }
+        @media (min-width: 980px) {
+            body.stage-mode #view-chart .wrap { margin-left: auto; margin-right: auto; max-width: 1040px; padding-left: 44px; padding-right: 44px; }
+        }
+        #chart-stage.on { color: var(--accent); }
         .btn-google {
             display: flex; align-items: center; justify-content: center; gap: 10px;
             width: 100%; padding: 11px 14px; margin: 2px 0 10px;
@@ -365,6 +386,11 @@
             box-shadow: 0 8px 22px rgba(47,104,255,0.34); transition: transform .1s ease, filter .15s; }
         .metro-start:active { transform: scale(0.96); }
         .metro-start.on { background: var(--surface); color: var(--danger); border:1px solid var(--danger); box-shadow:none; }
+        .metro-tap { font: inherit; font-size:16px; font-weight:650; cursor:pointer; color:var(--text);
+            background: var(--surface); border:1px solid var(--border); border-radius:999px; padding:12px 28px;
+            transition: transform .1s ease, border-color .15s; }
+        .metro-tap:active { transform: scale(0.96); }
+        @media (hover:hover) { .metro-tap:hover { border-color:var(--accent); } }
         @media (prefers-reduced-motion: reduce) { .metro-ring.beat, .metro-ring.beat.accent { animation:none; } }
         #chart-versions { margin-top: 6px; }
         .tag-filter {
@@ -932,6 +958,7 @@
             <span></span>
             <span class="bar-side right">
                 <button class="tap" id="chart-edit" onclick="openSongSheet(currentSongId)" style="display:none;">Edit</button>
+                <button class="tap glyph" id="chart-stage" onclick="toggleStage()" aria-label="Stage mode (big text)">&#9974;</button>
                 <button class="tap glyph" id="chart-share" onclick="shareSong(currentSongId)" aria-label="Share song">&#8599;</button>
                 <button class="tap glyph star-toggle" id="chart-star" onclick="toggleFav(currentSongId); renderChart();" aria-label="Toggle favorite">&#9734;</button>
             </span>
@@ -1054,7 +1081,7 @@
             </div>
             <div class="metro-actions">
                 <button class="metro-start" id="metro-toggle" onclick="metroToggle()">&#9654; Start</button>
-                <button class="tap" onclick="metroTap()">Tap tempo</button>
+                <button class="metro-tap" onclick="metroTap()">Tap tempo</button>
             </div>
         </div>
     </div>
@@ -1092,6 +1119,8 @@
 <button id="scroll-fab" onclick="toggleScroll()" aria-label="Play autoscroll" style="display:none;">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
 </button>
+<!-- leave stage mode (only visible while in it) -->
+<button id="stage-exit" onclick="toggleStage()" aria-label="Exit stage mode">&times; Exit stage</button>
 
 <div class="sheet-scrim" id="sheet-scrim" onclick="if (event.target === this) closeSheet()">
     <div class="sheet" id="sheet"></div>
@@ -2158,7 +2187,10 @@ function show(viewId) {
     // the floating autoscroll button lives on the chart only
     var fab = document.getElementById('scroll-fab');
     if (fab) fab.style.display = (viewId === 'chart') ? 'flex' : 'none';
-    if (viewId !== 'chart') document.body.classList.remove('chart-navbar');
+    if (viewId !== 'chart') {
+        document.body.classList.remove('chart-navbar');
+        if (stageMode) { stageMode = false; document.body.classList.remove('stage-mode'); }  // don't stay in stage off-chart
+    }
     updateScrollFab();
 }
 function updateProfileRow() {
@@ -3009,7 +3041,7 @@ function renderChart() {
 
     // body
     var body = document.getElementById('chart-body');
-    body.style.fontSize = state.fontSize + 'px';
+    body.style.fontSize = chartFontSize() + 'px';
     var displayedChart = transposeChordText(song.chart, displaySteps);
     if (view === 'drummer') {
         body.innerHTML = formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo ? song.tempo + ' BPM' : '—') + '\n\n' + song.chart);
@@ -3157,10 +3189,22 @@ function fontBy(d) {
     state.fontSize = Math.max(12, Math.min(28, state.fontSize + d));
     save(); renderChart();
 }
+/* ---- stage / performance mode: big text, minimal chrome ---- */
+var stageMode = false;
+function chartFontSize() { return Math.round(state.fontSize * (stageMode ? 1.6 : 1)); }
+function toggleStage() { setStage(!stageMode); }
+function setStage(on) {
+    stageMode = on;
+    document.body.classList.toggle('stage-mode', on);
+    var c = document.getElementById('chart-stage'); if (c) c.classList.toggle('on', on);
+    if (on) updateWakeLock();          // keep the screen awake on stage
+    else if (!wakeLockNeeded()) updateWakeLock();
+    renderChart();                     // re-apply the (scaled) chart font
+}
 
 /* ---- keep the screen awake while performing (scroll / click / pad) ---- */
 var wakeLock = null;
-function wakeLockNeeded() { return state.scroll.playing || metro.playing || pad.playing; }
+function wakeLockNeeded() { return state.scroll.playing || metro.playing || pad.playing || stageMode; }
 function updateWakeLock() {
     if (wakeLockNeeded()) {
         if (!wakeLock && 'wakeLock' in navigator) {
@@ -3629,7 +3673,7 @@ function renderMedley(mainSong, keyIdx, capo) {
         var chartText = medleyChartText(song, m.sectionIndices);
         var pre = document.createElement('div');
         pre.className = 'chart';
-        pre.style.fontSize = state.fontSize + 'px';
+        pre.style.fontSize = chartFontSize() + 'px';
         pre.innerHTML = view === 'drummer'
             ? formatChart('Feel: ' + (song.feel || '—') + '\nTempo: ' + (song.tempo || '—') + ' BPM\n\n' + chartText)
             : lyricsActive()
