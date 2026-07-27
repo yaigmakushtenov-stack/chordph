@@ -721,7 +721,7 @@
         <button class="tap" id="nav-setlists" onclick="go('setlists')">Setlists</button>
         <hr class="drawer-hr">
         <button class="tap" id="nav-import" onclick="openImportSheet()">Import songs</button>
-        <button class="tap" id="nav-submit" onclick="openSubmitSheet()">Submit a chart</button>
+        <button class="tap" id="nav-submit" onclick="pendingSubmitPrefill=null; openSubmitSheet()">Submit a chart</button>
         <button class="tap" id="nav-mysubs" onclick="go('mysubs')" style="display:none;">My submissions <span id="mysubs-badge" class="review-badge" style="display:none;"></span></button>
         <button class="tap" id="nav-review" onclick="go('review')" style="display:none;">Review queue <span id="review-badge" class="review-badge" style="display:none;"></span></button>
         <button class="tap" onclick="go('metronome')">Metronome</button>
@@ -1244,6 +1244,7 @@ var state = {
     showDiagrams: false,        // guitar chord-diagram reference strip
     lyricsOnly: null,           // vocalist mode: null = auto (on for Vocalists), else explicit
     iconLabels: true,           // show the small labels under the chart control icons
+    overrides: {},              // { libraryId: {edited fields} } — personal local edits of shared songs
     view: 'songs',
     chartFrom: 'songs',         // where Back returns to
     currentSetlistId: null,
@@ -1265,6 +1266,7 @@ function save() {
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
+    localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
     queuePush();
@@ -1288,6 +1290,7 @@ function load() {
         state.favorites = JSON.parse(localStorage.getItem('chordph2_favorites') || '[]');
         state.setlists = JSON.parse(localStorage.getItem('chordph2_setlists') || '[]');
         state.transpose = JSON.parse(localStorage.getItem('chordph2_transpose') || '{}');
+        state.overrides = JSON.parse(localStorage.getItem('chordph2_overrides') || '{}');
         state.capo = JSON.parse(localStorage.getItem('chordph2_capo') || '{}');
         var s = JSON.parse(localStorage.getItem('chordph2_settings') || '{}');
         if (s.fontSize) state.fontSize = s.fontSize;
@@ -1329,6 +1332,7 @@ function localSnapshot() {
         favorites: state.favorites,
         setlists: state.setlists,
         transpose: state.transpose,
+        overrides: state.overrides,
         capo: state.capo,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels },
         updated_at: state.updatedAt || 0
@@ -1340,6 +1344,7 @@ function applySnapshot(snap) {
     state.favorites = snap.favorites || [];
     state.setlists = snap.setlists || [];
     state.transpose = snap.transpose || {};
+    state.overrides = snap.overrides || {};
     state.capo = snap.capo || {};
     if (snap.settings) {
         state.fontSize = snap.settings.fontSize || 16;
@@ -1357,6 +1362,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
+    localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
 }
@@ -1381,6 +1387,7 @@ function mergeData(local, cloud) {
         setlists: mergeById(newer.setlists, older.setlists),
         favorites: Array.from(new Set((local.favorites || []).concat(cloud.favorites || []))),
         transpose: Object.assign({}, older.transpose, newer.transpose),
+        overrides: Object.assign({}, older.overrides, newer.overrides),
         capo: Object.assign({}, older.capo, newer.capo),
         settings: newer.settings || older.settings,
         updated_at: Math.max(local.updated_at || 0, cloud.updated_at || 0)
@@ -1523,6 +1530,7 @@ var TAB_INSTRUMENTS = ['Lead Guitar', 'Rhythm Guitar', 'Bass', 'Keyboard', 'Ukul
 function isRefUrl(u) {
     return /^https?:\/\/\S+/i.test(u) && /(youtube\.com|youtu\.be|spotify\.com)/i.test(u);
 }
+var pendingSubmitPrefill = null;   // set when "Submit to library" prefills an edit
 function openSubmitSheet() {
     closeDrawer();
     var keyOpts = keyOptionsHTML('');
@@ -1553,6 +1561,16 @@ function openSubmitSheet() {
         '<button class="tap primary" onclick="submitChart()">' + (signedOut ? 'Save to device' : 'Submit') + '</button></div>',
         'fit'
     );
+    // prefill when coming from "Submit to library" (editing a shared song)
+    if (pendingSubmitPrefill) {
+        var p = pendingSubmitPrefill;
+        document.getElementById('sub-title').value = p.title || '';
+        document.getElementById('sub-artist').value = p.artist || '';
+        if (p.key) document.getElementById('sub-key').value = p.key;
+        document.getElementById('sub-tempo').value = p.tempo || '';
+        document.getElementById('sub-tags').value = (p.tags || []).join(', ');
+        document.getElementById('sub-chart').value = p.chart || '';
+    }
 }
 function onSubTypeChange() {
     var isTab = document.getElementById('sub-type').value === 'tab';
@@ -1601,26 +1619,31 @@ function submitChart() {
     if (!isRefUrl(ref)) return fail('A YouTube or Spotify reference link is required.');
     if (type === 'tab' && !instrument) return fail('Pick the instrument this tab is for.');
 
-    // Always save locally so the contributor can use it right away (per the plan:
-    // usable on your device until it's approved into the shared library).
-    state.customs.push({ id: 'c' + Date.now(), title: title, artist: artist, key: key,
-                         tempo: tempo, feel: '', tags: tags, chart: chart, custom: true });
-    save();
-    if (state.view === 'songs') renderSongList();
+    var songId = pendingSubmitPrefill && pendingSubmitPrefill.song_id ? pendingSubmitPrefill.song_id : null;
+    pendingSubmitPrefill = null;   // one-shot
+
+    // A brand-new submission also saves locally so it's usable right away. An edit
+    // of an existing library song already exists locally (the override), so skip.
+    if (!songId) {
+        state.customs.push({ id: 'c' + Date.now(), title: title, artist: artist, key: key,
+                             tempo: tempo, feel: '', tags: tags, chart: chart, custom: true });
+        save();
+        if (state.view === 'songs') renderSongList();
+    }
 
     if (!currentUser || !supa) {
         closeSheet();
-        toast('Saved to your device. Sign in (Settings) to submit it for review.');
+        toast(songId ? 'Sign in (Settings) to submit your edit for review.' : 'Saved to your device. Sign in (Settings) to submit it for review.');
         return;
     }
     supa.from('submissions').insert({
-        submitter_id: currentUser.id, submitter_email: currentUser.email,
+        submitter_id: currentUser.id, submitter_email: currentUser.email, song_id: songId,
         title: title, artist: artist, key: key, tempo: tempo || null, feel: null, tags: tags,
         type: type, instrument: instrument || null, reference_url: ref, chart: chart
     }).then(function(res) {
         closeSheet();
-        if (res.error) toast('Saved locally, but submission failed: ' + res.error.message);
-        else toast('Submitted for review — thanks! It’s on your device meanwhile.');
+        if (res.error) toast('Submission failed: ' + res.error.message);
+        else toast(songId ? 'Edit submitted for review — thanks!' : 'Submitted for review — thanks! It’s on your device meanwhile.');
     });
 }
 
@@ -1926,7 +1949,11 @@ function migrate() {
    ========================================================= */
 function allSongs() { return LIBRARY.concat(state.customs); }
 function songById(id) {
-    for (var i = 0; i < LIBRARY.length; i++) if (LIBRARY[i].id === id) return LIBRARY[i];
+    for (var i = 0; i < LIBRARY.length; i++) if (LIBRARY[i].id === id) {
+        // a personal edit ("edit locally") overlays the shared song
+        if (state.overrides && state.overrides[id]) return Object.assign({ edited: true }, LIBRARY[i], state.overrides[id], { id: id, custom: false });
+        return LIBRARY[i];
+    }
     for (var j = 0; j < state.customs.length; j++) if (state.customs[j].id === id) return state.customs[j];
     if (sharedSongs[id]) return sharedSongs[id];   // transient shared-link songs
     return null;
@@ -2648,7 +2675,10 @@ function renderChart() {
     star.style.color = isFav(song.id) ? 'var(--gold)' : '';
     star.style.display = readonly ? 'none' : '';
     document.getElementById('chart-share').style.display = readonly ? 'none' : '';
-    document.getElementById('chart-edit').style.display = (!readonly && song.custom) ? 'inline-block' : 'none';
+    // Edit shows for your own songs AND library songs (a personal local edit)
+    var editable = !readonly && song && String(song.id).indexOf('shared-') !== 0;
+    document.getElementById('chart-edit').style.display = editable ? '' : 'none';
+    document.getElementById('chart-edit').textContent = song && song.edited ? 'Edited' : 'Edit';
 
     // setlist prev/next now lives only in the bottom bar (top arrows removed)
     var inSetlist = state.chartFrom === 'setlist';
@@ -3762,20 +3792,37 @@ function confirmMedley() {
 
 /* ---- add / edit song ---- */
 var editingSongId = null;
+function isLibrarySong(id) { if (!id) return false; for (var i = 0; i < LIBRARY.length; i++) if (LIBRARY[i].id === id) return true; return false; }
+function rerenderAfterEdit() {
+    if (state.view === 'songs') renderSongList();
+    if (document.getElementById('view-chart').classList.contains('active')) renderChart();
+    if (document.getElementById('view-setlist').classList.contains('active')) renderSetlistDetail();
+}
 function openSongSheet(songId) {
     var song = songId ? songById(songId) : null;
-    if (song && !song.custom) return;
+    var isLib = song && isLibrarySong(song.id);
+    if (song && !song.custom && !isLib) return;   // shared-link songs aren't editable here
     editingSongId = song ? song.id : null;
+    var hasOverride = isLib && state.overrides && state.overrides[song.id];
     var keyOpts = keyOptionsHTML(song ? song.key : '');
     var feels = ['Slow Worship', 'Moderate Worship', 'Upbeat Praise', 'Hymn', 'Contemporary'].map(function(f) {
         return '<option' + (song && song.feel === f ? ' selected' : '') + '>' + f + '</option>';
     }).join('');
+    var title = song ? (isLib ? 'Edit this song' : 'Edit song') : 'Add song';
+    var note = isLib
+        ? 'This edits <b style="color:var(--text);">your copy on this device</b> — the shared version everyone else sees stays as is. To propose the fix for everyone, tap “Submit to library”.'
+        : 'Saved on this device. <button class="tap" style="padding:0;color:var(--accent);font-size:12px;" onclick="openRulesSheet(\'song\')">See the rules</button> — chords on their own line above the lyric, and label sections like [Verse 1].';
+    var actions = isLib
+        ? (hasOverride ? '<button class="tap" onclick="resyncSong(\'' + song.id + '\')">Reset to original</button>' : '') +
+          '<button class="tap" onclick="submitEditToLibrary()">Submit to library</button>' +
+          '<button class="tap" onclick="closeSheet()">Cancel</button>' +
+          '<button class="tap primary" onclick="saveSong()">Save</button>'
+        : (song ? '<button class="tap danger" onclick="deleteSong()">Delete</button>' : '') +
+          '<button class="tap" onclick="closeSheet()">Cancel</button>' +
+          '<button class="tap primary" onclick="saveSong()">Save</button>';
     openSheet(
-        '<div class="sheet-head"><div class="sheet-title">' + (song ? 'Edit song' : 'Add song') + '</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Saved on this device. ' +
-        '<button class="tap" style="padding:0;color:var(--accent);font-size:12px;" onclick="openRulesSheet(\'song\')">See the rules</button> — ' +
-        'chords on their own line above the lyric, and label sections like [Verse 1]. ' +
-        'To share it with everyone, use “Submit a chart”.</div></div>' +
+        '<div class="sheet-head"><div class="sheet-title">' + title + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + note + '</div></div>' +
         '<div class="sheet-scroll">' +
         '<input class="field" id="sh-song-title" placeholder="Song title *" value="' + (song ? esc(song.title) : '') + '" autocomplete="off">' +
         '<input class="field" id="sh-song-artist" placeholder="Artist / band *" value="' + (song ? esc(song.artist) : '') + '" autocomplete="off">' +
@@ -3788,39 +3835,50 @@ function openSongSheet(songId) {
         '<textarea class="field" id="sh-song-chart" placeholder="Chord chart *&#10;&#10;[Verse 1]&#10;G              D&#10;Your lyrics here" style="min-height:160px;">' + (song ? esc(song.chart) : '') + '</textarea>' +
         '<div class="form-error" id="sh-song-err"></div>' +
         '</div>' +
-        '<div class="sheet-actions">' +
-        (song ? '<button class="tap danger" onclick="deleteSong()">Delete</button>' : '') +
-        '<button class="tap" onclick="closeSheet()">Cancel</button>' +
-        '<button class="tap primary" onclick="saveSong()">Save</button></div>',
+        '<div class="sheet-actions">' + actions + '</div>',
         'fit'
     );
 }
+function readSongForm() {
+    return {
+        title: document.getElementById('sh-song-title').value.trim(),
+        artist: document.getElementById('sh-song-artist').value.trim(),
+        key: document.getElementById('sh-song-key').value,
+        tempo: parseInt(document.getElementById('sh-song-tempo').value, 10) || 0,
+        feel: document.getElementById('sh-song-feel').value,
+        tags: parseTags(document.getElementById('sh-song-tags').value),
+        chart: document.getElementById('sh-song-chart').value.trim()
+    };
+}
 function saveSong() {
-    var title = document.getElementById('sh-song-title').value.trim();
-    var artist = document.getElementById('sh-song-artist').value.trim();
-    var key = document.getElementById('sh-song-key').value;
-    var tempo = parseInt(document.getElementById('sh-song-tempo').value, 10) || 0;
-    var feel = document.getElementById('sh-song-feel').value;
-    var tags = parseTags(document.getElementById('sh-song-tags').value);
-    var chart = document.getElementById('sh-song-chart').value.trim();
+    var f = readSongForm();
     var err = document.getElementById('sh-song-err');
-    if (!title || !artist || !key || !chart) {
-        err.textContent = 'Title, artist, key and chart are required.';
-        err.style.display = 'block';
-        return;
+    if (!f.title || !f.artist || !f.key || !f.chart) {
+        err.textContent = 'Title, artist, key and chart are required.'; err.style.display = 'block'; return;
     }
-    if (editingSongId) {
+    if (editingSongId && isLibrarySong(editingSongId)) {
+        state.overrides[editingSongId] = f;   // personal local override of a shared song
+    } else if (editingSongId) {
         var song = songById(editingSongId);
-        song.title = title; song.artist = artist; song.key = key;
-        song.tempo = tempo; song.feel = feel; song.tags = tags; song.chart = chart;
+        song.title = f.title; song.artist = f.artist; song.key = f.key;
+        song.tempo = f.tempo; song.feel = f.feel; song.tags = f.tags; song.chart = f.chart;
     } else {
-        state.customs.push({ id: 'c' + Date.now(), title: title, artist: artist, key: key,
-                             tempo: tempo, feel: feel, tags: tags, chart: chart, custom: true });
+        state.customs.push(Object.assign({ id: 'c' + Date.now(), custom: true }, f));
     }
-    save(); closeSheet();
-    if (state.view === 'songs') renderSongList();
-    if (document.getElementById('view-chart').classList.contains('active')) renderChart();
-    if (document.getElementById('view-setlist').classList.contains('active')) renderSetlistDetail();
+    save(); closeSheet(); rerenderAfterEdit();
+}
+function resyncSong(id) {
+    if (state.overrides) delete state.overrides[id];
+    save(); closeSheet(); rerenderAfterEdit();
+    toast('Reset to the shared version.');
+}
+/* propose the current edit to the shared library — reuses the Submit flow so the
+   reference link + review still apply, and links it to the existing song. */
+function submitEditToLibrary() {
+    var f = readSongForm();
+    if (!f.title || !f.chart) { var e = document.getElementById('sh-song-err'); e.textContent = 'Add a title and chart first.'; e.style.display = 'block'; return; }
+    pendingSubmitPrefill = { title: f.title, artist: f.artist, key: f.key, tempo: f.tempo, tags: f.tags, chart: f.chart, song_id: editingSongId };
+    openSubmitSheet();
 }
 function deleteSong() {
     if (!editingSongId || !confirm('Delete this song permanently?')) return;
