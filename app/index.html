@@ -669,17 +669,24 @@
                 border-bottom: 1px solid var(--hairline);
                 padding: 20px 0 12px;
             }
+            :root { --content-left: max(264px, calc((100vw - 820px) / 2)); --content-w: 820px; }
             .wrap {
-                margin-left: max(264px, calc((100vw - 820px) / 2));
+                margin-left: var(--content-left);
                 margin-right: auto;
-                max-width: 820px;
+                max-width: var(--content-w);
                 padding: 0 48px 100px;
             }
             /* onboarding + logged-out: no sidebar */
             body.pre-app .drawer { display: none; }
-            /* the fixed prev/next bar must start after the sidebar, not under it */
-            #setlist-navbar { left: 250px; padding-left: 24px; padding-right: 24px; }
-            body.pre-app #setlist-navbar { left: 0; }
+            /* the fixed prev/next bar hugs the reading column exactly — same left
+               edge as the lyrics, same right edge as the star button */
+            #setlist-navbar {
+                left: var(--content-left);
+                right: auto;
+                width: min(var(--content-w), calc(100vw - var(--content-left)));
+                padding-left: 48px; padding-right: 48px;
+            }
+            body.pre-app #setlist-navbar { left: 0; right: 0; width: auto; padding-left: 10px; padding-right: 10px; }
             .chart-title { font-size: 28px; }
             .chart { font-size: 17px; }
             .row { padding: 16px 4px; border-radius: 10px; padding-left: 10px; padding-right: 10px; transition: background .12s; }
@@ -689,7 +696,7 @@
 
         /* ============ WIDE DESKTOP — a little more air ============ */
         @media (min-width: 1400px) {
-            .wrap { max-width: 880px; margin-left: max(300px, calc((100vw - 880px) / 2)); }
+            :root { --content-left: max(300px, calc((100vw - 880px) / 2)); --content-w: 880px; }
         }
     </style>
 </head>
@@ -3989,6 +3996,8 @@ function setupChartSwipe() {
         on = false;
         if (e.touches.length !== 1) return;
         if (state.chartFrom !== 'setlist') return;
+        // don't treat scrolling the control toolbar / chord strip / sliders as a song swipe
+        if (e.target.closest('.control-dock') || e.target.closest('.chord-strip') || e.target.closest('input')) return;
         var t = e.touches[0];
         if (t.clientX <= 24) return;              // leave the left edge to the drawer swipe
         sx = t.clientX; sy = t.clientY; on = true;
