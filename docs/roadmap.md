@@ -106,6 +106,30 @@ numbers, and the Filipino worship focus.
 
 ## Parked features (soon)
 
+- **Legal & disclaimers** (user, Jul 27) — a legal/disclaimer section on the
+  landing page footer AND a small disclaimer under the chord chart (e.g. chords
+  are user-submitted, fair-use for worship/practice, not official transcriptions).
+- **Reference "learn the song" links** (user, Jul 27) — per-song YouTube (and
+  other) reference links shown on the chart page (near the Spotify player). Note:
+  `song_versions.reference_url` already exists from the submission flow; surface it
+  on the chart + let users add one.
+- **Spotify — full playback + A/B repeat** (user, Jul 27) — play the WHOLE song
+  in-app and loop a section (A/B markers) so learners don't drag the scrubber.
+  ⚠️ NOT possible with the current embed iframe (no seek/loop control); needs the
+  **Spotify Web Playback SDK + Premium + OAuth**. Premium feature.
+- **Spotify link review/approval** (user, Jul 27) — adding a link works locally
+  now; to attach it to the *global* library song it should go through super-admin
+  review (like the edit-submit flow). Store proposed links on `submissions`.
+- **Spotify per-medley switching** (user, Jul 27) — when a chart medleys song A→B,
+  switch the player to B's track as you scroll in. Needs the SDK (auto-play/seek);
+  today the chart shows the host song's link only.
+- **Clean-up / de-dupe local library** (user, Jul 27) — a one-tap "remove
+  duplicates" (match title+artist) so shared-then-saved songs don't pile up.
+  Keep "Add to my songs" for songs you don't already have.
+- **Android APK + hardware back button** (user, Jul 27, HIGH — most PH musicians
+  are Android) — package via PWABuilder; ALSO make the Android/browser back button
+  navigate views within the app (history.pushState + popstate) instead of leaving.
+  Worth doing the in-app back handling even before packaging.
 - **Nashville number trainer** — a practice/learn mode for the number system.
 - **Chord detection from audio** — premium; heavy ML (audio → chords).
 - ✅ **Premium metronome redesign — DONE** (tempo dial, Italian tempo name, ring
