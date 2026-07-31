@@ -2226,6 +2226,7 @@ function toggleFav(id) {
 /* =========================================================
    VIEWS + NAV
    ========================================================= */
+var navReady = false, isPoppingBack = false, lastShownView = 'songs';
 function show(viewId) {
     stopScroll();
     stopMetro();
@@ -2240,7 +2241,46 @@ function show(viewId) {
         if (stageMode) { stageMode = false; document.body.classList.remove('stage-mode'); }  // don't stay in stage off-chart
     }
     updateScrollFab();
+    // History integration: moving forward to a new screen adds a back-stack entry
+    // so the Android/browser Back button navigates within the app (not out to the
+    // landing page). Popping back is handled in the popstate listener.
+    if (navReady && !isPoppingBack && viewId !== lastShownView) history.pushState({ app: 1 }, '');
+    lastShownView = viewId;
 }
+function activeViewId() {
+    var v = document.querySelector('.view.active');
+    return v ? v.id.replace('view-', '') : 'songs';
+}
+/* one step "back" within the app; returns false only at the root (songs) so the
+   caller can allow a real exit from there */
+function appBack() {
+    var v = activeViewId();
+    if (v === 'chart') { chartBack(); return true; }
+    if (v === 'setlist') { go('setlists'); return true; }
+    if (v === 'shared') { leaveShared(); return true; }
+    if (v === 'onboarding' || v === 'songs') return false;   // root
+    go('songs'); return true;                                // any other view → songs
+}
+var backExitArmed = 0;
+function rearmBack() { if (navReady) history.pushState({ app: 1 }, ''); }
+window.addEventListener('popstate', function() {
+    if (!navReady) return;
+    // 1) an open overlay closes first
+    if (document.getElementById('sheet-scrim').classList.contains('open')) { closeSheet(); rearmBack(); return; }
+    if (drawerOpen()) { closeDrawer(); rearmBack(); return; }
+    if (stageMode) { setStage(false); rearmBack(); return; }
+    // 2) navigate one screen back inside the app
+    isPoppingBack = true;
+    var handled = appBack();
+    isPoppingBack = false;
+    if (handled) { rearmBack(); return; }
+    // 3) at the root — require a second back within 2s to actually leave the app
+    if (Date.now() - backExitArmed < 2000) { history.back(); return; }
+    backExitArmed = Date.now();
+    toast('Press back again to exit');
+    rearmBack();
+});
+function navInit() { history.replaceState({ app: 1 }, ''); history.pushState({ app: 1 }, ''); navReady = true; }
 function updateProfileRow() {
     document.getElementById('profile-name').textContent = state.profile ? state.profile.name : 'Set up profile';
     document.getElementById('profile-instrument').textContent = state.profile ? state.profile.instrument : 'Tap to begin';
@@ -4874,6 +4914,7 @@ function init() {
     setupChartSwipe();
     setupSheetSwipe();
     blockPinchZoom();
+    navInit();     // arm in-app Back-button navigation (after the first view is shown)
 }
 init();
 </script>
