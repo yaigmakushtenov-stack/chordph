@@ -151,6 +151,8 @@
         }
         .bar .wordmark { font-size: 17px; }
         .bar-side { min-width: 64px; }
+        /* absolutely centered bar title — stays centered even when one side is wider */
+        .bar-center { position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; }
         .bar-side.right { text-align: right; }
 
         /* ---- search: a hairline, not a box ---- */
@@ -1078,7 +1080,7 @@
                 <button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
                 <button class="tap" id="shared-back" onclick="leaveShared()">&lsaquo; Setlists</button>
             </span>
-            <span></span>
+            <span class="wordmark bar-center">Shared</span>
             <span class="bar-side right"></span>
         </div>
         <div class="chart-head">
@@ -2241,10 +2243,6 @@ function show(viewId) {
         if (stageMode) { stageMode = false; document.body.classList.remove('stage-mode'); }  // don't stay in stage off-chart
     }
     updateScrollFab();
-    // History integration: moving forward to a new screen adds a back-stack entry
-    // so the Android/browser Back button navigates within the app (not out to the
-    // landing page). Popping back is handled in the popstate listener.
-    if (navReady && !isPoppingBack && viewId !== lastShownView) history.pushState({ app: 1 }, '');
     lastShownView = viewId;
 }
 function activeViewId() {
@@ -2774,12 +2772,22 @@ function clearAllNotifs() {
 async function acceptInviteFromNotif(id) { await acceptInvite(id); openNotifications(); }
 async function declineInviteFromNotif(id) { await declineInvite(id); openNotifications(); }
 function openBandSettings() { closeSheet(); openSettings(); var g = document.getElementById('setg-band'); if (g) g.classList.add('open'); }
-/* open the sign-in UI directly (from the landing page "Log in" link → /app/#signin) */
+/* focused sign-in sheet (from the landing "Log in" link → /app/#signin, or the
+   in-app "Sign in" button) — leads with Continue with Google */
 function openSignIn() {
     exitPreApp();
     if (!(state.profile && state.profile.name)) go('songs');   // land somewhere behind the sheet
-    openSettings();
-    var g = document.getElementById('setg-account'); if (g) g.classList.add('open');
+    if (currentUser) { toast('You’re already signed in as ' + (currentUser.email || 'you') + '.'); return; }
+    openSheet(
+        '<div class="sheet-title">Sign in to Chord.ph</div>' +
+        '<div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Sync your songs, setlists and bands across all your devices.</div>' +
+        googleBtnHTML() +
+        '<div class="or-divider">or use email</div>' +
+        '<input class="field" id="sh-sync-email" type="email" placeholder="you@email.com" autocomplete="email">' +
+        '<div id="sh-sync-msg" style="font-size:12px;color:var(--accent);margin:4px 0 8px;"></div>' +
+        '<button class="tap primary" onclick="submitMagicLink()">Send sign-in link</button>' +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button></div>',
+        'fit');
 }
 function notifCount() {
     var invites = (typeof myInvites !== 'undefined' ? myInvites.length : 0);
@@ -3321,7 +3329,10 @@ function promptSpotify() {
 function removeSpotify() { delete state.spotify[currentSongId]; spotifyOpen = false; save(); renderSpotifyPanel(); }
 function openSpotifyMenu(anchor) {
     var readonly = state.chartFrom === 'shared' || state.chartFrom === 'shared-set';
-    var items = [{ label: 'Hide player', icon: '▾', onClick: function() { spotifyOpen = false; renderSpotifyPanel(); } }];
+    var items = [
+        { label: 'Log in to Spotify', icon: '🎧', onClick: function() { window.open('https://open.spotify.com', '_blank', 'noopener'); } },
+        { label: 'Hide player', icon: '▾', onClick: function() { spotifyOpen = false; renderSpotifyPanel(); } }
+    ];
     if (!readonly) {
         items.push({ label: 'Change link', icon: '✎', onClick: promptSpotify });
         items.push({ label: 'Remove', icon: '🗑', danger: true, onClick: removeSpotify });
@@ -4636,7 +4647,7 @@ function openSettings() {
         '<button class="tap" onclick="document.getElementById(\'import-input\').click()">Import data</button></div>' +
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
         '<span style="font-size:13px;color:var(--muted);">' + (dupN ? dupN + ' duplicate song' + (dupN > 1 ? 's' : '') + ' found' : 'No duplicate songs') + '</span>' +
-        '<button class="tap' + (dupN ? ' primary' : '') + '"' + (dupN ? '' : ' disabled') + ' onclick="cleanDuplicates()">Clean up duplicates</button></div>';
+        '<button class="tap' + (dupN ? ' primary' : '') + '"' + (dupN ? '' : ' disabled') + ' onclick="openDedupeSheet()">Review duplicates</button></div>';
 
     // account sub-label so you can tell at a glance if you're signed in
     var acctSub = currentUser ? esc(currentUser.email || 'signed in') : 'signed out';
@@ -4705,31 +4716,53 @@ function saveSettings() {
     save(); closeSheet(); updateProfileRow();
     if (document.getElementById('view-chart').classList.contains('active')) renderChart();
 }
-/* ---- de-duplicate the local library ----
-   Saving a shared/band setlist copies its songs into your customs, which can
-   duplicate songs you already have (in the shared library or as another custom).
-   This maps every duplicate custom onto the canonical copy — a matching library
-   song if there is one, otherwise the first custom — and rewrites references. */
-function songDupKey(s) { return ((s.title || '') + '|' + (s.artist || '')).trim().toLowerCase(); }
-function duplicateRemap() {
-    var libByKey = {}, seenCustom = {}, remap = {};
-    LIBRARY.forEach(function(s) { var k = songDupKey(s); if (!libByKey[k]) libByKey[k] = s.id; });
+/* ---- de-duplicate the local library (LOCAL only — nothing in the cloud is
+   touched). Saving a shared/band setlist copies its songs into your customs,
+   which can duplicate songs you already have. Only EXACT copies are matched
+   (same title, artist AND chart) so a same-title song with a *different* version
+   is never removed. The duplicates are shown for review before anything is
+   deleted. ---- */
+function normChart(c) { return String(c || '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n+/g, '\n').trim().toLowerCase(); }
+function songDupKey(s) { return (String(s.title || '').trim().toLowerCase()) + '|' + (String(s.artist || '').trim().toLowerCase()) + '|' + normChart(s.chart); }
+function duplicateInfo() {
+    var libByKey = {}, seenCustom = {}, remap = {}, groups = {};
+    LIBRARY.forEach(function(s) { var k = songDupKey(s); if (!libByKey[k]) libByKey[k] = { id: s.id, song: s, lib: true }; });
     state.customs.forEach(function(c) {
+        if (!c.title) return;
         var k = songDupKey(c);
-        if (!k || k === '|') return;
         var canon = libByKey[k] || seenCustom[k];
-        if (canon && canon !== c.id) remap[c.id] = canon;
-        else if (!seenCustom[k]) seenCustom[k] = c.id;
+        if (canon && canon.id !== c.id) {
+            remap[c.id] = canon.id;
+            (groups[k] = groups[k] || { keep: canon, removes: [] }).removes.push(c);
+        } else if (!seenCustom[k] && !libByKey[k]) {
+            seenCustom[k] = { id: c.id, song: c, lib: false };
+        }
     });
-    return remap;
+    return { remap: remap, groups: Object.keys(groups).map(function(k) { return groups[k]; }) };
 }
-function countDuplicateSongs() { return Object.keys(duplicateRemap()).length; }
+function countDuplicateSongs() { return Object.keys(duplicateInfo().remap).length; }
+/* review sheet — show which songs will be removed before doing it */
+function openDedupeSheet() {
+    var info = duplicateInfo();
+    var n = Object.keys(info.remap).length;
+    if (!n) { toast('No duplicate songs found.'); return; }
+    var rows = info.groups.map(function(g) {
+        var s = g.keep.song;
+        return '<div style="border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px;">' +
+            '<div style="font-size:14px;"><b>' + esc(s.title) + '</b> · ' + esc(s.artist || '—') + '</div>' +
+            '<div style="font-size:12px;color:var(--muted);margin-top:3px;">Keeping ' + (g.keep.lib ? 'the shared-library copy' : 'one copy') +
+            ' · removing ' + g.removes.length + ' identical duplicate' + (g.removes.length > 1 ? 's' : '') + '</div></div>';
+    }).join('');
+    openSheet('<div class="sheet-title">Duplicate songs</div>' +
+        '<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">These are <b>exact copies</b> (same title, artist &amp; chart) — usually from saving a shared setlist. Songs that share a title but have a different version are left alone. This only cleans your <b>local</b> library — nothing shared is affected.</div>' +
+        rows +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button>' +
+        '<button class="tap primary" onclick="cleanDuplicates()">Remove ' + n + ' duplicate' + (n > 1 ? 's' : '') + '</button></div>');
+}
 function cleanDuplicates() {
-    var remap = duplicateRemap();
+    var remap = duplicateInfo().remap;
     var ids = Object.keys(remap);
     if (!ids.length) { toast('No duplicate songs found.'); return; }
-    if (!confirm('Found ' + ids.length + ' duplicate song' + (ids.length > 1 ? 's' : '') +
-        ' (matching songs you already have). Remove the extras? Your setlists will point to the copy that’s kept.')) return;
     var remove = {}; ids.forEach(function(id) { remove[id] = 1; });
     state.customs = state.customs.filter(function(c) { return !remove[c.id]; });
     state.setlists.forEach(function(sl) {
@@ -4742,9 +4775,8 @@ function cleanDuplicates() {
     });
     state.favorites = Array.from(new Set(state.favorites.map(function(id) { return remap[id] || id; })));
     ids.forEach(function(id) { delete state.transpose[id]; delete state.capo[id]; if (state.spotify) delete state.spotify[id]; });
-    save(); rerenderCurrent();
+    save(); closeSheet(); rerenderCurrent();
     toast('Removed ' + ids.length + ' duplicate' + (ids.length > 1 ? 's' : '') + '.');
-    if (document.getElementById('sheet-scrim').classList.contains('open')) openSettings();
 }
 function exportBackup() {
     var blob = new Blob([JSON.stringify({
