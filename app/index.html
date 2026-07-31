@@ -667,6 +667,21 @@
         .set-body { display: none; padding: 0 15px 15px; }
         .set-group.open .set-body { display: block; }
         .set-body .section-label:first-child { margin-top: 2px; }
+        /* notification center rows */
+        .notif-item { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left;
+            background: none; border: none; border-bottom: 1px solid var(--hairline); cursor: pointer;
+            font: inherit; color: var(--text); padding: 13px 4px; }
+        .notif-item:last-of-type { border-bottom: none; }
+        @media (hover: hover) { .notif-item:hover { background: var(--hover); } }
+        .notif-ico { font-size: 18px; line-height: 1.3; flex-shrink: 0; }
+        .notif-txt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+        .notif-title { font-size: 14px; }
+        .notif-title b { font-weight: 700; }
+        .notif-sub { font-size: 12px; color: var(--muted); }
+        .notif-go { color: var(--accent); font-size: 20px; align-self: center; }
+        .notif-item.unread { position: relative; }
+        .notif-item.unread .notif-title::after { content: ''; display: inline-block; width: 7px; height: 7px;
+            border-radius: 50%; background: var(--accent); margin-left: 7px; vertical-align: middle; }
         /* segmented pickers (theme, chord colour) */
         .seg { display: flex; flex-wrap: wrap; gap: 8px; }
         .seg-btn { display: inline-flex; align-items: center; gap: 7px; background: none; cursor: pointer;
@@ -867,6 +882,7 @@
         <button class="tap" id="nav-songs" onclick="go('songs')">Songs</button>
         <button class="tap" id="nav-favorites" onclick="go('favorites')">Favorites</button>
         <button class="tap" id="nav-setlists" onclick="go('setlists')">Setlists</button>
+        <button class="tap" id="nav-notifs" onclick="openNotifications()">Notifications <span id="notif-badge" class="review-badge" style="display:none;"></span></button>
         <hr class="drawer-hr">
         <button class="tap" id="nav-import" onclick="openImportSheet()">Import songs</button>
         <button class="tap" id="nav-submit" onclick="pendingSubmitPrefill=null; openSubmitSheet()">Submit a chart</button>
@@ -1995,15 +2011,17 @@ async function rejectSubmission(id) {
 
 /* ---- submitter's side: my submissions + update notifications ---- */
 var mysubsSeen = parseInt(localStorage.getItem('chordph2_subseen') || '0', 10);
+var mysubsUnseen = 0;
 function refreshMySubsBadge() {
     if (!supa || !currentUser) return;
     supa.from('submissions').select('reviewed_at').eq('submitter_id', currentUser.id).not('reviewed_at', 'is', null)
         .then(function(res) {
             if (res.error) return;
             var n = (res.data || []).filter(function(r) { return new Date(r.reviewed_at).getTime() > mysubsSeen; }).length;
+            mysubsUnseen = n;
             var b = document.getElementById('mysubs-badge');
-            if (!b) return;
-            b.textContent = n; b.style.display = n ? 'inline-block' : 'none';
+            if (b) { b.textContent = n; b.style.display = n ? 'inline-block' : 'none'; }
+            updateNotifBadge();
         });
 }
 function renderMySubs() {
@@ -2641,9 +2659,71 @@ function refreshBandUI() {
 }
 /* red dot on the gear + hamburger when something needs the user's action —
    right now that's a pending band invite */
+var notifSeen = parseInt(localStorage.getItem('chordph2_notifseen') || '0', 10);
+/* everything worth telling the user about, newest first — built from data
+   already in memory (no new backend): band invites, band setlists, and reviewed
+   submissions. */
+function buildNotifications() {
+    var items = [];
+    (typeof myInvites !== 'undefined' ? myInvites : []).forEach(function(iv) {
+        items.push({ key: 'inv-' + iv.team_id, icon: '👥', ts: Date.now(), unread: true, actionable: true,
+            title: (iv.by ? esc(iv.by) + ' invited you to ' : 'You’re invited to ') + '<b>' + esc(iv.name) + '</b>',
+            sub: 'Tap to accept or decline',
+            onClick: 'closeSheet();openSettings();toggleSettingsGroup(\'band\')' });
+    });
+    (typeof teamSetlists !== 'undefined' ? teamSetlists : []).forEach(function(ts) {
+        var when = ts.updated_at ? new Date(ts.updated_at).getTime() : 0;
+        var band = (myTeams.filter(function(t) { return t.id === ts.team_id; })[0] || {}).name || 'your band';
+        var n = (ts.data && ts.data.songs || []).length;
+        items.push({ key: 'ts-' + ts.id, icon: '🎵', ts: when, unread: when > notifSeen, actionable: false,
+            title: '<b>' + esc(ts.name) + '</b> shared in ' + esc(band),
+            sub: n + ' song' + (n !== 1 ? 's' : '') + ' · ' + timeAgo(when),
+            onClick: 'closeSheet();go(\'setlists\')' });
+    });
+    if (mysubsUnseen > 0) {
+        items.push({ key: 'subs', icon: '📝', ts: Date.now(), unread: true, actionable: false,
+            title: mysubsUnseen + ' submission update' + (mysubsUnseen > 1 ? 's' : ''),
+            sub: 'A chart you submitted was reviewed', onClick: 'closeSheet();go(\'mysubs\')' });
+    }
+    return items.sort(function(a, b) { return b.ts - a.ts; });
+}
+function notifCount() {
+    var invites = (typeof myInvites !== 'undefined' ? myInvites.length : 0);
+    var newSets = (typeof teamSetlists !== 'undefined' ? teamSetlists : [])
+        .filter(function(ts) { return ts.updated_at && new Date(ts.updated_at).getTime() > notifSeen; }).length;
+    return invites + newSets + (mysubsUnseen || 0);
+}
 function updateNotifBadge() {
-    var pending = (typeof myInvites !== 'undefined' && myInvites) ? myInvites.length : 0;
-    document.body.classList.toggle('has-notif', pending > 0);
+    var n = notifCount();
+    document.body.classList.toggle('has-notif', n > 0);
+    var b = document.getElementById('notif-badge');
+    if (b) { b.textContent = n; b.style.display = n ? 'inline-block' : 'none'; }
+}
+function timeAgo(ts) {
+    if (!ts) return '';
+    var s = Math.max(0, (Date.now() - ts) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+}
+function openNotifications() {
+    closeDrawer();
+    var items = buildNotifications();
+    var body = items.length
+        ? items.map(function(it) {
+            return '<button class="notif-item' + (it.unread ? ' unread' : '') + '" onclick="' + it.onClick + '">' +
+                '<span class="notif-ico">' + it.icon + '</span>' +
+                '<span class="notif-txt"><span class="notif-title">' + it.title + '</span>' +
+                '<span class="notif-sub">' + esc(it.sub) + '</span></span>' +
+                (it.actionable ? '<span class="notif-go">›</span>' : '') + '</button>';
+        }).join('')
+        : '<div class="empty" style="padding:24px 0;">You’re all caught up. 🎉<br><span style="font-size:12px;color:var(--faint);">Band invites, shared setlists and review updates show here.</span></div>';
+    openSheet('<div class="sheet-title">Notifications</div>' + body +
+        '<div class="sheet-actions"><button class="tap primary" onclick="closeSheet()">Done</button></div>');
+    // opening = seen (invites stay flagged until actioned, so recompute)
+    notifSeen = Date.now(); localStorage.setItem('chordph2_notifseen', String(notifSeen));
+    updateNotifBadge();
 }
 function renderBandSection() {
     if (!currentUser) return '<div style="font-size:13px;color:var(--muted);">Sign in first to create or join a band.</div>';
