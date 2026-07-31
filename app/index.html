@@ -4629,10 +4629,14 @@ function openSettings() {
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
         '<span style="font-size:14px;">Labels under the chart icons</span>' +
         '<button class="tap" id="toggle-labels" onclick="toggleControlLabels()">' + (state.iconLabels ? 'Shown' : 'Hidden') + '</button></div>';
+    var dupN = countDuplicateSongs();
     var backupBody =
-        '<div style="display:flex;gap:24px;">' +
+        '<div style="display:flex;gap:24px;margin-bottom:12px;">' +
         '<button class="tap" onclick="exportBackup()">Export data</button>' +
-        '<button class="tap" onclick="document.getElementById(\'import-input\').click()">Import data</button></div>';
+        '<button class="tap" onclick="document.getElementById(\'import-input\').click()">Import data</button></div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
+        '<span style="font-size:13px;color:var(--muted);">' + (dupN ? dupN + ' duplicate song' + (dupN > 1 ? 's' : '') + ' found' : 'No duplicate songs') + '</span>' +
+        '<button class="tap' + (dupN ? ' primary' : '') + '"' + (dupN ? '' : ' disabled') + ' onclick="cleanDuplicates()">Clean up duplicates</button></div>';
 
     // account sub-label so you can tell at a glance if you're signed in
     var acctSub = currentUser ? esc(currentUser.email || 'signed in') : 'signed out';
@@ -4700,6 +4704,47 @@ function saveSettings() {
     state.profile = { name: name, instrument: window.__pickedInstrument };
     save(); closeSheet(); updateProfileRow();
     if (document.getElementById('view-chart').classList.contains('active')) renderChart();
+}
+/* ---- de-duplicate the local library ----
+   Saving a shared/band setlist copies its songs into your customs, which can
+   duplicate songs you already have (in the shared library or as another custom).
+   This maps every duplicate custom onto the canonical copy — a matching library
+   song if there is one, otherwise the first custom — and rewrites references. */
+function songDupKey(s) { return ((s.title || '') + '|' + (s.artist || '')).trim().toLowerCase(); }
+function duplicateRemap() {
+    var libByKey = {}, seenCustom = {}, remap = {};
+    LIBRARY.forEach(function(s) { var k = songDupKey(s); if (!libByKey[k]) libByKey[k] = s.id; });
+    state.customs.forEach(function(c) {
+        var k = songDupKey(c);
+        if (!k || k === '|') return;
+        var canon = libByKey[k] || seenCustom[k];
+        if (canon && canon !== c.id) remap[c.id] = canon;
+        else if (!seenCustom[k]) seenCustom[k] = c.id;
+    });
+    return remap;
+}
+function countDuplicateSongs() { return Object.keys(duplicateRemap()).length; }
+function cleanDuplicates() {
+    var remap = duplicateRemap();
+    var ids = Object.keys(remap);
+    if (!ids.length) { toast('No duplicate songs found.'); return; }
+    if (!confirm('Found ' + ids.length + ' duplicate song' + (ids.length > 1 ? 's' : '') +
+        ' (matching songs you already have). Remove the extras? Your setlists will point to the copy that’s kept.')) return;
+    var remove = {}; ids.forEach(function(id) { remove[id] = 1; });
+    state.customs = state.customs.filter(function(c) { return !remove[c.id]; });
+    state.setlists.forEach(function(sl) {
+        var seen = {};
+        sl.songIds = sl.songIds.map(function(id) { return remap[id] || id; }).filter(function(id) {
+            if (seen[id]) return false; seen[id] = 1; return true;   // drop a now-duplicated entry in the same setlist
+        });
+        if (sl.transposes) Object.keys(sl.transposes).forEach(function(id) { if (remap[id]) { if (!(remap[id] in sl.transposes)) sl.transposes[remap[id]] = sl.transposes[id]; delete sl.transposes[id]; } });
+        if (sl.medleys) Object.keys(sl.medleys).forEach(function(id) { if (remap[id]) { sl.medleys[remap[id]] = sl.medleys[id]; delete sl.medleys[id]; } });
+    });
+    state.favorites = Array.from(new Set(state.favorites.map(function(id) { return remap[id] || id; })));
+    ids.forEach(function(id) { delete state.transpose[id]; delete state.capo[id]; if (state.spotify) delete state.spotify[id]; });
+    save(); rerenderCurrent();
+    toast('Removed ' + ids.length + ' duplicate' + (ids.length > 1 ? 's' : '') + '.');
+    if (document.getElementById('sheet-scrim').classList.contains('open')) openSettings();
 }
 function exportBackup() {
     var blob = new Blob([JSON.stringify({
