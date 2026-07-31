@@ -355,8 +355,13 @@
         .listen-btn.ghost { color: var(--muted); }
         @media (hover: hover) { .listen-btn:hover { border-color: #1DB954; color: #1DB954; } }
         .listen-btn .sp { color: #1DB954; font-size: 15px; }
+        .spotify-embed-wrap { position: relative; }
         .spotify-panel iframe { display: block; width: 100%; border: 0; border-radius: 12px; }
-        .spotify-row { display: flex; gap: 18px; margin-top: 8px; }
+        .spotify-kebab { position: absolute; top: 6px; right: 6px; z-index: 2;
+            background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+            border-radius: 8px; width: 28px; height: 28px; cursor: pointer; font-size: 16px; line-height: 1;
+            display: flex; align-items: center; justify-content: center; opacity: .85; }
+        @media (hover: hover) { .spotify-kebab:hover { opacity: 1; color: var(--text); } }
         .metro-stage { display:flex; flex-direction:column; align-items:center; gap:22px; padding:14px 0 40px; max-width:440px; margin:0 auto; }
         /* the tempo dial — tap it (or Start) to run */
         .metro-dial { position:relative; width:238px; height:238px; border-radius:50%; cursor:pointer;
@@ -662,6 +667,8 @@
         .set-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
             padding: 14px 15px; background: none; border: none; color: var(--text); font: inherit; font-size: 15px; font-weight: 650; cursor: pointer; text-align: left; }
         .set-head .set-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+        .set-badge { display: inline-block; min-width: 18px; text-align: center; font-size: 11px; font-weight: 700;
+            color: #fff; background: var(--danger); border-radius: 999px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
         .set-head .chev { color: var(--muted); transition: transform .18s; font-size: 20px; line-height: 1; }
         .set-group.open .set-head .chev { transform: rotate(90deg); }
         .set-body { display: none; padding: 0 15px 15px; }
@@ -669,17 +676,19 @@
         .set-body .section-label:first-child { margin-top: 2px; }
         /* notification center rows */
         .notif-item { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left;
-            background: none; border: none; border-bottom: 1px solid var(--hairline); cursor: pointer;
-            font: inherit; color: var(--text); padding: 13px 4px; }
+            border-bottom: 1px solid var(--hairline); color: var(--text); padding: 13px 4px; }
         .notif-item:last-of-type { border-bottom: none; }
-        @media (hover: hover) { .notif-item:hover { background: var(--hover); } }
         .notif-ico { font-size: 18px; line-height: 1.3; flex-shrink: 0; }
-        .notif-txt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+        .notif-txt { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+        .notif-txt[onclick] { cursor: pointer; }
         .notif-title { font-size: 14px; }
         .notif-title b { font-weight: 700; }
         .notif-sub { font-size: 12px; color: var(--muted); }
-        .notif-go { color: var(--accent); font-size: 20px; align-self: center; }
-        .notif-item.unread { position: relative; }
+        .notif-actions { display: flex; gap: 16px; margin-top: 6px; }
+        .notif-actions .tap { padding: 4px 2px; font-size: 13px; }
+        .notif-x { background: none; border: none; cursor: pointer; color: var(--faint); font-size: 20px;
+            line-height: 1; padding: 2px 4px; flex-shrink: 0; }
+        @media (hover: hover) { .notif-x:hover { color: var(--danger); } }
         .notif-item.unread .notif-title::after { content: ''; display: inline-block; width: 7px; height: 7px;
             border-radius: 50%; background: var(--accent); margin-left: 7px; vertical-align: middle; }
         /* segmented pickers (theme, chord colour) */
@@ -1065,7 +1074,10 @@
 <div class="view" id="view-shared">
     <div class="wrap">
         <div class="bar">
-            <span class="bar-side"><button class="tap" onclick="leaveShared()">&lsaquo; Chord.ph</button></span>
+            <span class="bar-side" style="display:flex;gap:6px;">
+                <button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
+                <button class="tap" id="shared-back" onclick="leaveShared()">&lsaquo; Setlists</button>
+            </span>
             <span class="wordmark">Shared</span>
             <span class="bar-side right"></span>
         </div>
@@ -2645,7 +2657,7 @@ async function refreshTeams() {
         });
         myTeams = teams;   // publish the fully-built roster atomically
         await loadMyInvites();
-        var s = await supa.from('team_setlists').select('id,team_id,name,data,updated_at').order('updated_at', { ascending: false });
+        var s = await supa.from('team_setlists').select('id,team_id,name,data,updated_at,updated_by').order('updated_at', { ascending: false });
         teamSetlists = s.data || [];
         teamsReady = true;
         refreshBandUI();
@@ -2660,37 +2672,74 @@ function refreshBandUI() {
 /* red dot on the gear + hamburger when something needs the user's action —
    right now that's a pending band invite */
 var notifSeen = parseInt(localStorage.getItem('chordph2_notifseen') || '0', 10);
+var notifDismissed = {};
+try { notifDismissed = JSON.parse(localStorage.getItem('chordph2_notifdismiss') || '{}'); } catch (e) {}
 /* everything worth telling the user about, newest first — built from data
    already in memory (no new backend): band invites, band setlists, and reviewed
    submissions. */
 function buildNotifications() {
     var items = [];
     (typeof myInvites !== 'undefined' ? myInvites : []).forEach(function(iv) {
-        items.push({ key: 'inv-' + iv.team_id, icon: '👥', ts: Date.now(), unread: true, actionable: true,
+        items.push({ key: 'inv-' + iv.team_id, icon: '👥', ts: Date.now(), unread: true, type: 'invite', teamId: iv.team_id,
             title: (iv.by ? esc(iv.by) + ' invited you to ' : 'You’re invited to ') + '<b>' + esc(iv.name) + '</b>',
-            sub: 'Tap to accept or decline',
-            onClick: 'closeSheet();openSettings();toggleSettingsGroup(\'band\')' });
+            sub: 'Accept or decline below' });
     });
     (typeof teamSetlists !== 'undefined' ? teamSetlists : []).forEach(function(ts) {
+        if (currentUser && ts.updated_by === currentUser.id) return;   // don't notify me about what I published
+        if (notifDismissed['ts-' + ts.id]) return;
         var when = ts.updated_at ? new Date(ts.updated_at).getTime() : 0;
         var band = (myTeams.filter(function(t) { return t.id === ts.team_id; })[0] || {}).name || 'your band';
         var n = (ts.data && ts.data.songs || []).length;
-        items.push({ key: 'ts-' + ts.id, icon: '🎵', ts: when, unread: when > notifSeen, actionable: false,
+        items.push({ key: 'ts-' + ts.id, icon: '🎵', ts: when, unread: when > notifSeen, type: 'setlist', tsId: ts.id, dismissable: true,
             title: '<b>' + esc(ts.name) + '</b> shared in ' + esc(band),
             sub: n + ' song' + (n !== 1 ? 's' : '') + ' · ' + timeAgo(when),
-            onClick: 'closeSheet();go(\'setlists\')' });
+            onClick: 'openTeamSetlistById(\'' + ts.id + '\')' });
     });
-    if (mysubsUnseen > 0) {
-        items.push({ key: 'subs', icon: '📝', ts: Date.now(), unread: true, actionable: false,
+    if (mysubsUnseen > 0 && !notifDismissed['subs']) {
+        items.push({ key: 'subs', icon: '📝', ts: Date.now(), unread: true, type: 'subs', dismissable: true,
             title: mysubsUnseen + ' submission update' + (mysubsUnseen > 1 ? 's' : ''),
             sub: 'A chart you submitted was reviewed', onClick: 'closeSheet();go(\'mysubs\')' });
     }
     return items.sort(function(a, b) { return b.ts - a.ts; });
 }
+function openTeamSetlistById(id) {
+    var ts = (teamSetlists || []).filter(function(t) { return t.id === id; })[0];
+    closeSheet(); if (ts) openTeamSetlist(ts); else go('setlists');
+}
+function saveTeamSetlistById(id) {
+    var ts = (teamSetlists || []).filter(function(t) { return t.id === id; })[0];
+    if (!ts) return;
+    var ids = ((ts.data && ts.data.songs) || []).map(function(snap) {
+        var cid = 'c' + Date.now() + Math.floor(Math.random() * 100000);
+        state.customs.push({ id: cid, title: snap.title, artist: snap.artist, key: snap.key, tempo: snap.tempo || 0,
+                             feel: snap.feel || '', tags: snap.tags || [], chart: snap.chart, custom: true });
+        return cid;
+    });
+    state.setlists.push({ id: 's' + Date.now(), name: ts.name, songIds: ids });
+    save();
+    toast('Saved “' + ts.name + '” — available offline now.');
+    dismissNotif('ts-' + id);
+}
+function dismissNotif(key) {
+    notifDismissed[key] = 1;
+    localStorage.setItem('chordph2_notifdismiss', JSON.stringify(notifDismissed));
+    updateNotifBadge();
+    if (document.getElementById('sheet-scrim').classList.contains('open')) openNotifications();
+}
+function clearAllNotifs() {
+    buildNotifications().forEach(function(it) { if (it.dismissable) notifDismissed[it.key] = 1; });
+    localStorage.setItem('chordph2_notifdismiss', JSON.stringify(notifDismissed));
+    updateNotifBadge(); openNotifications();
+}
+async function acceptInviteFromNotif(id) { await acceptInvite(id); openNotifications(); }
+async function declineInviteFromNotif(id) { await declineInvite(id); openNotifications(); }
+function openBandSettings() { closeSheet(); openSettings(); var g = document.getElementById('setg-band'); if (g) g.classList.add('open'); }
 function notifCount() {
     var invites = (typeof myInvites !== 'undefined' ? myInvites.length : 0);
-    var newSets = (typeof teamSetlists !== 'undefined' ? teamSetlists : [])
-        .filter(function(ts) { return ts.updated_at && new Date(ts.updated_at).getTime() > notifSeen; }).length;
+    var newSets = (typeof teamSetlists !== 'undefined' ? teamSetlists : []).filter(function(ts) {
+        return ts.updated_at && new Date(ts.updated_at).getTime() > notifSeen &&
+            !(currentUser && ts.updated_by === currentUser.id) && !notifDismissed['ts-' + ts.id];
+    }).length;
     return invites + newSets + (mysubsUnseen || 0);
 }
 function updateNotifBadge() {
@@ -2710,17 +2759,31 @@ function timeAgo(ts) {
 function openNotifications() {
     closeDrawer();
     var items = buildNotifications();
+    var anyDismissable = items.some(function(it) { return it.dismissable; });
     var body = items.length
         ? items.map(function(it) {
-            return '<button class="notif-item' + (it.unread ? ' unread' : '') + '" onclick="' + it.onClick + '">' +
+            var tap = it.onClick ? ' onclick="' + it.onClick + '"' : '';
+            var actions = '';
+            if (it.type === 'invite') {
+                actions = '<span class="notif-actions">' +
+                    '<button class="tap primary" onclick="acceptInviteFromNotif(\'' + it.teamId + '\')">Accept</button>' +
+                    '<button class="tap" onclick="declineInviteFromNotif(\'' + it.teamId + '\')">Decline</button></span>';
+            } else if (it.type === 'setlist') {
+                actions = '<span class="notif-actions">' +
+                    '<button class="tap" onclick="openTeamSetlistById(\'' + it.tsId + '\')">Open</button>' +
+                    '<button class="tap primary" onclick="saveTeamSetlistById(\'' + it.tsId + '\')">Save offline</button></span>';
+            }
+            var x = it.dismissable ? '<button class="notif-x" aria-label="Dismiss" onclick="dismissNotif(\'' + it.key + '\')">&times;</button>' : '';
+            return '<div class="notif-item' + (it.unread ? ' unread' : '') + '">' +
                 '<span class="notif-ico">' + it.icon + '</span>' +
-                '<span class="notif-txt"><span class="notif-title">' + it.title + '</span>' +
-                '<span class="notif-sub">' + esc(it.sub) + '</span></span>' +
-                (it.actionable ? '<span class="notif-go">›</span>' : '') + '</button>';
+                '<span class="notif-txt"' + tap + '><span class="notif-title">' + it.title + '</span>' +
+                '<span class="notif-sub">' + esc(it.sub) + '</span>' + actions + '</span>' + x + '</div>';
         }).join('')
         : '<div class="empty" style="padding:24px 0;">You’re all caught up. 🎉<br><span style="font-size:12px;color:var(--faint);">Band invites, shared setlists and review updates show here.</span></div>';
     openSheet('<div class="sheet-title">Notifications</div>' + body +
-        '<div class="sheet-actions"><button class="tap primary" onclick="closeSheet()">Done</button></div>');
+        '<div class="sheet-actions">' +
+        (anyDismissable ? '<button class="tap" onclick="clearAllNotifs()">Clear read</button>' : '') +
+        '<button class="tap primary" onclick="closeSheet()">Done</button></div>');
     // opening = seen (invites stay flagged until actioned, so recompute)
     notifSeen = Date.now(); localStorage.setItem('chordph2_notifseen', String(notifSeen));
     updateNotifBadge();
@@ -2871,7 +2934,7 @@ async function publishSetlistToTeam(setlistId, teamId) {
     else { toast('Shared “' + sl.name + '” with the band.'); refreshTeams(); }
 }
 function openTeamSetlist(ts) {
-    openSharedSetlist({ name: ts.name, songs: (ts.data && ts.data.songs) || [] });
+    openSharedSetlist({ name: ts.name, songs: (ts.data && ts.data.songs) || [] }, 'band');
 }
 
 /* =========================================================
@@ -2978,14 +3041,18 @@ function openSharedSong(snap) {
     sharedSetlist = null;
     openChart(registerSharedSong(snap), 'shared');
 }
-function openSharedSetlist(p) {
+var sharedFrom = 'link';   // 'band' (came from Setlists) or 'link' (a share URL)
+function openSharedSetlist(p, from) {
     exitPreApp();
+    sharedFrom = from || 'link';
     sharedSetlist = { name: p.name || 'Shared setlist', ids: p.songs.map(function (snap, i) { return registerSharedSong(snap, i); }) };
     renderSharedSetlist();
     show('shared');
 }
 function renderSharedSetlist() {
     if (!sharedSetlist) { go('songs'); return; }
+    var back = document.getElementById('shared-back');
+    if (back) back.innerHTML = sharedFrom === 'band' ? '&lsaquo; Setlists' : '&lsaquo; Chord.ph';
     document.getElementById('shared-name').textContent = sharedSetlist.name;
     document.getElementById('shared-count').textContent =
         sharedSetlist.ids.length + ' song' + (sharedSetlist.ids.length !== 1 ? 's' : '') + ' · tap a song to play through — swipe to change songs';
@@ -2996,7 +3063,11 @@ function renderSharedSetlist() {
         box.appendChild(songRow(s, { onOpen: function () { state.setlistPos = pos; openChart(sid, 'shared-set'); } }));
     });
 }
-function leaveShared() { location.hash = ''; sharedSetlist = null; go('songs'); }
+function leaveShared() {
+    var toSetlists = sharedFrom === 'band';
+    location.hash = ''; sharedSetlist = null;
+    go(toSetlists ? 'setlists' : 'songs');
+}
 function cloneSharedToCustom(id) {
     var s = sharedSongs[id]; if (!s) return null;
     var cid = 'c' + Date.now() + Math.floor(Math.random() * 1000);
@@ -3182,9 +3253,8 @@ function renderSpotifyPanel() {
     var url = state.spotify[currentSongId];
     var valid = url && parseSpotify(url);
     if (valid && spotifyOpen) {
-        box.innerHTML = '<div class="spotify-panel">' + spotifyEmbed(url) +
-            '<div class="spotify-row"><button class="tap" onclick="spotifyOpen=false;renderSpotifyPanel()">Hide</button>' +
-            (readonly ? '' : '<button class="tap" onclick="promptSpotify()">Change link</button><button class="tap danger" onclick="removeSpotify()">Remove</button>') +
+        box.innerHTML = '<div class="spotify-panel"><div class="spotify-embed-wrap">' + spotifyEmbed(url) +
+            '<button class="spotify-kebab" onclick="openSpotifyMenu(this)" aria-label="Player options">&#8943;</button>' +
             '</div></div>';
     } else if (valid) {
         box.innerHTML = '<button class="listen-btn" onclick="spotifyOpen=true;renderSpotifyPanel()"><span class="sp">&#9654;</span> Listen on Spotify</button>';
@@ -3202,6 +3272,15 @@ function promptSpotify() {
     save(); renderSpotifyPanel();
 }
 function removeSpotify() { delete state.spotify[currentSongId]; spotifyOpen = false; save(); renderSpotifyPanel(); }
+function openSpotifyMenu(anchor) {
+    var readonly = state.chartFrom === 'shared' || state.chartFrom === 'shared-set';
+    var items = [{ label: 'Hide player', icon: '▾', onClick: function() { spotifyOpen = false; renderSpotifyPanel(); } }];
+    if (!readonly) {
+        items.push({ label: 'Change link', icon: '✎', onClick: promptSpotify });
+        items.push({ label: 'Remove', icon: '🗑', danger: true, onClick: removeSpotify });
+    }
+    openMenu(items, anchor);
+}
 function renderChordStrip(strip, chartText) {
     var names = uniqueChords(chartText);
     var html = names.map(function(n) {
@@ -4518,7 +4597,7 @@ function openSettings() {
         setGroup('profile', 'Profile', esc(p.instrument || ''), profileBody, true) +
         setGroup('appearance', 'Appearance', '', appearanceBody, false) +
         (syncEnabled() ? setGroup('account', 'Account & sync', acctSub, '<div id="sync-status">' + renderSyncSection() + '</div>', false) : '') +
-        (syncEnabled() && currentUser ? setGroup('band', 'Band', bandSub, '<div id="band-status">' + renderBandSection() + '</div>', !!inviteCount) : '') +
+        (syncEnabled() && currentUser ? setGroup('band', 'Band' + (inviteCount ? ' <span class="set-badge">' + inviteCount + '</span>' : ''), inviteCount ? 'action needed' : bandSub, '<div id="band-status">' + renderBandSection() + '</div>', !!inviteCount) : '') +
         setGroup('backup', 'Backup', '', backupBody, false) +
         '<div class="sheet-actions">' +
         '<button class="tap" onclick="closeSheet()">Cancel</button>' +
