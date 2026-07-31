@@ -93,14 +93,43 @@ numbers, and the Filipino worship focus.
 
 ---
 
-## Monetisation
+## Monetisation — three tiers (decided Jul 27)
 
-- Paid tier anchored on **ambient pads** (above).
-- Other paid ideas: batch analysis + CSV export, ID3 tag writing, energy
-  rating, harmonic set planner.
-- **Chord & lyric detection from audio** — heavy ML, future paid feature.
-- Requires payment infrastructure (Stripe) and the NC-licence isolation noted
-  above.
+Prices are placeholders (localised PH pricing TBD). Payment infra (Stripe /
+local gateway) still to build.
+
+### FREE — "Musician" (solo essentials — generous on purpose)
+Library + search + tags; transpose, capo shapes, Nashville numbers, chord
+diagrams; personal setlists + medleys; autoscroll + floating button; premium
+metronome; stage mode; light/dark/colour-blind themes + font sizes; offline PWA;
+**personal** cloud sync (your own devices); submit charts + voting; **Key & BPM
+Analyzer** (MUST stay free — CC BY-NC-SA models can't be paywalled); Spotify link
+(preview); share links; notifications.
+
+### PRO — "Worship Team" (~₱99–149/mo or annual) — the band + practice tier
+Everything in Free, plus: **band/team sync** (live setlists, shared band song
+library, member editing, multi-band switcher); **ambient pads** + percussion
+beds; **audio practice player** — import your own MP3 + **A/B repeat** + speed
+control (see Spotify note); keep-awake; band roles. This is the paid-team-sync
+anchor; one Supabase Pro ($25/mo) comfortably covers many teams.
+
+### PREMIUM — "Studio / Pro" (~₱249–349/mo) — heavy AI + audio
+Everything in Pro, plus: **chord & lyric detection from audio** (needs
+commercially-licensed models — NOT the NC analyzer); **Spotify full playback +
+control** (Web Playback SDK, needs Spotify Premium + OAuth); batch analysis + CSV
+export; ID3 tag writing; energy rating; harmonic set planner.
+
+**Constraints:** analyzer + its models stay FREE (non-commercial licence);
+Premium chord-detection needs a *different*, commercially-licensed model.
+
+### Spotify vs MP3 practice player (decided Jul 27)
+The Spotify embed can't do full playback or A/B repeat on mobile (no seek/loop
+control, can't use the app's Premium session). The clean answer is the user's
+idea: an **`<audio>` player that plays the user's own MP3** (local import or a
+URL) with **A/B loop markers + speed control** — full control, no licensing/SDK
+needed (user supplies audio they own; we never host/distribute it). Ship this as
+the real "learn a section" tool (Pro). Keep Spotify link as a convenience only;
+its full-playback/SDK path stays a later Premium extra.
 
 ---
 

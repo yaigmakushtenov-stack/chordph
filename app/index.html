@@ -1727,6 +1727,7 @@ async function signOut() {
     isAdminUser = false;
     myTeams = []; teamSetlists = []; teamsReady = false;
     myInvites = []; mysubsUnseen = 0;                 // clear this account's notifications
+    unsubscribeBandRealtime();
     updateNotifBadge();
     updateAuthUI();
     if (document.getElementById('view-setlists').classList.contains('active')) renderSetlists();
@@ -2640,6 +2641,34 @@ function ownedTeams() { return myTeams.filter(function(t) { return t.isOwner; })
 function initTeams() {
     if (!supa || !currentUser) { myTeams = []; teamSetlists = []; teamsReady = false; myInvites = []; updateNotifBadge(); return; }
     refreshTeams();   // v2: no more auto-join — invites are accepted/declined in Settings → Band
+    subscribeBandRealtime();
+}
+/* ---- live band sync: get published setlists + invites the moment they change,
+   without waiting for a refresh. Needs supabase/realtime.sql. RLS still applies,
+   so you only receive rows you're allowed to see. ---- */
+var bandChannel = null, bandRtDebounce = null;
+function subscribeBandRealtime() {
+    if (!supa || !currentUser || bandChannel) return;
+    try {
+        bandChannel = supa.channel('band-live-' + currentUser.id)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_setlists' }, function(p) {
+                var by = p['new'] && p['new'].updated_by;
+                if (by && by !== currentUser.id) {
+                    var nm = p['new'] && p['new'].name;
+                    toast(nm ? ('“' + nm + '” updated in your band') : 'A band setlist was updated');
+                }
+                scheduleBandRefresh();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_invites' }, function() { scheduleBandRefresh(); })
+            .subscribe();
+    } catch (e) { /* realtime not enabled / offline — silent, refresh-on-focus still works */ }
+}
+function scheduleBandRefresh() {   // coalesce bursts of changes into one refresh
+    clearTimeout(bandRtDebounce);
+    bandRtDebounce = setTimeout(function() { if (supa && currentUser) refreshTeams(); }, 400);
+}
+function unsubscribeBandRealtime() {
+    if (bandChannel && supa) { try { supa.removeChannel(bandChannel); } catch (e) {} bandChannel = null; }
 }
 /* pick up new band invites (and their notification dot) without a manual reload:
    refresh when the app returns to the foreground, and on a light 60s timer */
