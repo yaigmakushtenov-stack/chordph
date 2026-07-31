@@ -1078,7 +1078,7 @@
                 <button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button>
                 <button class="tap" id="shared-back" onclick="leaveShared()">&lsaquo; Setlists</button>
             </span>
-            <span class="wordmark">Shared</span>
+            <span></span>
             <span class="bar-side right"></span>
         </div>
         <div class="chart-head">
@@ -2734,6 +2734,13 @@ function clearAllNotifs() {
 async function acceptInviteFromNotif(id) { await acceptInvite(id); openNotifications(); }
 async function declineInviteFromNotif(id) { await declineInvite(id); openNotifications(); }
 function openBandSettings() { closeSheet(); openSettings(); var g = document.getElementById('setg-band'); if (g) g.classList.add('open'); }
+/* open the sign-in UI directly (from the landing page "Log in" link → /app/#signin) */
+function openSignIn() {
+    exitPreApp();
+    if (!(state.profile && state.profile.name)) go('songs');   // land somewhere behind the sheet
+    openSettings();
+    var g = document.getElementById('setg-account'); if (g) g.classList.add('open');
+}
 function notifCount() {
     var invites = (typeof myInvites !== 'undefined' ? myInvites.length : 0);
     var newSets = (typeof teamSetlists !== 'undefined' ? teamSetlists : []).filter(function(ts) {
@@ -4860,6 +4867,7 @@ function init() {
     else renderOnboarding();
     applyIconLabels();
     applyTheme();
+    if (location.hash === '#signin') { history.replaceState(null, '', location.pathname); openSignIn(); }
     fetchLibrary();     // shared cloud library — cache already painted, refresh in background
     initSync();
     setupEdgeSwipe();

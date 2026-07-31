@@ -109,6 +109,8 @@ numbers, and the Filipino worship focus.
 - **Legal & disclaimers** (user, Jul 27) — a legal/disclaimer section on the
   landing page footer AND a small disclaimer under the chord chart (e.g. chords
   are user-submitted, fair-use for worship/practice, not official transcriptions).
+- **Social media links** (user, Jul 27, soon) — social icons/links (FB, IG, etc.)
+  on the landing page (footer) and possibly in-app.
 - **Reference "learn the song" links** (user, Jul 27) — per-song YouTube (and
   other) reference links shown on the chart page (near the Spotify player). Note:
   `song_versions.reference_url` already exists from the submission flow; surface it
