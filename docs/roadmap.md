@@ -31,8 +31,10 @@ on the add/submit forms, and showing it on the chart. Makes the drummer's Click
 correct for 3/4 and 6/8 songs.
 
 ### 3. Stage / performance mode
-Big text, minimal chrome, and ideally **band-follows-leader** sync across
-devices. A key OnSong differentiator.
+- ✅ **DONE** — a Stage button on the chart hides all chrome and scales the text
+  up ~1.6x; floating exit; keeps screen awake; swipe still changes songs.
+- ⏳ Still to do: **band-follows-leader** sync across devices (ties into live band
+  sync). A key OnSong differentiator.
 
 ### 4. Team / band sync
 - ✅ **v1 + v2 DONE & live** — owner creates a band, invites by email (accept/
@@ -106,20 +108,21 @@ numbers, and the Filipino worship focus.
 
 - **Nashville number trainer** — a practice/learn mode for the number system.
 - **Chord detection from audio** — premium; heavy ML (audio → chords).
-- **Premium metronome redesign** — the standalone Metronome view looks generic;
-  make it feel premium (big animated beat/pendulum, nicer BPM dial, polished
-  time-sig chips, tactile Start/Stop). Engine already works — this is visual.
-- **Notification center** — full in-app list ("your chart was edited", "band
-  setlist updated", invite accepted) + optional email (needs SMTP). The red
-  gear/hamburger dot for pending band invites is the first piece, already live.
+- ✅ **Premium metronome redesign — DONE** (tempo dial, Italian tempo name, ring
+  pulse per beat, beat pips that follow the time signature, gradient Start/Stop).
+- ✅ **Notification center — DONE** (drawer item + badge; list of pending invites,
+  shared band setlists, reviewed submissions; red gear/hamburger dot). ⏳ optional
+  EMAIL notifications still need custom SMTP (Resend).
 - ✅ **Edit song from the setlist view** — DONE. Personal local override
   (`state.overrides`), "Reset to original", and "Submit to library" (prefills the
   Submit sheet, linked by `song_id`, for review — no duplicate custom).
-- **Connect to Spotify** — auto-detect the practised song and play in-app
-  (Premium + Web Playback SDK), or play from a provided Spotify link.
+- ✅ **Connect to Spotify (link play) — DONE** — paste a Spotify link per song →
+  embedded player (no API/OAuth; uses the listener's own Spotify). ⏳ Still parked:
+  **auto-detect** the practised song + in-app control (needs Premium + Web
+  Playback SDK + OAuth).
+- **Floating play/scroll button** — ✅ **DONE** (round autoscroll FAB on the chart).
 - **Tap-tempo / BPM-linked auto-scroll** — scroll speed derived from the song's
   BPM (needs a words-per-beat calibration; BPM alone doesn't map to scroll rate).
-- **Floating play/scroll button** — quick-access scroll toggle (bottom-right).
 - ✅ **Band invites v2** — DONE. Accept/decline instead of auto-join; roster
   (members + pending) under each band; admin remove-member / cancel-invite;
   duplicate-invite guard. Setlists already group per band ("Band setlists").
