@@ -1726,6 +1726,8 @@ async function signOut() {
     currentUser = null;
     isAdminUser = false;
     myTeams = []; teamSetlists = []; teamsReady = false;
+    myInvites = []; mysubsUnseen = 0;                 // clear this account's notifications
+    updateNotifBadge();
     updateAuthUI();
     if (document.getElementById('view-setlists').classList.contains('active')) renderSetlists();
 }
@@ -2045,12 +2047,26 @@ function renderMySubs() {
     supa.from('submissions').select('*').eq('submitter_id', currentUser.id).order('created_at', { ascending: false })
         .then(function(res) {
             if (res.error) { box.innerHTML = '<div class="empty">Couldn’t load: ' + esc(res.error.message) + '</div>'; return; }
-            var rows = res.data || [];
+            var dismissed = mysubDismissed();
+            var rows = (res.data || []).filter(function(r) { return !dismissed[r.id]; });
             if (!rows.length) { box.innerHTML = '<div class="empty">You haven’t submitted anything yet.<br>Tap “Submit a chart”.</div>'; return; }
             box.innerHTML = rows.map(mysubCard).join('');
             mysubsSeen = Date.now(); localStorage.setItem('chordph2_subseen', String(mysubsSeen));  // opening = seen
             var b = document.getElementById('mysubs-badge'); if (b) b.style.display = 'none';
         });
+}
+function mysubDismissed() { try { return JSON.parse(localStorage.getItem('chordph2_subdismiss') || '{}'); } catch (e) { return {}; } }
+function dismissMySub(id) {
+    var d = mysubDismissed(); d[id] = 1; localStorage.setItem('chordph2_subdismiss', JSON.stringify(d));
+    renderMySubs();
+}
+/* open the approved song in the library (matched by title + artist) */
+function openMySubSong(title, artist) {
+    var t = (title || '').toLowerCase().trim(), a = (artist || '').toLowerCase().trim();
+    var song = LIBRARY.filter(function(s) { return (s.title || '').toLowerCase().trim() === t && (s.artist || '').toLowerCase().trim() === a; })[0]
+            || LIBRARY.filter(function(s) { return (s.title || '').toLowerCase().trim() === t; })[0];
+    if (song) { openChart(song.id, 'songs'); }
+    else { go('songs'); var sr = document.getElementById('search'); if (sr) { sr.value = title; renderSongList(); } toast('Opening in Songs…'); }
 }
 function mysubCard(s) {
     var cls = s.status === 'approved' ? 'status-approved' : s.status === 'rejected' ? 'status-rejected' : 'status-pending';
@@ -2058,11 +2074,16 @@ function mysubCard(s) {
     var note = s.review_note
         ? '<div class="review-note"><b>Reviewer:</b> ' + esc(s.review_note) + '</div>'
         : (s.status === 'pending' ? '<div class="sc-by" style="margin-top:6px;">Waiting for review — usable on your device meanwhile.</div>' : '');
+    var reviewed = s.status === 'approved' || s.status === 'rejected';
+    var enc = encodeURIComponent;
+    var actions = reviewed ? '<div style="display:flex;gap:18px;margin-top:8px;">' +
+        (s.status === 'approved' ? '<button class="tap primary" onclick="openMySubSong(decodeURIComponent(\'' + enc(s.title) + '\'),decodeURIComponent(\'' + enc(s.artist || '') + '\'))">Open in Songs ›</button>' : '') +
+        '<button class="tap" onclick="dismissMySub(\'' + s.id + '\')">Dismiss</button></div>' : '';
     return '<div class="sub-card">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
         '<div class="sc-title">' + esc(s.title) + '</div><span class="status-pill ' + cls + '">' + esc(s.status) + '</span></div>' +
         '<div class="sc-by">' + esc(s.artist || '') + ' · ' + tag + ' · Key ' + esc(s.key || '?') + '</div>' +
-        note + '</div>';
+        note + actions + '</div>';
 }
 
 /* ---- versions + voting (on the chart) ---- */
@@ -2272,8 +2293,11 @@ window.addEventListener('popstate', function() {
     var handled = appBack();
     isPoppingBack = false;
     if (handled) { rearmBack(); return; }
-    // 3) at the root — require a second back within 2s to actually leave the app
-    if (Date.now() - backExitArmed < 2000) { history.back(); return; }
+    // 3) at the root — require a second back within 2s to actually leave. Go to
+    // the landing page rather than history.back(): after a Google sign-in the
+    // OAuth pages sit in history right behind us, and history.back() would drop
+    // the user on Google's account chooser.
+    if (Date.now() - backExitArmed < 2000) { location.href = '/'; return; }
     backExitArmed = Date.now();
     toast('Press back again to exit');
     rearmBack();
@@ -2786,8 +2810,7 @@ function openSignIn() {
         '<input class="field" id="sh-sync-email" type="email" placeholder="you@email.com" autocomplete="email">' +
         '<div id="sh-sync-msg" style="font-size:12px;color:var(--accent);margin:4px 0 8px;"></div>' +
         '<button class="tap primary" onclick="submitMagicLink()">Send sign-in link</button>' +
-        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button></div>',
-        'fit');
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button></div>');
 }
 function notifCount() {
     var invites = (typeof myInvites !== 'undefined' ? myInvites.length : 0);
@@ -4723,7 +4746,7 @@ function saveSettings() {
    is never removed. The duplicates are shown for review before anything is
    deleted. ---- */
 function normChart(c) { return String(c || '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n+/g, '\n').trim().toLowerCase(); }
-function songDupKey(s) { return (String(s.title || '').trim().toLowerCase()) + '|' + (String(s.artist || '').trim().toLowerCase()) + '|' + normChart(s.chart); }
+function songDupKey(s) { return (String(s.title || '').trim().toLowerCase()) + '|' + (String(s.artist || '').trim().toLowerCase()) + '|' + (String(s.key || '').trim().toLowerCase()) + '|' + normChart(s.chart); }
 function duplicateInfo() {
     var libByKey = {}, seenCustom = {}, remap = {}, groups = {};
     LIBRARY.forEach(function(s) { var k = songDupKey(s); if (!libByKey[k]) libByKey[k] = { id: s.id, song: s, lib: true }; });
@@ -4741,28 +4764,40 @@ function duplicateInfo() {
     return { remap: remap, groups: Object.keys(groups).map(function(k) { return groups[k]; }) };
 }
 function countDuplicateSongs() { return Object.keys(duplicateInfo().remap).length; }
-/* review sheet — show which songs will be removed before doing it */
+/* review sheet — preview each duplicate group and choose which to remove */
+var dedupeGroups = [];
 function openDedupeSheet() {
     var info = duplicateInfo();
-    var n = Object.keys(info.remap).length;
-    if (!n) { toast('No duplicate songs found.'); return; }
-    var rows = info.groups.map(function(g) {
-        var s = g.keep.song;
+    if (!Object.keys(info.remap).length) { toast('No duplicate songs found.'); return; }
+    dedupeGroups = info.groups.map(function(g) {
+        return { keepId: g.keep.id, keepLib: g.keep.lib, song: g.keep.song, removeIds: g.removes.map(function(c) { return c.id; }) };
+    });
+    var rows = dedupeGroups.map(function(g, i) {
+        var s = g.song;
+        var snippet = esc(String(s.chart || '').split('\n').slice(0, 4).join('\n')) || '(no chart)';
         return '<div style="border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px;">' +
-            '<div style="font-size:14px;"><b>' + esc(s.title) + '</b> · ' + esc(s.artist || '—') + '</div>' +
-            '<div style="font-size:12px;color:var(--muted);margin-top:3px;">Keeping ' + (g.keep.lib ? 'the shared-library copy' : 'one copy') +
-            ' · removing ' + g.removes.length + ' identical duplicate' + (g.removes.length > 1 ? 's' : '') + '</div></div>';
+            '<label style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;cursor:pointer;">' +
+            '<span><b>' + esc(s.title) + '</b> · ' + esc(s.artist || '—') + ' · Key ' + esc(s.key || '?') + '<br>' +
+            '<span style="font-size:12px;color:var(--muted);">' + g.removeIds.length + ' identical duplicate' + (g.removeIds.length > 1 ? 's' : '') +
+            ' · keeps ' + (g.keepLib ? 'library copy' : 'one copy') + '</span></span>' +
+            '<input type="checkbox" id="dd-' + i + '" checked style="width:20px;height:20px;flex-shrink:0;accent-color:var(--accent);"></label>' +
+            '<pre style="font-size:12px;color:var(--muted);margin-top:8px;white-space:pre-wrap;max-height:96px;overflow:auto;font-family:ui-monospace,monospace;">' + snippet + '</pre>' +
+            '</div>';
     }).join('');
     openSheet('<div class="sheet-title">Duplicate songs</div>' +
-        '<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">These are <b>exact copies</b> (same title, artist &amp; chart) — usually from saving a shared setlist. Songs that share a title but have a different version are left alone. This only cleans your <b>local</b> library — nothing shared is affected.</div>' +
+        '<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">These are <b>exact copies</b> (same title, artist, key &amp; chart) — usually from saving a shared setlist. A same-title song with a <b>different version</b> (other key, live/radio, edited chords) is <b>not</b> listed. Uncheck any group you’d rather keep as-is. This only cleans your <b>local</b> library.</div>' +
         rows +
         '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button>' +
-        '<button class="tap primary" onclick="cleanDuplicates()">Remove ' + n + ' duplicate' + (n > 1 ? 's' : '') + '</button></div>');
+        '<button class="tap primary" onclick="cleanDuplicatesSelected()">Remove checked</button></div>');
 }
-function cleanDuplicates() {
-    var remap = duplicateInfo().remap;
+function cleanDuplicatesSelected() {
+    var remap = {};
+    dedupeGroups.forEach(function(g, i) {
+        var cb = document.getElementById('dd-' + i);
+        if (cb && cb.checked) g.removeIds.forEach(function(id) { remap[id] = g.keepId; });
+    });
     var ids = Object.keys(remap);
-    if (!ids.length) { toast('No duplicate songs found.'); return; }
+    if (!ids.length) { toast('Nothing checked — kept everything.'); closeSheet(); return; }
     var remove = {}; ids.forEach(function(id) { remove[id] = 1; });
     state.customs = state.customs.filter(function(c) { return !remove[c.id]; });
     state.setlists.forEach(function(sl) {

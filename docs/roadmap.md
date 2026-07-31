@@ -111,6 +111,13 @@ numbers, and the Filipino worship focus.
   are user-submitted, fair-use for worship/practice, not official transcriptions).
 - **Social media links** (user, Jul 27, soon) — social icons/links (FB, IG, etc.)
   on the landing page (footer) and possibly in-app.
+- **Personalised / account-synced landing page** (user, Jul 27) — the landing page
+  becomes a signed-in surface tied to the account: greet by name (basic version
+  already live — reads the app's cached Supabase session from localStorage), and
+  later a real logged-in home (their bands, recent setlists, quick "continue"),
+  fully synced with the app. Details TBD; think of it as a lightweight dashboard.
+- **Facebook (and more) sign-in** (user, Jul 27) — add Facebook as an OAuth
+  provider alongside Google (Supabase supports it; needs a Facebook app + config).
 - **Reference "learn the song" links** (user, Jul 27) — per-song YouTube (and
   other) reference links shown on the chart page (near the Spotify player). Note:
   `song_versions.reference_url` already exists from the submission flow; surface it

@@ -52,6 +52,7 @@
     nav .links { display: flex; align-items: center; gap: 22px; }
     nav .links a { color: var(--muted); font-size: 14px; transition: color .15s; }
     nav .links a:hover { color: var(--text); }
+    nav .links a.nav-hi { color: var(--accent); font-weight: 600; }
     .btn {
         display: inline-block; border-radius: 10px; font-weight: 600; cursor: pointer;
         white-space: nowrap;
@@ -210,7 +211,7 @@
                 <a href="#features" onclick="closeNavMenu()">Features</a>
                 <a href="/analyzer/">Analyzer</a>
                 <a href="#contact" onclick="closeNavMenu()">Contact</a>
-                <a href="/app/#signin">Log in</a>
+                <a href="/app/#signin" id="nav-login">Log in</a>
             </span>
             <a class="btn btn-primary" href="/app/">Open app</a>
             <button class="nav-burger" id="nav-burger" aria-label="Menu" aria-expanded="false" onclick="toggleNavMenu(event)">&#9776;</button>
@@ -349,6 +350,29 @@ At sasambahin ka sa dakong lihim</div>
 </footer>
 
 <script>
+    // Greet a signed-in visitor. The app (same origin, /app/) stores its Supabase
+    // session in localStorage, so we can read the name here without loading the SDK.
+    (function reflectAuth() {
+        function apply() {
+            var name = null;
+            try {
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (!/^sb-.*-auth-token$/.test(k)) continue;
+                    var s = JSON.parse(localStorage.getItem(k) || 'null') || {};
+                    var u = s.user || (s.currentSession && s.currentSession.user);
+                    if (u) { name = (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || (u.email || '').split('@')[0]; break; }
+                }
+            } catch (e) {}
+            var link = document.getElementById('nav-login');
+            if (!link) return;
+            if (name) { link.textContent = 'Hi, ' + name.split(' ')[0]; link.href = '/app/'; link.classList.add('nav-hi'); }
+            else { link.textContent = 'Log in'; link.href = '/app/#signin'; link.classList.remove('nav-hi'); }
+        }
+        apply();
+        window.addEventListener('storage', apply);   // update live if they sign in/out in the app tab
+    })();
+
     // Mobile nav menu (the text links collapse into a tap-to-open dropdown on phones)
     function toggleNavMenu(e) {
         if (e) e.stopPropagation();
