@@ -2211,6 +2211,7 @@ function songById(id) {
         return LIBRARY[i];
     }
     for (var j = 0; j < state.customs.length; j++) if (state.customs[j].id === id) return state.customs[j];
+    for (var b = 0; b < teamSongs.length; b++) if (teamSongs[b].id === id) return teamSongs[b];   // shared band library
     if (sharedSongs[id]) return sharedSongs[id];   // transient shared-link songs
     return null;
 }
@@ -2451,12 +2452,25 @@ function renderSongList() {
     renderTagFilter();
     var sortEl = document.getElementById('songs-sort'); if (sortEl) sortEl.innerHTML = sortSelectHTML();
     box.innerHTML = '';
+    // shared BAND library — shown above your own songs
+    var bandMatches = applySort(teamSongs.filter(function(s) {
+        return matchesQuery(s, q) && hasAllTags(s, songFilterTags) && (!songFavOnly || isFav(s.id));
+    }));
+    if (bandMatches.length) {
+        var bl = document.createElement('div'); bl.className = 'section-label'; bl.textContent = 'Band library';
+        box.appendChild(bl);
+        bandMatches.forEach(function(s) { box.appendChild(songRow(s, { onOpen: function(song) { openChart(song.id, 'band'); } })); });
+    }
     var list = applySort(allSongs().filter(function(s) {
         return matchesQuery(s, q) && hasAllTags(s, songFilterTags) && (!songFavOnly || isFav(s.id));
     }));
-    if (!list.length) {
+    if (!list.length && !bandMatches.length) {
         box.innerHTML = '<div class="empty">' + (songFavOnly ? 'No favorites match. Tap ☆ on any song.' : 'No songs match.') + '</div>';
         return;
+    }
+    if (list.length && bandMatches.length) {
+        var yl = document.createElement('div'); yl.className = 'section-label'; yl.textContent = 'Songs';
+        box.appendChild(yl);
     }
     list.forEach(function(s) { box.appendChild(songRow(s)); });
 }
@@ -2636,7 +2650,7 @@ function importChordProFiles(ev) {
    setlists sync to everyone. Cloud-native (Supabase); degrades to nothing
    when signed out or the tables aren't set up yet.
    ========================================================= */
-var myTeams = [], teamSetlists = [], teamsReady = false, myInvites = [], lastTeamsRefresh = 0;
+var myTeams = [], teamSetlists = [], teamSongs = [], teamsReady = false, myInvites = [], lastTeamsRefresh = 0;
 function ownedTeams() { return myTeams.filter(function(t) { return t.isOwner; }); }
 function initTeams() {
     if (!supa || !currentUser) { myTeams = []; teamSetlists = []; teamsReady = false; myInvites = []; updateNotifBadge(); return; }
@@ -2660,6 +2674,7 @@ function subscribeBandRealtime() {
                 scheduleBandRefresh();
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_invites' }, function() { scheduleBandRefresh(); })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_songs' }, function() { scheduleBandRefresh(); })
             .subscribe();
     } catch (e) { /* realtime not enabled / offline — silent, refresh-on-focus still works */ }
 }
@@ -2750,8 +2765,11 @@ async function refreshTeams() {
         await loadMyInvites();
         var s = await supa.from('team_setlists').select('id,team_id,name,data,updated_at,updated_by').order('updated_at', { ascending: false });
         teamSetlists = s.data || [];
+        var sg = await supa.from('team_songs').select('id,team_id,title,artist,key,tempo,feel,tags,chart').order('title');
+        teamSongs = (sg.data || []).map(function(x) { return { id: x.id, team_id: x.team_id, title: x.title, artist: x.artist, key: x.key, tempo: x.tempo || 0, feel: x.feel || '', tags: x.tags || [], chart: x.chart, band: true }; });
         teamsReady = true;
         refreshBandUI();
+        if (document.getElementById('view-songs').classList.contains('active')) renderSongList();
         if (document.getElementById('view-setlists').classList.contains('active')) renderSetlists();
     } catch (e) {}
 }
@@ -2918,11 +2936,15 @@ function renderBandSection() {
     }
     html += myTeams.map(function(t) {
         var roster = renderRoster(t);
+        var libN = teamSongs.filter(function(s) { return s.team_id === t.id; }).length;
+        var libBtn = '<button class="tap" onclick="openBandLibrary(\'' + t.id + '\')">Band library (' + libN + ')</button>';
         var manage = t.isOwner
-            ? '<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:8px;"><button class="tap" onclick="promptInvite(\'' + t.id + '\')">Invite member</button>' +
+            ? '<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:8px;">' + libBtn +
+              '<button class="tap" onclick="promptInvite(\'' + t.id + '\')">Invite member</button>' +
               '<button class="tap" onclick="promptRenameTeam(\'' + t.id + '\')">Rename</button>' +
               '<button class="tap danger" onclick="deleteTeam(\'' + t.id + '\')">Delete band</button></div>'
-            : '<div style="margin-top:8px;"><button class="tap danger" onclick="leaveTeam(\'' + t.id + '\')">Leave band</button></div>';
+            : '<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:8px;">' + libBtn +
+              '<button class="tap danger" onclick="leaveTeam(\'' + t.id + '\')">Leave band</button></div>';
         // each band in its own card, so two bands (even same-named) read as separate
         return '<div style="border:1px solid var(--border,var(--hairline));border-radius:12px;padding:12px 14px;margin-bottom:10px;">' +
             '<b style="color:var(--text);">' + esc(t.name) + '</b> ' +
@@ -3042,6 +3064,41 @@ async function publishSetlistToTeam(setlistId, teamId) {
 }
 function openTeamSetlist(ts) {
     openSharedSetlist({ name: ts.name, songs: (ts.data && ts.data.songs) || [] }, 'band');
+}
+/* ---- shared BAND song library (owner manages, everyone browses) ---- */
+async function addSongToBand(song, teamId) {
+    if (!supa || !currentUser || !song) return;
+    var r = await supa.from('team_songs').insert({ team_id: teamId, title: song.title, artist: song.artist || null,
+        key: song.key || null, tempo: song.tempo || null, feel: song.feel || null, tags: song.tags || [], chart: song.chart, added_by: currentUser.id });
+    if (r.error) { toast('Couldn’t add to band: ' + r.error.message); return; }
+    toast('Added “' + song.title + '” to the band library.');
+    refreshTeams();
+}
+function promptAddSongToBand(song) {
+    var owned = ownedTeams();
+    if (!owned.length) { toast('Create a band first (Settings → Band).'); return; }
+    if (owned.length === 1) return addSongToBand(song, owned[0].id);
+    var pick = window.prompt('Add to which band library?\n' + owned.map(function(t, i) { return (i + 1) + '. ' + t.name; }).join('\n'), '1');
+    var idx = parseInt(pick, 10) - 1;
+    if (owned[idx]) addSongToBand(song, owned[idx].id);
+}
+async function removeBandSong(id) {
+    if (!confirm('Remove this song from the band library?')) return;
+    var r = await supa.from('team_songs').delete().eq('id', id);
+    if (r.error) toast('Remove failed: ' + r.error.message);
+    else { toast('Removed from band library.'); refreshTeams(); }
+}
+function openBandLibrary(teamId) {
+    var t = myTeams.filter(function(x) { return x.id === teamId; })[0]; if (!t) return;
+    var songs = teamSongs.filter(function(s) { return s.team_id === teamId; });
+    var rows = songs.length ? songs.map(function(s) {
+        return '<div class="row"><div class="row-main" style="cursor:pointer;" onclick="closeSheet();openChart(\'' + s.id + '\',\'band\')">' +
+            '<div class="row-title">' + esc(s.title) + '</div><div class="row-sub">' + esc(s.artist || '') + ' · Key ' + esc(s.key || '?') + '</div></div>' +
+            (t.isOwner ? '<button class="tap danger" onclick="removeBandSong(\'' + s.id + '\')">Remove</button>' : '') + '</div>';
+    }).join('') : '<div class="empty">No songs in this band’s library yet.</div>';
+    var note = t.isOwner ? '<div style="font-size:12px;color:var(--muted);margin-top:10px;">Add any song to the band from its chart → <b>Edit → Add to band</b>.</div>' : '';
+    openSheet('<div class="sheet-title">' + esc(t.name) + ' · library</div>' + rows + note +
+        '<div class="sheet-actions"><button class="tap primary" onclick="closeSheet()">Done</button></div>');
 }
 
 /* =========================================================
@@ -3227,6 +3284,7 @@ function chartBack() {
     if (state.chartFrom === 'setlist') openSetlist(state.currentSetlistId);
     else if (state.chartFrom === 'shared-set') { renderSharedSetlist(); show('shared'); }
     else if (state.chartFrom === 'shared') leaveShared();
+    else if (state.chartFrom === 'band') go('songs');
     else go(state.chartFrom);
 }
 function viewFor() {
@@ -3245,7 +3303,7 @@ function renderChart() {
     var fingeredKeyIdx = ((keyIdx - capo) % 12 + 12) % 12;
 
     var cf = state.chartFrom;
-    var readonly = (cf === 'shared' || cf === 'shared-set');
+    var readonly = (cf === 'shared' || cf === 'shared-set' || cf === 'band');
     document.getElementById('chart-back').innerHTML =
         cf === 'setlist' ? '&lsaquo; Setlist' :
         cf === 'shared-set' ? '&lsaquo; Setlist' :
@@ -4571,12 +4629,16 @@ function openSongSheet(songId) {
     var note = isLib
         ? 'This edits <b style="color:var(--text);">your copy on this device</b> — the shared version everyone else sees stays as is. To propose the fix for everyone, tap “Submit to library”.'
         : 'Saved on this device. <button class="tap" style="padding:0;color:var(--accent);font-size:12px;" onclick="openRulesSheet(\'song\')">See the rules</button> — chords on their own line above the lyric, and label sections like [Verse 1].';
+    var bandBtn = (typeof ownedTeams === 'function' && ownedTeams().length)
+        ? '<button class="tap" onclick="promptAddSongToBand(readSongForm())">Add to band</button>' : '';
     var actions = isLib
         ? (hasOverride ? '<button class="tap" onclick="resyncSong(\'' + song.id + '\')">Reset to original</button>' : '') +
+          bandBtn +
           '<button class="tap" onclick="submitEditToLibrary()">Submit to library</button>' +
           '<button class="tap" onclick="closeSheet()">Cancel</button>' +
           '<button class="tap primary" onclick="saveSong()">Save</button>'
         : (song ? '<button class="tap danger" onclick="deleteSong()">Delete</button>' : '') +
+          bandBtn +
           '<button class="tap" onclick="closeSheet()">Cancel</button>' +
           '<button class="tap primary" onclick="saveSong()">Save</button>';
     openSheet(
