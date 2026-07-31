@@ -125,13 +125,13 @@ numbers, and the Filipino worship focus.
 - **Spotify per-medley switching** (user, Jul 27) — when a chart medleys song A→B,
   switch the player to B's track as you scroll in. Needs the SDK (auto-play/seek);
   today the chart shows the host song's link only.
-- **Clean-up / de-dupe local library** (user, Jul 27) — a one-tap "remove
-  duplicates" (match title+artist) so shared-then-saved songs don't pile up.
-  Keep "Add to my songs" for songs you don't already have.
-- **Android APK + hardware back button** (user, Jul 27, HIGH — most PH musicians
-  are Android) — package via PWABuilder; ALSO make the Android/browser back button
-  navigate views within the app (history.pushState + popstate) instead of leaving.
-  Worth doing the in-app back handling even before packaging.
+- ✅ **Clean-up / de-dupe local library — DONE** (Settings → Backup → "Clean up
+  duplicates"; remaps custom dups onto library/first-custom, rewrites refs).
+- **Android APK** (user, Jul 27, HIGH — most PH musicians are Android) — package
+  via PWABuilder. ✅ **In-app back button handling DONE** (history.pushState +
+  popstate: back navigates views / closes overlays; root = press-back-twice to
+  exit). ⏳ still to do: build/sign the actual APK; confirm hardware-back exit on a
+  real device.
 - **Nashville number trainer** — a practice/learn mode for the number system.
 - **Chord detection from audio** — premium; heavy ML (audio → chords).
 - ✅ **Premium metronome redesign — DONE** (tempo dial, Italian tempo name, ring
