@@ -347,6 +347,16 @@
             padding: 8px 12px; border-radius: 8px;
             background: rgba(79,140,255,0.10); border: 1px solid rgba(79,140,255,0.28);
         }
+        /* Spotify listen panel */
+        #chart-spotify:not(:empty) { margin-top: 10px; }
+        .listen-btn { font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px;
+            background: var(--hover); color: var(--text); border: 1px solid var(--border); }
+        .listen-btn.ghost { color: var(--muted); }
+        @media (hover: hover) { .listen-btn:hover { border-color: #1DB954; color: #1DB954; } }
+        .listen-btn .sp { color: #1DB954; font-size: 15px; }
+        .spotify-panel iframe { display: block; width: 100%; border: 0; border-radius: 12px; }
+        .spotify-row { display: flex; gap: 18px; margin-top: 8px; }
         .metro-stage { display:flex; flex-direction:column; align-items:center; gap:22px; padding:14px 0 40px; max-width:440px; margin:0 auto; }
         /* the tempo dial — tap it (or Start) to run */
         .metro-dial { position:relative; width:238px; height:238px; border-radius:50%; cursor:pointer;
@@ -968,6 +978,7 @@
             <div class="chart-meta" id="chart-meta"></div>
             <div id="share-banner" class="share-banner" style="display:none;"></div>
             <div id="chart-versions"></div>
+            <div id="chart-spotify"></div>
         </div>
 
         <div class="control-dock">
@@ -1400,6 +1411,7 @@ var state = {
     theme: 'dark',              // 'dark' | 'light' | 'auto' (follow OS)
     chordColor: 'default',      // chord ink: default | amber | teal | magenta | mono (colour-blind friendly)
     overrides: {},              // { libraryId: {edited fields} } — personal local edits of shared songs
+    spotify: {},                // { songId: spotifyUrl } — a track to play alongside the chart
     deleted: { setlists: {}, customs: {} },  // tombstones {id: deletedAt} so a delete syncs instead of resurrecting
     view: 'songs',
     chartFrom: 'songs',         // where Back returns to
@@ -1423,6 +1435,7 @@ function save() {
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
+    localStorage.setItem('chordph2_spotify', JSON.stringify(state.spotify));
     localStorage.setItem('chordph2_deleted', JSON.stringify(state.deleted));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels, theme: state.theme, chordColor: state.chordColor }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
@@ -1448,6 +1461,7 @@ function load() {
         state.setlists = JSON.parse(localStorage.getItem('chordph2_setlists') || '[]');
         state.transpose = JSON.parse(localStorage.getItem('chordph2_transpose') || '{}');
         state.overrides = JSON.parse(localStorage.getItem('chordph2_overrides') || '{}');
+        state.spotify = JSON.parse(localStorage.getItem('chordph2_spotify') || '{}');
         state.deleted = JSON.parse(localStorage.getItem('chordph2_deleted') || '{"setlists":{},"customs":{}}');
         if (!state.deleted.setlists) state.deleted.setlists = {};
         if (!state.deleted.customs) state.deleted.customs = {};
@@ -1495,6 +1509,7 @@ function localSnapshot() {
         setlists: state.setlists,
         transpose: state.transpose,
         overrides: state.overrides,
+        spotify: state.spotify,
         deleted: state.deleted,
         capo: state.capo,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels, theme: state.theme, chordColor: state.chordColor },
@@ -1508,6 +1523,7 @@ function applySnapshot(snap) {
     state.setlists = snap.setlists || [];
     state.transpose = snap.transpose || {};
     state.overrides = snap.overrides || {};
+    state.spotify = snap.spotify || {};
     state.deleted = snap.deleted || { setlists: {}, customs: {} };
     if (!state.deleted.setlists) state.deleted.setlists = {};
     if (!state.deleted.customs) state.deleted.customs = {};
@@ -1531,6 +1547,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
+    localStorage.setItem('chordph2_spotify', JSON.stringify(state.spotify));
     localStorage.setItem('chordph2_deleted', JSON.stringify(state.deleted));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels, theme: state.theme, chordColor: state.chordColor }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
@@ -1569,6 +1586,7 @@ function mergeData(local, cloud) {
         favorites: Array.from(new Set((local.favorites || []).concat(cloud.favorites || []))),
         transpose: Object.assign({}, older.transpose, newer.transpose),
         overrides: Object.assign({}, older.overrides, newer.overrides),
+        spotify: Object.assign({}, older.spotify, newer.spotify),
         deleted: { setlists: tombSet, customs: tombCus },
         capo: Object.assign({}, older.capo, newer.capo),
         settings: newer.settings || older.settings,
@@ -2931,6 +2949,7 @@ function saveSharedSetlist() {
 function openChart(songId, from) {
     currentSongId = songId;
     state.chartFrom = from || 'songs';
+    spotifyOpen = false;   // each song's Spotify player starts collapsed
     // medley + transpose are remembered per setlist; from the library they're
     // fresh each open (transpose resets to the song's own key)
     if (state.chartFrom === 'setlist' && state.currentSetlistId) {
@@ -3063,7 +3082,46 @@ function renderChart() {
     }
     renderMedley(song, keyIdx, capo);
     buildTempoZones(song);
+    renderSpotifyPanel();
 }
+/* ---- Spotify: play a track alongside the chart (paste a link — no login/API
+   needed; the embedded player uses the listener's own Spotify) ---- */
+var spotifyOpen = false;
+function parseSpotify(url) {
+    var m = String(url || '').match(/(?:open\.spotify\.com\/(?:intl-[a-z]+\/)?|spotify:)(track|album|playlist|episode)[\/:]([A-Za-z0-9]+)/);
+    return m ? { type: m[1], id: m[2] } : null;
+}
+function spotifyEmbed(url) {
+    var p = parseSpotify(url); if (!p) return '';
+    return '<iframe src="https://open.spotify.com/embed/' + p.type + '/' + p.id + '?utm_source=chordph" width="100%" height="152" ' +
+        'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>';
+}
+function renderSpotifyPanel() {
+    var box = document.getElementById('chart-spotify'); if (!box) return;
+    var readonly = state.chartFrom === 'shared' || state.chartFrom === 'shared-set';
+    var url = state.spotify[currentSongId];
+    var valid = url && parseSpotify(url);
+    if (valid && spotifyOpen) {
+        box.innerHTML = '<div class="spotify-panel">' + spotifyEmbed(url) +
+            '<div class="spotify-row"><button class="tap" onclick="spotifyOpen=false;renderSpotifyPanel()">Hide</button>' +
+            (readonly ? '' : '<button class="tap" onclick="promptSpotify()">Change link</button><button class="tap danger" onclick="removeSpotify()">Remove</button>') +
+            '</div></div>';
+    } else if (valid) {
+        box.innerHTML = '<button class="listen-btn" onclick="spotifyOpen=true;renderSpotifyPanel()"><span class="sp">&#9654;</span> Listen on Spotify</button>';
+    } else if (!readonly) {
+        box.innerHTML = '<button class="listen-btn ghost" onclick="promptSpotify()"><span class="sp">&#9834;</span> Add Spotify link</button>';
+    } else box.innerHTML = '';
+}
+function promptSpotify() {
+    var v = window.prompt('Paste a Spotify link (Spotify → Share → Copy link):', state.spotify[currentSongId] || '');
+    if (v === null) return;
+    v = v.trim();
+    if (v && !parseSpotify(v)) { toast('That doesn’t look like a Spotify link.'); return; }
+    if (v) { state.spotify[currentSongId] = v; spotifyOpen = true; }
+    else { delete state.spotify[currentSongId]; spotifyOpen = false; }
+    save(); renderSpotifyPanel();
+}
+function removeSpotify() { delete state.spotify[currentSongId]; spotifyOpen = false; save(); renderSpotifyPanel(); }
 function renderChordStrip(strip, chartText) {
     var names = uniqueChords(chartText);
     var html = names.map(function(n) {
