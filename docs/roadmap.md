@@ -139,19 +139,11 @@ its full-playback/SDK path stays a later Premium extra.
 
 ## Queued next (agreed July 28)
 
-- **Stage-view floating controls overhaul** (user spec, Jul 28) — in stage mode,
-  add a vertical floating column (in line with the autoscroll speed + play button,
-  bottom-right) of the key chart functions: **Transpose, Numbers, Chords, Lyrics,
-  Text**. Tapping one reveals its options **floating horizontally, inline** (options
-  "slide out" from that button). Must **shift the lyrics** so the options don't
-  cover them. Provide a **single toggle** (placed above the autoscroll speed dial)
-  that hides/shows the whole function column. (Challenge the layout if there's a
-  cleaner idea.)
-- **Landing nav restructure** (user, Jul 28) — declutter the top nav: move
-  **"Open app"** into the hamburger menu; put **"Hi <name>" / "Log in"** in the
-  hamburger too; the hamburger should carry the **full link set** (App, Analyzer,
-  About, Features, Contact, Terms) — same as the footer. (Confirm desktop behavior:
-  keep inline links on desktop, hamburger on mobile.)
+- ✅ **Stage-view floating controls — DONE** (☰ toggle above the speed dial reveals
+  a vertical Transpose/Numbers/Chords/Lyrics/Text column; Numbers/Chords/Lyrics
+  toggle+highlight, Transpose/Text slide options out horizontally; lyrics shift).
+- ✅ **Landing nav restructure — DONE** (full menu = footer set; Open app + Hi/Login
+  folded in; standalone button removed).
 - **Payments / tiers — architecture (decided)**: **ONE app, not three.** Tier is a
   property of the account (a `subscription_tier` col / `subscriptions` table in
   Supabase); the app reads it and unlocks features. Sell upgrades **on the web**
