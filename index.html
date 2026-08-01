@@ -219,12 +219,12 @@
     /* Welcome-back banner (shown to signed-in visitors) */
     #welcome { display: none; }
     #welcome.show { display: block; }
-    .welcome-card { max-width: 720px; margin: 0 auto 8px; background: rgba(79,140,255,0.08);
-        border: 1px solid rgba(79,140,255,0.28); border-radius: 16px; padding: 18px 22px;
-        display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-    .welcome-card .wc-hi { font-size: 18px; font-weight: 700; }
-    .welcome-card .wc-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
-    .welcome-card .wc-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .welcome-card { max-width: 720px; margin: 0 auto; background: rgba(79,140,255,0.08);
+        border: 1px solid rgba(79,140,255,0.28); border-radius: 12px; padding: 11px 16px;
+        display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; transition: border-color .15s, background .15s; }
+    .welcome-card:hover { border-color: var(--accent); background: rgba(79,140,255,0.12); }
+    .welcome-card .wc-hi { font-size: 15px; font-weight: 700; color: var(--text); }
+    .welcome-card .wc-sub { color: var(--muted); font-size: 13px; }
 
     .reveal { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
     .reveal.in { opacity: 1; transform: none; }
@@ -250,16 +250,11 @@
 </nav>
 
 <section id="welcome">
-    <div class="wrap" style="padding-top:24px;">
-        <div class="welcome-card">
-            <div>
-                <div class="wc-hi" id="wc-hi">Welcome back</div>
-                <div class="wc-sub">Pick up where you left off.</div>
-            </div>
-            <div class="wc-actions">
-                <a class="btn btn-primary" href="/app/">Open Chord.ph &rarr;</a>
-            </div>
-        </div>
+    <div class="wrap" style="padding-top:20px;">
+        <a class="welcome-card" href="/app/">
+            <span class="wc-hi" id="wc-hi">Welcome back</span>
+            <span class="wc-sub">Tap to pick up where you left off &rarr;</span>
+        </a>
     </div>
 </section>
 
@@ -315,28 +310,9 @@ At sasambahin ka sa dakong lihim</div>
             <div class="feature reveal"><span class="ico">☁️</span><h3>Cloud sync &amp; offline</h3><p>Your songs and setlists follow you across phone and PC — and still work with no signal.</p></div>
             <div class="feature reveal"><span class="ico">🥁</span><h3>Plays your part</h3><p>Pick your instrument and the chart adapts — drummers see feel &amp; tempo, guitarists see capo.</p></div>
             <div class="feature reveal"><span class="ico">📖</span><h3>Readable on stage</h3><p>Chords highlighted, controls that stay in reach while you scroll, adjustable text size and auto-scroll.</p></div>
-        </div>
-    </div>
-</section>
-
-<section id="about">
-    <div class="wrap">
-        <div class="section-head reveal">
-            <h2>About Chord.ph</h2>
-            <p>Built by Filipino worship musicians, for worship musicians.</p>
-        </div>
-        <div class="about-body reveal">
-            <p>Chord.ph started with a very ordinary Sunday problem: chord charts scattered across
-                screenshots, group chats, notebooks and half a dozen apps — none of them made for a band
-                playing together. We wanted one clean place where the whole team reads the same sheet, in
-                the right key, on any device.</p>
-            <p>So we built it. Instant transpose and capo shapes, Nashville numbers, setlists and medleys,
-                an on-device key &amp; BPM analyzer, and band sync so your worship team shares one library
-                and one setlist that updates live. It runs in the browser, works offline, and installs to
-                your home screen — <b>no account needed to start</b>.</p>
-            <p>Chord.ph is <b>free for every musician</b>. Team features and a few power tools support the
-                project so the core stays free and keeps getting better — made in the Philippines, for the
-                worldwide worship community.</p>
+            <div class="feature reveal"><span class="ico">👥</span><h3>Band sync</h3><p>Share one live library and setlist with your team — updates appear instantly, with member roles and a switcher for multiple bands.</p></div>
+            <div class="feature reveal"><span class="ico">🎧</span><h3>Listen &amp; learn</h3><p>Attach a Spotify track and a YouTube tutorial to any song, right on the chart — hear it while you practice.</p></div>
+            <div class="feature reveal"><span class="ico">🔁</span><h3>MP3 A/B practice</h3><p>Load your own audio and loop a tricky section (A→B) at half speed until it's yours. Everything stays on your device.</p></div>
         </div>
     </div>
 </section>
@@ -400,6 +376,28 @@ At sasambahin ka sa dakong lihim</div>
     </div>
 </section>
 
+<section id="about">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <h2>About Chord.ph</h2>
+            <p>Built by Filipino worship musicians, for worship musicians.</p>
+        </div>
+        <div class="about-body reveal">
+            <p>Chord.ph started with a very ordinary Sunday problem: chord charts scattered across
+                screenshots, group chats, notebooks and half a dozen apps — none of them made for a band
+                playing together. We wanted one clean place where the whole team reads the same sheet, in
+                the right key, on any device.</p>
+            <p>So we built it. Instant transpose and capo shapes, Nashville numbers, setlists and medleys,
+                an on-device key &amp; BPM analyzer, and band sync so your worship team shares one library
+                and one setlist that updates live. It runs in the browser, works offline, and installs to
+                your home screen — <b>no account needed to start</b>.</p>
+            <p>Chord.ph is <b>free for every musician</b>. Team features and a few power tools support the
+                project so the core stays free and keeps getting better — made in the Philippines, for the
+                worldwide worship community.</p>
+        </div>
+    </div>
+</section>
+
 <section id="legal">
     <div class="wrap">
         <div class="section-head reveal">
@@ -447,9 +445,9 @@ At sasambahin ka sa dakong lihim</div>
         <div class="flinks">
             <a href="/app/">App</a>
             <a href="/analyzer/">Analyzer</a>
-            <a href="#about">About</a>
             <a href="#features">Features</a>
             <a href="#contact">Contact</a>
+            <a href="#about">About</a>
             <a href="#legal">Terms</a>
         </div>
     </div>

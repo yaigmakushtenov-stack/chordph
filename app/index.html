@@ -315,6 +315,9 @@
         /* lift it above the setlist prev/next bar when that's showing */
         body.chart-navbar #scroll-fab { bottom: calc(112px + env(safe-area-inset-bottom)); }
         body.stage-mode.chart-navbar #scroll-fab { bottom: calc(22px + env(safe-area-inset-bottom)); }
+        /* lift the speed dial with the play button when the setlist navbar shows */
+        body.chart-navbar #stage-speed { bottom: calc(176px + env(safe-area-inset-bottom)); }
+        body.stage-mode.chart-navbar #stage-speed { bottom: calc(86px + env(safe-area-inset-bottom)); }
         /* ---- stage / performance mode: big text, minimal chrome ---- */
         #stage-exit { position: fixed; z-index: 260; display: none;
             top: calc(10px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right));
@@ -336,6 +339,7 @@
         body.stage-mode .chart-meta,
         body.stage-mode #chart-versions,
         body.stage-mode #share-banner,
+        body.stage-mode .chart-disclaimer,
         body.stage-mode #setlist-navbar { display: none !important; }
         body.stage-mode .drawer { display: none !important; }
         body.stage-mode #view-chart .wrap { max-width: none; margin: 0 auto; padding: 14px 20px 90px; }
@@ -386,6 +390,14 @@
         .audio-speed .sp-btn.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
         .audio-foot { display: flex; justify-content: space-between; margin-top: 10px; }
         .listen-btn.audio-add .sp { color: var(--accent); }
+        /* Listen & learn consolidated panel */
+        .media-body { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding: 10px 12px;
+            border: 1px solid var(--border); border-radius: 12px; background: var(--hover); }
+        .media-count { display: inline-block; min-width: 17px; text-align: center; font-size: 11px; font-weight: 700;
+            color: #fff; background: var(--accent); border-radius: 999px; padding: 0 5px; }
+        /* small disclaimer under the chord chart */
+        .chart-disclaimer { margin: 20px 0 6px; padding-top: 12px; border-top: 1px solid var(--hairline);
+            font-size: 11px; color: var(--faint); line-height: 1.6; }
         .spotify-embed-wrap { position: relative; }
         .spotify-panel iframe { display: block; width: 100%; border: 0; border-radius: 12px; }
         .spotify-kebab { position: absolute; top: 6px; right: 6px; z-index: 2;
@@ -821,6 +833,10 @@
         .field-row .field { flex: 1; }
         .form-error { color: var(--danger); font-size: 12px; margin-top: 6px; display: none; }
 
+        /* keep the search bar reachable while scrolling the song list */
+        .songs-sticky { position: sticky; top: 0; z-index: 50; background: var(--bg); }
+        #view-songs .bar { position: static; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+        .songs-sticky .search { margin-bottom: 0; padding-bottom: 10px; }
         .chip-row { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 6px 0 10px; }
         .chip { color: var(--muted); cursor: pointer; padding: 8px 2px; font-size: 15px; background: none; border: none; }
         .chip.on { color: var(--accent); font-weight: 650; }
@@ -963,12 +979,14 @@
 
 <div class="view" id="view-songs">
     <div class="wrap">
-        <div class="bar">
-            <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
-            <span class="wordmark" role="link" tabindex="0" title="Go to chord.ph home" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">Chord.ph</span>
-            <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()" aria-label="Add song">+</button></span>
+        <div class="songs-sticky">
+            <div class="bar">
+                <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
+                <span class="wordmark" role="link" tabindex="0" title="Go to chord.ph home" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">Chord.ph</span>
+                <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()" aria-label="Add song">+</button></span>
+            </div>
+            <input class="search" id="search" placeholder="Search songs, artists, tags&hellip;" oninput="renderSongList()" autocomplete="off">
         </div>
-        <input class="search" id="search" placeholder="Search songs, artists, tags&hellip;" oninput="renderSongList()" autocomplete="off">
         <div id="tag-filter" class="tag-filter"></div>
         <div id="songs-sort" class="sort-row"></div>
         <div id="song-list"></div>
@@ -1040,8 +1058,7 @@
             <div class="chart-meta" id="chart-meta"></div>
             <div id="share-banner" class="share-banner" style="display:none;"></div>
             <div id="chart-versions"></div>
-            <div id="chart-spotify"></div>
-            <div id="chart-audio"></div>
+            <div id="chart-media"></div>
         </div>
 
         <div class="control-dock">
@@ -1099,6 +1116,7 @@
         <div class="chord-strip" id="chord-strip" style="display:none;"></div>
         <div class="chart" id="chart-body"></div>
         <div id="medley-blocks"></div>
+        <div class="chart-disclaimer">Community-contributed interpretation for worship &amp; practice — not an official transcription. All rights belong to the songwriters &amp; publishers.</div>
         <div id="setlist-navbar" style="display:none;">
             <button class="sl-nav" id="sl-prev" onclick="setlistStep(-1)"><span class="sl-arrow">&lsaquo;</span><span class="sl-txt" id="sl-prev-txt"></span></button>
             <button class="sl-nav right" id="sl-next" onclick="setlistStep(1)"><span class="sl-txt" id="sl-next-txt"></span><span class="sl-arrow">&rsaquo;</span></button>
@@ -1481,6 +1499,7 @@ var state = {
     chordColor: 'default',      // chord ink: default | amber | teal | magenta | mono (colour-blind friendly)
     overrides: {},              // { libraryId: {edited fields} } — personal local edits of shared songs
     spotify: {},                // { songId: spotifyUrl } — a track to play alongside the chart
+    youtube: {},                // { songId: youtubeUrl } — a "learn the song" video
     deleted: { setlists: {}, customs: {} },  // tombstones {id: deletedAt} so a delete syncs instead of resurrecting
     view: 'songs',
     chartFrom: 'songs',         // where Back returns to
@@ -1505,6 +1524,7 @@ function save() {
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
     localStorage.setItem('chordph2_spotify', JSON.stringify(state.spotify));
+    localStorage.setItem('chordph2_youtube', JSON.stringify(state.youtube));
     localStorage.setItem('chordph2_deleted', JSON.stringify(state.deleted));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels, theme: state.theme, chordColor: state.chordColor }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
@@ -1531,6 +1551,7 @@ function load() {
         state.transpose = JSON.parse(localStorage.getItem('chordph2_transpose') || '{}');
         state.overrides = JSON.parse(localStorage.getItem('chordph2_overrides') || '{}');
         state.spotify = JSON.parse(localStorage.getItem('chordph2_spotify') || '{}');
+        state.youtube = JSON.parse(localStorage.getItem('chordph2_youtube') || '{}');
         state.deleted = JSON.parse(localStorage.getItem('chordph2_deleted') || '{"setlists":{},"customs":{}}');
         if (!state.deleted.setlists) state.deleted.setlists = {};
         if (!state.deleted.customs) state.deleted.customs = {};
@@ -1579,6 +1600,7 @@ function localSnapshot() {
         transpose: state.transpose,
         overrides: state.overrides,
         spotify: state.spotify,
+        youtube: state.youtube,
         deleted: state.deleted,
         capo: state.capo,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels, theme: state.theme, chordColor: state.chordColor },
@@ -1593,6 +1615,7 @@ function applySnapshot(snap) {
     state.transpose = snap.transpose || {};
     state.overrides = snap.overrides || {};
     state.spotify = snap.spotify || {};
+    state.youtube = snap.youtube || {};
     state.deleted = snap.deleted || { setlists: {}, customs: {} };
     if (!state.deleted.setlists) state.deleted.setlists = {};
     if (!state.deleted.customs) state.deleted.customs = {};
@@ -1617,6 +1640,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
     localStorage.setItem('chordph2_spotify', JSON.stringify(state.spotify));
+    localStorage.setItem('chordph2_youtube', JSON.stringify(state.youtube));
     localStorage.setItem('chordph2_deleted', JSON.stringify(state.deleted));
     localStorage.setItem('chordph2_settings', JSON.stringify({ fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville, showDiagrams: state.showDiagrams, lyricsOnly: state.lyricsOnly, iconLabels: state.iconLabels, theme: state.theme, chordColor: state.chordColor }));
     localStorage.setItem('chordph2_updated', String(state.updatedAt));
@@ -1656,6 +1680,7 @@ function mergeData(local, cloud) {
         transpose: Object.assign({}, older.transpose, newer.transpose),
         overrides: Object.assign({}, older.overrides, newer.overrides),
         spotify: Object.assign({}, older.spotify, newer.spotify),
+        youtube: Object.assign({}, older.youtube, newer.youtube),
         deleted: { setlists: tombSet, customs: tombCus },
         capo: Object.assign({}, older.capo, newer.capo),
         settings: newer.settings || older.settings,
@@ -3323,7 +3348,7 @@ function saveSharedSetlist() {
 function openChart(songId, from) {
     currentSongId = songId;
     state.chartFrom = from || 'songs';
-    spotifyOpen = false;   // each song's Spotify player starts collapsed
+    mediaOpen = false; spotifyOpen = false; youtubeOpen = false;   // each song's media starts collapsed
     stopPractice(); practice.open = false;   // reset the practice audio for the new song
     // medley + transpose are remembered per setlist; from the library they're
     // fresh each open (transpose resets to the song's own key)
@@ -3458,8 +3483,74 @@ function renderChart() {
     }
     renderMedley(song, keyIdx, capo);
     buildTempoZones(song);
-    renderSpotifyPanel();
-    renderAudioPanel();
+    renderMediaPanel();
+}
+/* ---- "Listen & learn": one collapsible home for the Spotify link, a YouTube
+   "learn the song" video, and the MP3 A/B practice player — keeps the chart head
+   uncluttered ---- */
+var mediaOpen = false;
+function mediaCount() {
+    var n = 0;
+    if (state.spotify[currentSongId]) n++;
+    if (state.youtube[currentSongId]) n++;
+    if (audioKeys[currentSongId]) n++;
+    return n;
+}
+function renderMediaPanel() {
+    var box = document.getElementById('chart-media'); if (!box) return;
+    if (!mediaOpen) {
+        var n = mediaCount();
+        box.innerHTML = '<button class="listen-btn" onclick="mediaOpen=true;renderMediaPanel()"><span class="sp">🎧</span> Listen &amp; learn' + (n ? ' <span class="media-count">' + n + '</span>' : '') + '</button>';
+        return;
+    }
+    box.innerHTML = '<div class="media-body">' +
+        '<div id="chart-spotify"></div><div id="chart-youtube"></div><div id="chart-audio"></div>' +
+        '<button class="tap" onclick="mediaOpen=false;renderMediaPanel()" style="margin-top:4px;">Hide</button></div>';
+    renderSpotifyPanel(); renderYouTube(); renderAudioPanel();
+}
+
+/* ---- YouTube "learn the song" video (paste a link) ---- */
+var youtubeOpen = false;
+function parseYouTube(url) {
+    var m = String(url || '').match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+    return m ? m[1] : null;
+}
+function youtubeEmbed(url) {
+    var id = parseYouTube(url); if (!id) return '';
+    return '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '" width="100%" height="200" style="border:0;border-radius:12px;" ' +
+        'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>';
+}
+function renderYouTube() {
+    var box = document.getElementById('chart-youtube'); if (!box) return;
+    var readonly = state.chartFrom === 'shared' || state.chartFrom === 'shared-set';
+    var url = state.youtube[currentSongId];
+    var valid = url && parseYouTube(url);
+    if (valid && youtubeOpen) {
+        box.innerHTML = '<div class="spotify-panel"><div class="spotify-embed-wrap">' + youtubeEmbed(url) +
+            '<button class="spotify-kebab" onclick="openYouTubeMenu(this)" aria-label="Video options">&#8943;</button></div></div>';
+    } else if (valid) {
+        box.innerHTML = '<button class="listen-btn" onclick="youtubeOpen=true;renderYouTube()"><span class="sp" style="color:#ff4d4d;">▶</span> Watch on YouTube</button>';
+    } else if (!readonly) {
+        box.innerHTML = '<button class="listen-btn ghost" onclick="promptYouTube()"><span class="sp" style="color:#ff4d4d;">▶</span> Add YouTube link</button>';
+    } else box.innerHTML = '';
+}
+function promptYouTube() {
+    var v = window.prompt('Paste a YouTube link (a tutorial or the official video):', state.youtube[currentSongId] || '');
+    if (v === null) return;
+    v = v.trim();
+    if (v && !parseYouTube(v)) { toast('That doesn’t look like a YouTube link.'); return; }
+    if (v) { state.youtube[currentSongId] = v; youtubeOpen = true; } else { delete state.youtube[currentSongId]; youtubeOpen = false; }
+    save(); renderYouTube();
+}
+function removeYouTube() { delete state.youtube[currentSongId]; youtubeOpen = false; save(); renderYouTube(); }
+function openYouTubeMenu(anchor) {
+    var readonly = state.chartFrom === 'shared' || state.chartFrom === 'shared-set';
+    var items = [{ label: 'Hide video', icon: '▾', onClick: function() { youtubeOpen = false; renderYouTube(); } }];
+    if (!readonly) {
+        items.push({ label: 'Change link', icon: '✎', onClick: promptYouTube });
+        items.push({ label: 'Remove', icon: '🗑', danger: true, onClick: removeYouTube });
+    }
+    openMenu(items, anchor);
 }
 /* ---- Spotify: play a track alongside the chart (paste a link — no login/API
    needed; the embedded player uses the listener's own Spotify) ---- */
@@ -3585,10 +3676,16 @@ function loadPracticeAudio(id, autoplay) {
         var el = practiceAudioEl();
         el.src = practice.url; el.playbackRate = practice.rate;
         if ('preservesPitch' in el) el.preservesPitch = true;
-        practice.ready = true;
+        practice.ready = true; practice.songId = id;
         renderAudioPanel();
         if (autoplay) el.play().catch(function() {});
     }).catch(function() { renderAudioPanel(); });
+}
+/* re-open the player without reloading — so hiding/showing keeps it playing and
+   keeps the A/B markers (only load from disk if it isn't already loaded) */
+function resumePracticePanel() {
+    if (practice.ready && practice.songId === currentSongId) renderAudioPanel();
+    else loadPracticeAudio(currentSongId, false);
 }
 /* called from renderChart + openChart */
 function renderAudioPanel() {
@@ -3596,7 +3693,7 @@ function renderAudioPanel() {
     var id = currentSongId;
     if (!audioKeys[id]) { box.innerHTML = '<button class="listen-btn ghost audio-add" onclick="pickPracticeAudio()"><span class="sp">♫</span> Add practice audio (MP3)</button>'; return; }
     if (!practice.open || !practice.ready) {
-        box.innerHTML = '<button class="listen-btn" onclick="practice.open=true;loadPracticeAudio(currentSongId,false)"><span class="sp">▶</span> Practice track (A/B loop)</button>';
+        box.innerHTML = '<button class="listen-btn" onclick="practice.open=true;resumePracticePanel()"><span class="sp">▶</span> Practice track (A/B loop)</button>';
         return;
     }
     box.innerHTML = '<div class="audio-panel">' +
