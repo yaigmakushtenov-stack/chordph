@@ -53,6 +53,7 @@
     nav .links a { color: var(--muted); font-size: 14px; transition: color .15s; }
     nav .links a:hover { color: var(--text); }
     nav .links a.nav-hi { color: var(--accent); font-weight: 600; }
+    nav .links a.nav-app { color: var(--accent); font-weight: 600; }
     .btn {
         display: inline-block; border-radius: 10px; font-weight: 600; cursor: pointer;
         white-space: nowrap;
@@ -238,12 +239,14 @@
         <span class="wordmark">Chord.ph</span>
         <span class="nav-right">
             <span class="links" id="nav-links">
-                <a href="#features" onclick="closeNavMenu()">Features</a>
+                <a href="/app/" class="nav-app">Open app</a>
                 <a href="/analyzer/">Analyzer</a>
+                <a href="#features" onclick="closeNavMenu()">Features</a>
                 <a href="#contact" onclick="closeNavMenu()">Contact</a>
+                <a href="#about" onclick="closeNavMenu()">About</a>
+                <a href="#legal" onclick="closeNavMenu()">Terms</a>
                 <a href="/app/#signin" id="nav-login">Log in</a>
             </span>
-            <a class="btn btn-primary" href="/app/">Open app</a>
             <button class="nav-burger" id="nav-burger" aria-label="Menu" aria-expanded="false" onclick="toggleNavMenu(event)">&#9776;</button>
         </span>
     </div>
