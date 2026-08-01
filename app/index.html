@@ -441,6 +441,12 @@
             background: var(--hover); border: 1px solid var(--border, #263041); color: var(--muted);
         }
         .tag-chip.on { background: rgba(79,140,255,0.15); border-color: var(--accent); color: var(--accent); }
+        /* multi-band switcher chips */
+        .band-switcher { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 12px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .band-switcher::-webkit-scrollbar { display: none; }
+        .band-chip { flex: 0 0 auto; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 14px;
+            border-radius: 999px; white-space: nowrap; background: var(--hover); border: 1px solid var(--border); color: var(--muted); }
+        .band-chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
         .sort-row { display: flex; justify-content: flex-end; padding: 0 0 8px; }
         .sort-row:empty { display: none; }
         .sort-sel {
@@ -2475,8 +2481,10 @@ function renderSongList() {
     var sortEl = document.getElementById('songs-sort'); if (sortEl) sortEl.innerHTML = sortSelectHTML();
     box.innerHTML = '';
     // shared BAND library — shown above your own songs
+    var sw = bandSwitcherHTML();
+    if (sw) { var swd = document.createElement('div'); swd.innerHTML = sw; box.appendChild(swd.firstChild); }
     var bandMatches = applySort(teamSongs.filter(function(s) {
-        return matchesQuery(s, q) && hasAllTags(s, songFilterTags) && (!songFavOnly || isFav(s.id));
+        return bandMatchesActive(s.team_id) && matchesQuery(s, q) && hasAllTags(s, songFilterTags) && (!songFavOnly || isFav(s.id));
     }));
     if (bandMatches.length) {
         var bl = document.createElement('div'); bl.className = 'section-label'; bl.textContent = 'Band library';
@@ -4244,11 +4252,35 @@ function setlistById(id) {
     for (var i = 0; i < state.setlists.length; i++) if (state.setlists[i].id === id) return state.setlists[i];
     return null;
 }
+/* ---- multi-band switcher: when you're in several bands, focus one so the
+   band setlists + band library show just that band's content ---- */
+var activeBand = localStorage.getItem('chordph2_activeband') || '';   // '' = all bands
+function bandMatchesActive(teamId) {
+    if (activeBand && !myTeams.some(function(t) { return t.id === activeBand; })) activeBand = '';   // stale
+    return !activeBand || teamId === activeBand;
+}
+function setActiveBand(id) {
+    activeBand = id || '';
+    localStorage.setItem('chordph2_activeband', activeBand);
+    if (document.getElementById('view-songs').classList.contains('active')) renderSongList();
+    if (document.getElementById('view-setlists').classList.contains('active')) renderSetlists();
+}
+function bandSwitcherHTML() {
+    if (myTeams.length <= 1) return '';   // only useful with 2+ bands
+    if (activeBand && !myTeams.some(function(t) { return t.id === activeBand; })) activeBand = '';
+    var chips = '<button class="band-chip' + (!activeBand ? ' on' : '') + '" onclick="setActiveBand(\'\')">All bands</button>' +
+        myTeams.map(function(t) { return '<button class="band-chip' + (activeBand === t.id ? ' on' : '') + '" onclick="setActiveBand(\'' + t.id + '\')">' + esc(t.name) + '</button>'; }).join('');
+    return '<div class="band-switcher">' + chips + '</div>';
+}
 function renderBandSetlists(box) {
-    if (!teamSetlists.length) return;
+    var sw = bandSwitcherHTML();
+    var sets = teamSetlists.filter(function(ts) { return bandMatchesActive(ts.team_id); });
+    if (!sets.length && !sw) return;
+    if (sw) { var swd = document.createElement('div'); swd.innerHTML = sw; box.appendChild(swd.firstChild); }
+    if (!sets.length) return;
     var lbl = document.createElement('div'); lbl.className = 'section-label'; lbl.textContent = 'Band setlists';
     box.appendChild(lbl);
-    teamSetlists.forEach(function(ts) {
+    sets.forEach(function(ts) {
         var teamName = (myTeams.filter(function(t) { return t.id === ts.team_id; })[0] || {}).name || 'your band';
         var n = (ts.data && ts.data.songs || []).length;
         var row = document.createElement('div');
