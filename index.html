@@ -195,6 +195,36 @@
     footer .flinks { display: flex; gap: 20px; }
     footer .flinks a { color: var(--muted); font-size: 13px; }
     footer .flinks a:hover { color: var(--text); }
+    footer .socials { display: flex; gap: 12px; margin-top: 12px; }
+    footer .socials:empty, footer .socials a[hidden] { display: none; }
+    footer .socials a { color: var(--muted); display: inline-flex; }
+    footer .socials a:hover { color: var(--accent); }
+    footer .socials svg { width: 22px; height: 22px; fill: currentColor; }
+    .foot-legal { border-top: 1px solid var(--hairline); margin-top: 26px; padding-top: 20px; }
+    .foot-legal .disclaimer { color: var(--faint); font-size: 12px; line-height: 1.6; max-width: 70ch; }
+    .foot-legal .copy { color: var(--faint); font-size: 12px; margin-top: 12px; }
+    .foot-legal .copy a { color: var(--muted); }
+    .foot-legal .copy a:hover { color: var(--text); }
+
+    /* About */
+    #about .about-body { max-width: 720px; margin: 0 auto; }
+    #about .about-body p { color: var(--muted); font-size: 16px; line-height: 1.7; margin-bottom: 16px; }
+    #about .about-body p b { color: var(--text); }
+
+    /* Legal */
+    #legal .legal-body { max-width: 760px; margin: 0 auto; }
+    #legal h3 { font-size: 16px; margin: 26px 0 8px; }
+    #legal .legal-body p { color: var(--muted); font-size: 14px; line-height: 1.7; margin-bottom: 8px; }
+
+    /* Welcome-back banner (shown to signed-in visitors) */
+    #welcome { display: none; }
+    #welcome.show { display: block; }
+    .welcome-card { max-width: 720px; margin: 0 auto 8px; background: rgba(79,140,255,0.08);
+        border: 1px solid rgba(79,140,255,0.28); border-radius: 16px; padding: 18px 22px;
+        display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .welcome-card .wc-hi { font-size: 18px; font-weight: 700; }
+    .welcome-card .wc-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .welcome-card .wc-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
     .reveal { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
     .reveal.in { opacity: 1; transform: none; }
@@ -218,6 +248,20 @@
         </span>
     </div>
 </nav>
+
+<section id="welcome">
+    <div class="wrap" style="padding-top:24px;">
+        <div class="welcome-card">
+            <div>
+                <div class="wc-hi" id="wc-hi">Welcome back</div>
+                <div class="wc-sub">Pick up where you left off.</div>
+            </div>
+            <div class="wc-actions">
+                <a class="btn btn-primary" href="/app/">Open Chord.ph &rarr;</a>
+            </div>
+        </div>
+    </div>
+</section>
 
 <header class="hero wrap">
     <span class="eyebrow">Free · works offline</span>
@@ -271,6 +315,28 @@ At sasambahin ka sa dakong lihim</div>
             <div class="feature reveal"><span class="ico">☁️</span><h3>Cloud sync &amp; offline</h3><p>Your songs and setlists follow you across phone and PC — and still work with no signal.</p></div>
             <div class="feature reveal"><span class="ico">🥁</span><h3>Plays your part</h3><p>Pick your instrument and the chart adapts — drummers see feel &amp; tempo, guitarists see capo.</p></div>
             <div class="feature reveal"><span class="ico">📖</span><h3>Readable on stage</h3><p>Chords highlighted, controls that stay in reach while you scroll, adjustable text size and auto-scroll.</p></div>
+        </div>
+    </div>
+</section>
+
+<section id="about">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <h2>About Chord.ph</h2>
+            <p>Built by Filipino worship musicians, for worship musicians.</p>
+        </div>
+        <div class="about-body reveal">
+            <p>Chord.ph started with a very ordinary Sunday problem: chord charts scattered across
+                screenshots, group chats, notebooks and half a dozen apps — none of them made for a band
+                playing together. We wanted one clean place where the whole team reads the same sheet, in
+                the right key, on any device.</p>
+            <p>So we built it. Instant transpose and capo shapes, Nashville numbers, setlists and medleys,
+                an on-device key &amp; BPM analyzer, and band sync so your worship team shares one library
+                and one setlist that updates live. It runs in the browser, works offline, and installs to
+                your home screen — <b>no account needed to start</b>.</p>
+            <p>Chord.ph is <b>free for every musician</b>. Team features and a few power tools support the
+                project so the core stays free and keeps getting better — made in the Philippines, for the
+                worldwide worship community.</p>
         </div>
     </div>
 </section>
@@ -334,18 +400,64 @@ At sasambahin ka sa dakong lihim</div>
     </div>
 </section>
 
+<section id="legal">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <h2>Terms &amp; privacy</h2>
+            <p>The short, plain version.</p>
+        </div>
+        <div class="legal-body reveal">
+            <h3>Using Chord.ph</h3>
+            <p>Chord.ph is provided free, as-is, for worship and personal music practice. We do our best to
+                keep it running and accurate, but we can't guarantee it's error-free or always available.
+                Use it at your own discretion for your ministry and practice.</p>
+
+            <h3>Chords &amp; charts (disclaimer)</h3>
+            <p>Chord charts and tabs are contributed by the community as interpretations to help people
+                play and worship. They are not official transcriptions. All songs remain the property of
+                their respective songwriters, artists and publishers. If you own a work and want a chart
+                removed, contact us and we'll take it down.</p>
+
+            <h3>Your data &amp; privacy</h3>
+            <p>You can use the app with no account at all — your songs and setlists stay on your device.
+                If you sign in (to sync across devices or use band features), we store your email and your
+                library in our secure database (Supabase) purely to provide the service. We do not sell your
+                data or share it for advertising. Analysis in the Key &amp; BPM Analyzer runs on your device;
+                audio you add to the practice player stays on your device.</p>
+
+            <h3>Contact</h3>
+            <p>Questions, takedowns, or partnership: use the <a href="#contact">contact form</a> above.
+                This is a plain-language summary and a work in progress, not formal legal advice.</p>
+        </div>
+    </div>
+</section>
+
 <footer>
     <div class="wrap">
         <div>
             <div class="wordmark">Chord.ph</div>
             <div class="tagline">Your chords. Your key. Your music.</div>
+            <div class="socials" id="socials">
+                <!-- Fill hrefs with your real pages, then remove hidden -->
+                <a href="#" data-social="facebook" hidden aria-label="Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 22v-8h2.7l.4-3H13V9c0-.9.3-1.5 1.6-1.5H16V4.9C15.7 4.9 14.7 4.8 13.6 4.8 11.3 4.8 9.7 6.2 9.7 8.7V11H7v3h2.7v8H13z"/></svg></a>
+                <a href="#" data-social="instagram" hidden aria-label="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.3 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.3 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.3-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.9c.1-1.2.3-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4 1.3-.1 1.7-.1 4.9-.1zm0 1.8c-3.1 0-3.5 0-4.7.1-1.1.1-1.7.2-2.1.4-.5.2-.9.4-1.3.8-.4.4-.6.8-.8 1.3-.2.4-.3 1-.4 2.1C2.4 9.5 2.4 9.9 2.4 12s0 2.5.1 3.7c.1 1.1.2 1.7.4 2.1.2.5.4.9.8 1.3.4.4.8.6 1.3.8.4.2 1 .3 2.1.4 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1.1-.1 1.7-.2 2.1-.4.5-.2.9-.4 1.3-.8.4-.4.6-.8.8-1.3.2-.4.3-1 .4-2.1.1-1.2.1-1.6.1-3.7s0-2.5-.1-3.7c-.1-1.1-.2-1.7-.4-2.1-.2-.5-.4-.9-.8-1.3-.4-.4-.8-.6-1.3-.8-.4-.2-1-.3-2.1-.4C15.5 4 15.1 4 12 4zm0 3.1a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8zm0 8.1a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zm5.2-8.3a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0z"/></svg></a>
+                <a href="#" data-social="youtube" hidden aria-label="YouTube"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23 12s0-3.2-.4-4.7c-.2-.8-.9-1.5-1.7-1.7C19.4 5.2 12 5.2 12 5.2s-7.4 0-8.9.4c-.8.2-1.5.9-1.7 1.7C1 8.8 1 12 1 12s0 3.2.4 4.7c.2.8.9 1.5 1.7 1.7 1.5.4 8.9.4 8.9.4s7.4 0 8.9-.4c.8-.2 1.5-.9 1.7-1.7.4-1.5.4-4.7.4-4.7zM9.7 15.3V8.7l5.8 3.3-5.8 3.3z"/></svg></a>
+            </div>
         </div>
         <div class="flinks">
             <a href="/app/">App</a>
             <a href="/analyzer/">Analyzer</a>
+            <a href="#about">About</a>
             <a href="#features">Features</a>
             <a href="#contact">Contact</a>
+            <a href="#legal">Terms</a>
         </div>
+    </div>
+    <div class="foot-legal wrap">
+        <p class="disclaimer">Chord charts are community-contributed interpretations for worship and personal
+            practice, not official transcriptions. All songs remain the property of their respective
+            songwriters and publishers.</p>
+        <p class="copy">© <span id="foot-year">2026</span> Chord.ph · <a href="#legal">Terms &amp; Privacy</a> · Made in the Philippines 🇵🇭</p>
     </div>
 </footer>
 
@@ -364,13 +476,19 @@ At sasambahin ka sa dakong lihim</div>
                     if (u) { name = (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || (u.email || '').split('@')[0]; break; }
                 }
             } catch (e) {}
+            var first = name ? name.split(' ')[0] : '';
             var link = document.getElementById('nav-login');
-            if (!link) return;
-            if (name) { link.textContent = 'Hi, ' + name.split(' ')[0]; link.href = '/app/'; link.classList.add('nav-hi'); }
-            else { link.textContent = 'Log in'; link.href = '/app/#signin'; link.classList.remove('nav-hi'); }
+            if (link) {
+                if (name) { link.textContent = 'Hi, ' + first; link.href = '/app/'; link.classList.add('nav-hi'); }
+                else { link.textContent = 'Log in'; link.href = '/app/#signin'; link.classList.remove('nav-hi'); }
+            }
+            var wel = document.getElementById('welcome'), hi = document.getElementById('wc-hi');
+            if (wel) wel.classList.toggle('show', !!name);
+            if (hi && name) hi.textContent = 'Welcome back, ' + first + ' 👋';
         }
         apply();
         window.addEventListener('storage', apply);   // update live if they sign in/out in the app tab
+        var fy = document.getElementById('foot-year'); if (fy) fy.textContent = new Date().getFullYear();
     })();
 
     // Mobile nav menu (the text links collapse into a tap-to-open dropdown on phones)

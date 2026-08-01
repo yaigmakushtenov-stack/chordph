@@ -322,14 +322,15 @@
             background: var(--surface); color: var(--text); border: 1px solid var(--border);
             border-radius: 999px; padding: 7px 14px; box-shadow: var(--shadow-sm); }
         body.stage-mode #stage-exit { display: block; }
-        #stage-speed { position: fixed; z-index: 260; display: none;
-            left: calc(14px + env(safe-area-inset-left)); bottom: calc(22px + env(safe-area-inset-bottom));
-            align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--border);
-            border-radius: 999px; padding: 4px 6px; box-shadow: var(--shadow-sm); }
-        body.stage-mode #stage-speed { display: flex; }
+        /* autoscroll speed — vertical, stacked just above the floating play button
+           (bottom-right). Shown on every chart so you can nudge speed without
+           opening a control. Visibility toggled in show(). */
+        #stage-speed { position: fixed; z-index: 260; display: none; flex-direction: column; align-items: center; gap: 2px;
+            right: calc(21px + env(safe-area-inset-right)); bottom: calc(86px + env(safe-area-inset-bottom));
+            background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 5px 3px; box-shadow: var(--shadow-sm); }
         #stage-speed button { width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer;
             background: none; color: var(--text); font-size: 18px; line-height: 1; }
-        #stage-speed #stage-speed-val { font-size: 13px; color: var(--muted); min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+        #stage-speed #stage-speed-val { font-size: 12px; color: var(--muted); min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
         body.stage-mode #view-chart .bar,
         body.stage-mode .control-dock,
         body.stage-mode .chart-meta,
@@ -1078,10 +1079,7 @@
 
             <div class="layer" id="layer-scroll">
                 <button class="tap primary" id="scroll-toggle" onclick="toggleScroll()">&#9654; Play</button>
-                <span class="lbl">speed</span>
-                <button class="tap glyph" onclick="scrollSpeedBy(-0.5)" aria-label="Scroll slower">&minus;</button>
-                <span class="val" id="scroll-val" aria-live="polite">3</span>
-                <button class="tap glyph" onclick="scrollSpeedBy(0.5)" aria-label="Scroll faster">+</button>
+                <span class="lbl">Speed is the &minus;/+ dial by the play button.</span>
             </div>
 
             <div class="layer" id="layer-click">
@@ -1199,9 +1197,9 @@
 <button id="stage-exit" onclick="toggleStage()" aria-label="Exit stage mode">&times; Exit stage</button>
 <!-- autoscroll speed, reachable in stage mode -->
 <div id="stage-speed" aria-hidden="true">
-    <button onclick="scrollSpeedBy(-0.5)" aria-label="Scroll slower">&minus;</button>
-    <span id="stage-speed-val">3</span>
     <button onclick="scrollSpeedBy(0.5)" aria-label="Scroll faster">+</button>
+    <span id="stage-speed-val">3</span>
+    <button onclick="scrollSpeedBy(-0.5)" aria-label="Scroll slower">&minus;</button>
 </div>
 
 <div class="sheet-scrim" id="sheet-scrim" onclick="if (event.target === this) closeSheet()">
@@ -2299,9 +2297,12 @@ function show(viewId) {
     document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
     document.getElementById('view-' + viewId).classList.add('active');
     window.scrollTo(0, 0);
-    // the floating autoscroll button lives on the chart only
+    // the floating autoscroll play button + speed control live on the chart only
     var fab = document.getElementById('scroll-fab');
     if (fab) fab.style.display = (viewId === 'chart') ? 'flex' : 'none';
+    var spd = document.getElementById('stage-speed');
+    if (spd) { spd.style.display = (viewId === 'chart') ? 'flex' : 'none';
+        var sv = document.getElementById('stage-speed-val'); if (sv) sv.textContent = fmtScroll(state.scroll.speed); }
     if (viewId !== 'chart') {
         document.body.classList.remove('chart-navbar');
         if (stageMode) { stageMode = false; document.body.classList.remove('stage-mode'); }  // don't stay in stage off-chart
@@ -3416,7 +3417,7 @@ function renderChart() {
     document.getElementById('notation-sharp').classList.toggle('on', !state.useFlats);
     document.getElementById('notation-flat').classList.toggle('on', state.useFlats);
     document.getElementById('font-val').textContent = state.fontSize;
-    document.getElementById('scroll-val').textContent = fmtScroll(state.scroll.speed);
+    var svEl = document.getElementById('stage-speed-val'); if (svEl) svEl.textContent = fmtScroll(state.scroll.speed);
     renderCapoLayer(song, keyIdx);
     // Click control needs a tempo; hide it (and its layer) on tempo-less songs
     document.getElementById('ctl-click').style.display = song.tempo ? '' : 'none';
@@ -3606,8 +3607,8 @@ function renderAudioPanel() {
         '<div class="audio-ab">' +
         '<button class="ab-btn' + (practice.a != null ? ' on' : '') + '" onclick="setPracticeMark(\'a\')">Set A</button>' +
         '<button class="ab-btn' + (practice.b != null ? ' on' : '') + '" onclick="setPracticeMark(\'b\')">Set B</button>' +
-        '<button class="ab-btn' + (practice.loop ? ' on' : '') + '" onclick="togglePracticeLoop()">Loop A–B</button>' +
-        '<span class="ab-mark">A ' + (practice.a != null ? fmtTime(practice.a) : '—') + ' · B ' + (practice.b != null ? fmtTime(practice.b) : '—') + '</span></div>' +
+        ((practice.a != null || practice.b != null) ? '<button class="ab-btn" onclick="clearPracticeAB()">Clear</button>' : '') +
+        '<span class="ab-mark">A ' + (practice.a != null ? fmtTime(practice.a) : '—') + ' · B ' + (practice.b != null ? fmtTime(practice.b) : '—') + (practice.loop ? ' · looping ↺' : '') + '</span></div>' +
         '<div class="audio-speed"><span>Speed</span>' +
         [0.5, 0.75, 1, 1.25].map(function(r) { return '<button class="sp-btn' + (practice.rate === r ? ' on' : '') + '" onclick="setPracticeRate(' + r + ')">' + r + '×</button>'; }).join('') +
         '</div>' +
@@ -3627,16 +3628,16 @@ function seekPractice(v) { if (practice.el) practice.el.currentTime = parseFloat
 function setPracticeMark(which) {
     if (!practice.el) return;
     practice[which] = practice.el.currentTime;
-    if (practice.a != null && practice.b != null && practice.a > practice.b) { var t = practice.a; practice.a = practice.b; practice.b = t; }
-    renderAudioPanel();
-}
-function togglePracticeLoop() {
-    if (practice.a == null || practice.b == null) { toast('Set point A and B first.'); return; }
-    practice.loop = !practice.loop;
-    if (practice.loop && practice.el && (practice.el.currentTime < practice.a || practice.el.currentTime > practice.b)) practice.el.currentTime = practice.a;
+    // once BOTH A and B are set, loop between them automatically
+    if (practice.a != null && practice.b != null) {
+        if (practice.a > practice.b) { var t = practice.a; practice.a = practice.b; practice.b = t; }
+        practice.loop = true;
+        if (practice.el.currentTime < practice.a || practice.el.currentTime > practice.b) practice.el.currentTime = practice.a;
+    }
     renderAudioPanel();
 }
 function setPracticeRate(r) { practice.rate = r; if (practice.el) practice.el.playbackRate = r; renderAudioPanel(); }
+function clearPracticeAB() { practice.a = null; practice.b = null; practice.loop = false; renderAudioPanel(); }
 function renderChordStrip(strip, chartText) {
     var names = uniqueChords(chartText);
     var html = names.map(function(n) {
