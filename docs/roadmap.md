@@ -139,6 +139,29 @@ its full-playback/SDK path stays a later Premium extra.
 
 ## Parked features (soon)
 
+- **Android file picker opens a chooser, not Files** (user, Jul 28) — on Android,
+  the analyzer + MP3-player file inputs show an intent chooser (voice recorder /
+  photos). This is Android's OS picker driven by the `accept` MIME type; a web
+  page can't force "Files only". Investigate: extension-only `accept`, or a custom
+  "how to pick" hint. For now users tap Files/Browse in the chooser.
+- **Analyzer: listen history + per-item clear** (user, Jul 28) — the Key & BPM
+  Analyzer keeps a history of analysed songs; let users clear ONE entry or all
+  (not just clear-all). Lives in the /analyzer app ([[key-bpm-detector-app]]).
+- **AI chord + lyric mapping from uploaded audio** (user, Jul 28) — Premium:
+  upload an MP3 → AI detects song structure + maps chords & lyrics automatically
+  (audio→chart). Heavy ML; needs a commercially-licensed model (NOT the NC
+  analyzer). Sits with Premium chord-detection.
+- **AI note/tab transcriber** (user, Jul 28) — real-time transcription mapping,
+  incl. guitar tab, AI-powered. A big adjacent product; possibly its own app.
+- **Geo-based pricing** (user, Jul 28) — different price per country for a
+  worldwide launch (Stripe/local gateways support region pricing + PPP tiers).
+- **Translation / i18n** (user, Jul 28) — multi-language UI (start with the PH
+  languages + English). Needs a string-extraction pass + locale files.
+- **About Us** section on the landing page (user, Jul 28) — pair with legal +
+  social links.
+- **Ads on the page?** (user, Jul 28, DISCUSS) — leaning NO for a worship tool;
+  premium tiers + pads are the cleaner revenue. If ever, keep them out of the
+  chart/stage view. Decide later.
 - **Legal & disclaimers** (user, Jul 27) — a legal/disclaimer section on the
   landing page footer AND a small disclaimer under the chord chart (e.g. chords
   are user-submitted, fair-use for worship/practice, not official transcriptions).
