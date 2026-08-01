@@ -159,9 +159,19 @@ its full-playback/SDK path stays a later Premium extra.
   languages + English). Needs a string-extraction pass + locale files.
 - **About Us** section on the landing page (user, Jul 28) — pair with legal +
   social links.
-- **Ads on the page?** (user, Jul 28, DISCUSS) — leaning NO for a worship tool;
-  premium tiers + pads are the cleaner revenue. If ever, keep them out of the
-  chart/stage view. Decide later.
+- **Ads — LANDING PAGE ONLY** (user, Jul 28, DECIDED) — the user is open to ads
+  on the **landing page only**; the **app stays 100% ad-free** (no ads in the
+  chart/library/stage — ever). Revenue mainly from the Pro/Premium tiers; landing
+  ads are a secondary lane. Implement later with the payments/marketing round.
+- **Contribution credits → free Pro** (user, Jul 28) — reward users who submit
+  high-quality tabs/charts (via the existing thumbs-up voting): earn credits/points
+  that unlock Pro-tier time for free. Gamifies the community library; needs a
+  credits ledger + a rule for "high quality" (votes/approvals) + redemption.
+- **Landing → social / marketplace (big vision)** (user, Jul 28) — the landing
+  page evolves into a social surface: users post performances/videos; later a
+  marketplace for second-hand instruments and new pro audio gear. Major separate
+  build (feeds, uploads, listings, payments/escrow, moderation). Park as a
+  long-term direction, not near-term.
 - **Legal & disclaimers** (user, Jul 27) — a legal/disclaimer section on the
   landing page footer AND a small disclaimer under the chord chart (e.g. chords
   are user-submitted, fair-use for worship/practice, not official transcriptions).
