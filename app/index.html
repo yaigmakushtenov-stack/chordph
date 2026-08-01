@@ -322,6 +322,14 @@
             background: var(--surface); color: var(--text); border: 1px solid var(--border);
             border-radius: 999px; padding: 7px 14px; box-shadow: var(--shadow-sm); }
         body.stage-mode #stage-exit { display: block; }
+        #stage-speed { position: fixed; z-index: 260; display: none;
+            left: calc(14px + env(safe-area-inset-left)); bottom: calc(22px + env(safe-area-inset-bottom));
+            align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 999px; padding: 4px 6px; box-shadow: var(--shadow-sm); }
+        body.stage-mode #stage-speed { display: flex; }
+        #stage-speed button { width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer;
+            background: none; color: var(--text); font-size: 18px; line-height: 1; }
+        #stage-speed #stage-speed-val { font-size: 13px; color: var(--muted); min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
         body.stage-mode #view-chart .bar,
         body.stage-mode .control-dock,
         body.stage-mode .chart-meta,
@@ -1189,6 +1197,12 @@
 </button>
 <!-- leave stage mode (only visible while in it) -->
 <button id="stage-exit" onclick="toggleStage()" aria-label="Exit stage mode">&times; Exit stage</button>
+<!-- autoscroll speed, reachable in stage mode -->
+<div id="stage-speed" aria-hidden="true">
+    <button onclick="scrollSpeedBy(-0.5)" aria-label="Scroll slower">&minus;</button>
+    <span id="stage-speed-val">3</span>
+    <button onclick="scrollSpeedBy(0.5)" aria-label="Scroll faster">+</button>
+</div>
 
 <div class="sheet-scrim" id="sheet-scrim" onclick="if (event.target === this) closeSheet()">
     <div class="sheet" id="sheet"></div>
@@ -3590,8 +3604,8 @@ function renderAudioPanel() {
         '<input type="range" class="audio-seek" id="audio-seek" min="0" max="' + (practice.el.duration || 0) + '" step="0.01" value="' + (practice.el.currentTime || 0) + '" oninput="seekPractice(this.value)">' +
         '<span class="audio-time" id="audio-time">' + fmtTime(practice.el.currentTime) + ' / ' + fmtTime(practice.el.duration) + '</span></div>' +
         '<div class="audio-ab">' +
-        '<button class="ab-btn" onclick="setPracticeMark(\'a\')">Set A</button>' +
-        '<button class="ab-btn" onclick="setPracticeMark(\'b\')">Set B</button>' +
+        '<button class="ab-btn' + (practice.a != null ? ' on' : '') + '" onclick="setPracticeMark(\'a\')">Set A</button>' +
+        '<button class="ab-btn' + (practice.b != null ? ' on' : '') + '" onclick="setPracticeMark(\'b\')">Set B</button>' +
         '<button class="ab-btn' + (practice.loop ? ' on' : '') + '" onclick="togglePracticeLoop()">Loop A–B</button>' +
         '<span class="ab-mark">A ' + (practice.a != null ? fmtTime(practice.a) : '—') + ' · B ' + (practice.b != null ? fmtTime(practice.b) : '—') + '</span></div>' +
         '<div class="audio-speed"><span>Speed</span>' +
@@ -3756,6 +3770,7 @@ function setStage(on) {
     stageMode = on;
     document.body.classList.toggle('stage-mode', on);
     var c = document.getElementById('chart-stage'); if (c) c.classList.toggle('on', on);
+    var ss = document.getElementById('stage-speed-val'); if (ss) ss.textContent = fmtScroll(state.scroll.speed);
     if (on) updateWakeLock();          // keep the screen awake on stage
     else if (!wakeLockNeeded()) updateWakeLock();
     renderChart();                     // re-apply the (scaled) chart font
@@ -3824,7 +3839,9 @@ function stopScroll() {
 function fmtScroll(s) { return (s % 1 === 0) ? String(s) : s.toFixed(1); }
 function scrollSpeedBy(d) {
     state.scroll.speed = Math.max(1, Math.min(5, Math.round((state.scroll.speed + d) * 2) / 2));
-    document.getElementById('scroll-val').textContent = fmtScroll(state.scroll.speed);
+    var v = fmtScroll(state.scroll.speed);
+    var sv = document.getElementById('scroll-val'); if (sv) sv.textContent = v;
+    var ss = document.getElementById('stage-speed-val'); if (ss) ss.textContent = v;
 }
 
 /* ---- click / metronome (Web Audio, accent on beat 1 of 4/4) ---- */
