@@ -334,6 +334,30 @@
         #stage-speed button { width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer;
             background: none; color: var(--text); font-size: 18px; line-height: 1; }
         #stage-speed #stage-speed-val { font-size: 12px; color: var(--muted); min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+        /* stage: floating chart functions, stacked above the speed dial */
+        #stage-funcs { position: fixed; z-index: 261; display: none; flex-direction: column; align-items: flex-end; gap: 8px;
+            right: calc(21px + env(safe-area-inset-right)); bottom: calc(188px + env(safe-area-inset-bottom)); }
+        body.stage-mode #stage-funcs { display: flex; }
+        .sf-main { width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: 18px; line-height: 1;
+            background: var(--surface); border: 1px solid var(--border); color: var(--text); box-shadow: var(--shadow-sm); }
+        #stage-funcs.open .sf-main { color: var(--accent); border-color: var(--accent); }
+        .sf-list { display: none; flex-direction: column; gap: 8px; align-items: flex-end; }
+        #stage-funcs.open .sf-list { display: flex; }
+        .sf-row { display: flex; align-items: center; gap: 8px; }
+        .sf-btn { width: 44px; height: 44px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+            background: var(--surface); border: 1px solid var(--border); color: var(--muted); box-shadow: var(--shadow-sm);
+            display: flex; align-items: center; justify-content: center; }
+        .sf-btn svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 1.7; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+        .sf-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+        .sf-opts { display: flex; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 999px; padding: 4px 6px; box-shadow: var(--shadow-sm); }
+        .sf-opts button { min-width: 32px; height: 32px; border-radius: 999px; border: none; cursor: pointer;
+            background: none; color: var(--text); font: inherit; font-size: 14px; padding: 0 8px; }
+        .sf-opts button.on { color: var(--accent); }
+        .sf-opts .sf-val { font-size: 13px; color: var(--muted); min-width: 26px; text-align: center; font-variant-numeric: tabular-nums; }
+        /* shift the reading column so the dock / options don't cover the lyrics */
+        body.stage-mode.sf-open #view-chart .wrap { padding-right: 76px; }
+        body.stage-mode.sf-opts-open #view-chart .wrap { padding-right: 210px; }
         body.stage-mode #view-chart .bar,
         body.stage-mode .control-dock,
         body.stage-mode .chart-meta,
@@ -1218,6 +1242,11 @@
     <button onclick="scrollSpeedBy(0.5)" aria-label="Scroll faster">+</button>
     <span id="stage-speed-val">3</span>
     <button onclick="scrollSpeedBy(-0.5)" aria-label="Scroll slower">&minus;</button>
+</div>
+<!-- stage mode: floating chart functions (transpose / numbers / chords / lyrics / text) -->
+<div id="stage-funcs" aria-hidden="true">
+    <div class="sf-list" id="sf-list"></div>
+    <button class="sf-main" id="sf-main" onclick="toggleStageFuncs()" aria-label="Chart functions">&#9776;</button>
 </div>
 
 <div class="sheet-scrim" id="sheet-scrim" onclick="if (event.target === this) closeSheet()">
@@ -3869,9 +3898,57 @@ function setStage(on) {
     document.body.classList.toggle('stage-mode', on);
     var c = document.getElementById('chart-stage'); if (c) c.classList.toggle('on', on);
     var ss = document.getElementById('stage-speed-val'); if (ss) ss.textContent = fmtScroll(state.scroll.speed);
-    if (on) updateWakeLock();          // keep the screen awake on stage
+    if (!on) {   // leaving stage: reset the function dock + lyric shift
+        stageFuncsOpen = false; stageActiveFunc = null;
+        document.body.classList.remove('sf-open', 'sf-opts-open');
+        var sf = document.getElementById('stage-funcs'); if (sf) sf.classList.remove('open');
+    }
+    if (on) { renderStageFuncs(); updateWakeLock(); }   // keep the screen awake on stage
     else if (!wakeLockNeeded()) updateWakeLock();
     renderChart();                     // re-apply the (scaled) chart font
+}
+/* ---- stage floating chart functions ---- */
+var stageFuncsOpen = false, stageActiveFunc = null;   // active = 'transpose' | 'text' | null
+var SF_ICONS = {
+    transpose: '<path d="M8 4v16M8 4l-3 3M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3"/>',
+    numbers: '<path d="M8 4v16M16 4v16M4 9h16M4 15h16"/>',
+    chords: '<path d="M5 4h14M5 9h14M5 14h14M5 19h14M9 4v15M15 4v15"/>',
+    lyrics: '<path d="M5 6h14M5 10h14M5 14h9M5 18h11"/>',
+    text: '<path d="M3 18l4.5-12 4.5 12M4.6 14h5.8M15 18l2.5-7 2.5 7M16 16h3"/>'
+};
+function toggleStageFuncs() {
+    stageFuncsOpen = !stageFuncsOpen;
+    if (!stageFuncsOpen) stageActiveFunc = null;
+    document.getElementById('stage-funcs').classList.toggle('open', stageFuncsOpen);
+    document.body.classList.toggle('sf-open', stageFuncsOpen);
+    document.body.classList.toggle('sf-opts-open', stageFuncsOpen && !!stageActiveFunc);
+    renderStageFuncs();
+}
+function stageFunc(id) {
+    if (id === 'numbers') { toggleNashville(); stageActiveFunc = null; renderStageFuncs(); return; }
+    if (id === 'chords') { toggleDiagrams(); stageActiveFunc = null; renderStageFuncs(); return; }
+    if (id === 'lyrics') { toggleLyrics(); stageActiveFunc = null; renderStageFuncs(); return; }
+    stageActiveFunc = (stageActiveFunc === id) ? null : id;   // transpose / text: toggle inline options
+    document.body.classList.toggle('sf-opts-open', !!stageActiveFunc);
+    renderStageFuncs();
+}
+function renderStageFuncs() {
+    var list = document.getElementById('sf-list'); if (!list) return;
+    var lyricsOn = lyricsActive();
+    function btn(id, on) { return '<button class="sf-btn' + (on ? ' on' : '') + '" onclick="stageFunc(\'' + id + '\')" aria-label="' + id + '"><svg viewBox="0 0 24 24" aria-hidden="true">' + SF_ICONS[id] + '</svg></button>'; }
+    function row(optsHtml, id, on) { return '<div class="sf-row">' + (optsHtml || '') + btn(id, on) + '</div>'; }
+    var trOpts = stageActiveFunc === 'transpose'
+        ? '<div class="sf-opts"><button onclick="transposeBy(-1);renderStageFuncs()">&minus;</button><span class="sf-val">' + (state.transpose[currentSongId] > 0 ? '+' : '') + (state.transpose[currentSongId] || 0) + '</span><button onclick="transposeBy(1);renderStageFuncs()">+</button><button onclick="resetTranspose();renderStageFuncs()">&#8635;</button></div>'
+        : '';
+    var txtOpts = stageActiveFunc === 'text'
+        ? '<div class="sf-opts"><button onclick="fontBy(-2);renderStageFuncs()">A&minus;</button><span class="sf-val">' + state.fontSize + '</span><button onclick="fontBy(2);renderStageFuncs()">A+</button></div>'
+        : '';
+    list.innerHTML =
+        row(trOpts, 'transpose', stageActiveFunc === 'transpose') +
+        row('', 'numbers', state.nashville) +
+        row('', 'chords', state.showDiagrams) +
+        row('', 'lyrics', lyricsOn) +
+        row(txtOpts, 'text', stageActiveFunc === 'text');
 }
 
 /* ---- keep the screen awake while performing (scroll / click / pad) ---- */
