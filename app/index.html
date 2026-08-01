@@ -2674,6 +2674,12 @@ function importChordProFiles(ev) {
    ========================================================= */
 var myTeams = [], teamSetlists = [], teamSongs = [], teamsReady = false, myInvites = [], lastTeamsRefresh = 0;
 function ownedTeams() { return myTeams.filter(function(t) { return t.isOwner; }); }
+function editableTeams() { return myTeams.filter(function(t) { return t.canEdit; }); }   // owner OR granted-editor
+async function setMemberEdit(teamId, userId, val) {
+    var r = await supa.from('team_members').update({ can_edit: val }).eq('team_id', teamId).eq('user_id', userId);
+    if (r.error) toast('Couldn’t update: ' + r.error.message);
+    else { toast(val ? 'Member can now edit the band.' : 'Editing turned off for member.'); await refreshTeams(); }
+}
 function initTeams() {
     if (!supa || !currentUser) { myTeams = []; teamSetlists = []; teamsReady = false; myInvites = []; updateNotifBadge(); return; }
     refreshTeams();   // v2: no more auto-join — invites are accepted/declined in Settings → Band
@@ -2755,13 +2761,13 @@ async function refreshTeams() {
         var teams = (t.data || []).map(function(x) { return { id: x.id, name: x.name, owner_id: x.owner_id, isOwner: x.owner_id === currentUser.id, members: [], pending: [] }; });
         var ids = teams.map(function(x) { return x.id; });
         if (ids.length) {
-            var mem = await supa.from('team_members').select('team_id,user_id,email,role').in('team_id', ids);
+            var mem = await supa.from('team_members').select('team_id,user_id,email,role,can_edit').in('team_id', ids);
             var seen = {};
             (mem.data || []).forEach(function(r) {
                 var key = r.team_id + '|' + r.user_id;
                 if (seen[key]) return; seen[key] = 1;   // belt-and-braces de-dupe
                 var tm = teams.filter(function(x) { return x.id === r.team_id; })[0];
-                if (tm) tm.members.push({ user_id: r.user_id, email: r.email, role: r.role });
+                if (tm) tm.members.push({ user_id: r.user_id, email: r.email, role: r.role, canEdit: !!r.can_edit });
             });
             var owned = teams.filter(function(x) { return x.isOwner; }).map(function(x) { return x.id; });
             if (owned.length) {
@@ -2782,6 +2788,9 @@ async function refreshTeams() {
         // Accept/Decline prompt.
         teams = teams.filter(function(x) {
             return x.isOwner || x.members.some(function(m) { return m.user_id === currentUser.id; });
+        });
+        teams.forEach(function(x) {   // can I edit this band? owner, or a member the owner granted
+            x.canEdit = x.isOwner || x.members.some(function(m) { return m.user_id === currentUser.id && m.canEdit; });
         });
         myTeams = teams;   // publish the fully-built roster atomically
         await loadMyInvites();
@@ -2982,10 +2991,15 @@ function renderRoster(t) {
     }).map(function(m) {
         var me = m.user_id === currentUser.id;
         var who = esc(m.email || 'member') + (me ? ' (you)' : '');
-        var tag = m.role === 'owner' ? ' · admin' : '';
-        var kick = (t.isOwner && !me) ? ' <button class="tap danger" style="font-size:12px;padding:0;" onclick="removeMember(\'' + t.id + '\',\'' + m.user_id + '\')">Remove</button>' : '';
-        return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;">' +
-            '<span>' + who + '<span style="color:var(--faint);">' + tag + '</span></span>' + kick + '</div>';
+        var tag = m.role === 'owner' ? ' · admin' : (m.canEdit ? ' · editor' : '');
+        var controls = '';
+        if (t.isOwner && !me && m.role !== 'owner') {
+            controls = '<button class="tap" style="font-size:12px;padding:0;" onclick="setMemberEdit(\'' + t.id + '\',\'' + m.user_id + '\',' + (!m.canEdit) + ')">' + (m.canEdit ? 'Editor ✓' : 'Make editor') + '</button>' +
+                '<button class="tap danger" style="font-size:12px;padding:0;" onclick="removeMember(\'' + t.id + '\',\'' + m.user_id + '\')">Remove</button>';
+        }
+        return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;flex-wrap:wrap;">' +
+            '<span>' + who + '<span style="color:var(--faint);">' + tag + '</span></span>' +
+            '<span style="display:flex;gap:14px;">' + controls + '</span></div>';
     });
     if (t.isOwner) rows = rows.concat((t.pending || []).map(function(email) {
         return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;color:var(--muted);">' +
@@ -3066,9 +3080,9 @@ async function deleteTeam(teamId) {
     await supa.from('teams').delete().eq('id', teamId);
     await refreshTeams();
 }
-/* owner publishes a personal setlist to the band */
+/* owner or granted editor publishes a personal setlist to the band */
 function shareSetlistToBand(setlistId) {
-    var owned = ownedTeams();
+    var owned = editableTeams();
     if (!owned.length) { toast('Create a band first (Settings → Band).'); return; }
     if (owned.length === 1) return publishSetlistToTeam(setlistId, owned[0].id);
     var names = owned.map(function(t, i) { return (i + 1) + '. ' + t.name; }).join('\n');
@@ -3097,7 +3111,7 @@ async function addSongToBand(song, teamId) {
     refreshTeams();
 }
 function promptAddSongToBand(song) {
-    var owned = ownedTeams();
+    var owned = editableTeams();
     if (!owned.length) { toast('Create a band first (Settings → Band).'); return; }
     if (owned.length === 1) return addSongToBand(song, owned[0].id);
     var pick = window.prompt('Add to which band library?\n' + owned.map(function(t, i) { return (i + 1) + '. ' + t.name; }).join('\n'), '1');
@@ -3116,9 +3130,9 @@ function openBandLibrary(teamId) {
     var rows = songs.length ? songs.map(function(s) {
         return '<div class="row"><div class="row-main" style="cursor:pointer;" onclick="closeSheet();openChart(\'' + s.id + '\',\'band\')">' +
             '<div class="row-title">' + esc(s.title) + '</div><div class="row-sub">' + esc(s.artist || '') + ' · Key ' + esc(s.key || '?') + '</div></div>' +
-            (t.isOwner ? '<button class="tap danger" onclick="removeBandSong(\'' + s.id + '\')">Remove</button>' : '') + '</div>';
+            (t.canEdit ? '<button class="tap danger" onclick="removeBandSong(\'' + s.id + '\')">Remove</button>' : '') + '</div>';
     }).join('') : '<div class="empty">No songs in this band’s library yet.</div>';
-    var note = t.isOwner ? '<div style="font-size:12px;color:var(--muted);margin-top:10px;">Add any song to the band from its chart → <b>Edit → Add to band</b>.</div>' : '';
+    var note = t.canEdit ? '<div style="font-size:12px;color:var(--muted);margin-top:10px;">Add any song to the band from its chart → <b>Edit → Add to band</b>.</div>' : '';
     openSheet('<div class="sheet-title">' + esc(t.name) + ' · library</div>' + rows + note +
         '<div class="sheet-actions"><button class="tap primary" onclick="closeSheet()">Done</button></div>');
 }
@@ -4384,7 +4398,7 @@ function openSetlistMenu() {
     ];
     // only offer "Publish to band" when you actually own a band — otherwise it's
     // confusing (it would just toast "create a band first")
-    if (ownedTeams().length) items.push({ label: 'Publish to band', icon: '👥', onClick: function() { shareSetlistToBand(state.currentSetlistId); } });
+    if (editableTeams().length) items.push({ label: 'Publish to band', icon: '👥', onClick: function() { shareSetlistToBand(state.currentSetlistId); } });
     items.push({ label: 'Rename setlist', icon: '✎', onClick: renameSetlistPrompt });
     items.push({ label: 'Delete setlist', icon: '🗑', danger: true, onClick: deleteSetlistFromDetail });
     openMenu(items, document.getElementById('setlist-menu-btn'));
@@ -4781,7 +4795,7 @@ function openSongSheet(songId) {
     var note = isLib
         ? 'This edits <b style="color:var(--text);">your copy on this device</b> — the shared version everyone else sees stays as is. To propose the fix for everyone, tap “Submit to library”.'
         : 'Saved on this device. <button class="tap" style="padding:0;color:var(--accent);font-size:12px;" onclick="openRulesSheet(\'song\')">See the rules</button> — chords on their own line above the lyric, and label sections like [Verse 1].';
-    var bandBtn = (typeof ownedTeams === 'function' && ownedTeams().length)
+    var bandBtn = (typeof editableTeams === 'function' && editableTeams().length)
         ? '<button class="tap" onclick="promptAddSongToBand(readSongForm())">Add to band</button>' : '';
     var actions = isLib
         ? (hasOverride ? '<button class="tap" onclick="resyncSong(\'' + song.id + '\')">Reset to original</button>' : '') +
