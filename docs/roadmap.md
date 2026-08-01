@@ -36,14 +36,18 @@ correct for 3/4 and 6/8 songs.
 - ⏳ Still to do: **band-follows-leader** sync across devices (ties into live band
   sync). A key OnSong differentiator.
 
-### 4. Team / band sync
-- ✅ **v1 + v2 DONE & live** — owner creates a band, invites by email (accept/
-  decline, not auto-join), roster with remove/cancel, publishes setlists that
-  members play in place. (`teams.sql` + `teams_v2.sql`)
-- ⏳ Later: live 2-way sync, member editing rights, a shared band *song library*
-  (not just setlists), multi-band active switcher.
-- Monetisation: free personal sync + **paid team sync** is the intended paywall
-  (so we don't need to cap devices per account).
+### 4. Team / band sync — ✅ FULL SUITE DONE & live
+- ✅ v1 + v2 — create band, invite (accept/decline), roster, publish setlists.
+- ✅ **Live setlist updates** (Supabase realtime — `realtime.sql`).
+- ✅ **Shared band song library** (`team_library.sql`).
+- ✅ **Member editing rights** (`team_editing.sql` — admin grants editors).
+- ✅ **Multi-band switcher** (focus one band's setlists + library).
+- SQL to run: teams.sql, teams_v2.sql, realtime.sql, team_library.sql,
+  team_editing.sql.
+- ⏳ Later ideas: band-follows-leader stage sync; in-place editing of a band
+  song's chart (today band songs are read-only in the chart; add/remove via the
+  library manager).
+- Monetisation: free personal sync + **paid team sync** (Pro) is the paywall.
 
 ---
 
