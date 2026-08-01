@@ -137,6 +137,39 @@ its full-playback/SDK path stays a later Premium extra.
 
 ---
 
+## Queued next (agreed July 28)
+
+- **Stage-view floating controls overhaul** (user spec, Jul 28) — in stage mode,
+  add a vertical floating column (in line with the autoscroll speed + play button,
+  bottom-right) of the key chart functions: **Transpose, Numbers, Chords, Lyrics,
+  Text**. Tapping one reveals its options **floating horizontally, inline** (options
+  "slide out" from that button). Must **shift the lyrics** so the options don't
+  cover them. Provide a **single toggle** (placed above the autoscroll speed dial)
+  that hides/shows the whole function column. (Challenge the layout if there's a
+  cleaner idea.)
+- **Landing nav restructure** (user, Jul 28) — declutter the top nav: move
+  **"Open app"** into the hamburger menu; put **"Hi <name>" / "Log in"** in the
+  hamburger too; the hamburger should carry the **full link set** (App, Analyzer,
+  About, Features, Contact, Terms) — same as the footer. (Confirm desktop behavior:
+  keep inline links on desktop, hamburger on mobile.)
+- **Payments / tiers — architecture (decided)**: **ONE app, not three.** Tier is a
+  property of the account (a `subscription_tier` col / `subscriptions` table in
+  Supabase); the app reads it and unlocks features. Sell upgrades **on the web**
+  (chord.ph) via a **PH-friendly gateway (PayMongo → GCash/Maya/cards)** to avoid
+  Google Play's 15–30% cut and serve local payment methods; the account carries the
+  tier into the web app AND the APK. Publish the **APK to Play Store for reach**,
+  but keep upgrades web-based (mind Play's billing/anti-steering policy — if we ever
+  sell inside the Android app we'd need Google Play Billing). Do this LATER — user
+  prefers building AI key-detection + AI chord-chart first.
+- **Community credits — earning ideas** (user, Jul 28) — earn credits → redeem for
+  free Pro time, to grow an active contributing community. Earn by: submitting an
+  approved chart/tab; **adding a verified reference link (YouTube/Spotify) to a
+  song**; your version getting upvotes (ongoing); fixing/improving an approved
+  chart; correct tagging; referrals (invite a musician who joins); optional light
+  streak/engagement bonus. Anti-abuse: credits only from **approved/vote-gated**
+  contributions, daily caps, quality thresholds. Needs a credits ledger + redemption
+  rule (e.g. X credits = 1 month Pro).
+
 ## Parked features (soon)
 
 - **Android file picker opens a chooser, not Files** (user, Jul 28) — on Android,
