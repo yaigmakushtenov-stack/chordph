@@ -357,6 +357,26 @@
         .listen-btn.ghost { color: var(--muted); }
         @media (hover: hover) { .listen-btn:hover { border-color: #1DB954; color: #1DB954; } }
         .listen-btn .sp { color: #1DB954; font-size: 15px; }
+        /* MP3 A/B practice player */
+        #chart-audio:not(:empty) { margin-top: 10px; }
+        .audio-panel { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--hover); }
+        .audio-row { display: flex; align-items: center; gap: 10px; }
+        .audio-play { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+            background: var(--grad); color: #fff; display: flex; align-items: center; justify-content: center; }
+        .audio-play svg { width: 20px; height: 20px; fill: currentColor; }
+        .audio-seek { flex: 1; accent-color: var(--accent); height: 4px; }
+        .audio-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 78px; text-align: right; }
+        .audio-ab { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+        .audio-ab .ab-btn { font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 5px 11px;
+            border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--muted); }
+        .audio-ab .ab-btn.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+        .audio-ab .ab-mark { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+        .audio-speed { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+        .audio-speed .sp-btn { font: inherit; font-size: 12px; cursor: pointer; padding: 4px 9px; border-radius: 8px;
+            border: 1px solid var(--border); background: none; color: var(--muted); }
+        .audio-speed .sp-btn.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+        .audio-foot { display: flex; justify-content: space-between; margin-top: 10px; }
+        .listen-btn.audio-add .sp { color: var(--accent); }
         .spotify-embed-wrap { position: relative; }
         .spotify-panel iframe { display: block; width: 100%; border: 0; border-radius: 12px; }
         .spotify-kebab { position: absolute; top: 6px; right: 6px; z-index: 2;
@@ -1006,6 +1026,7 @@
             <div id="share-banner" class="share-banner" style="display:none;"></div>
             <div id="chart-versions"></div>
             <div id="chart-spotify"></div>
+            <div id="chart-audio"></div>
         </div>
 
         <div class="control-dock">
@@ -2264,6 +2285,7 @@ function show(viewId) {
     if (viewId !== 'chart') {
         document.body.classList.remove('chart-navbar');
         if (stageMode) { stageMode = false; document.body.classList.remove('stage-mode'); }  // don't stay in stage off-chart
+        if (typeof stopPractice === 'function') { stopPractice(); practice.open = false; }    // stop practice audio off-chart
     }
     updateScrollFab();
     lastShownView = viewId;
@@ -3265,6 +3287,7 @@ function openChart(songId, from) {
     currentSongId = songId;
     state.chartFrom = from || 'songs';
     spotifyOpen = false;   // each song's Spotify player starts collapsed
+    stopPractice(); practice.open = false;   // reset the practice audio for the new song
     // medley + transpose are remembered per setlist; from the library they're
     // fresh each open (transpose resets to the song's own key)
     if (state.chartFrom === 'setlist' && state.currentSetlistId) {
@@ -3399,6 +3422,7 @@ function renderChart() {
     renderMedley(song, keyIdx, capo);
     buildTempoZones(song);
     renderSpotifyPanel();
+    renderAudioPanel();
 }
 /* ---- Spotify: play a track alongside the chart (paste a link — no login/API
    needed; the embedded player uses the listener's own Spotify) ---- */
@@ -3449,6 +3473,134 @@ function openSpotifyMenu(anchor) {
     }
     openMenu(items, anchor);
 }
+
+/* ============================================================
+   MP3 A/B PRACTICE PLAYER — import your own audio file, loop a
+   section (A↔B) and slow it down to learn a part. The file is stored
+   locally in IndexedDB (offline, never uploaded); a small list of which
+   songs have audio is kept in localStorage for a synchronous render.
+   ============================================================ */
+var IDB_NAME = 'chordph_audio', IDB_STORE = 'files';
+function idbOpen() {
+    return new Promise(function(res, rej) {
+        var r = indexedDB.open(IDB_NAME, 1);
+        r.onupgradeneeded = function() { r.result.createObjectStore(IDB_STORE); };
+        r.onsuccess = function() { res(r.result); };
+        r.onerror = function() { rej(r.error); };
+    });
+}
+function idbPut(k, v) { return idbOpen().then(function(db) { return new Promise(function(res, rej) { var tx = db.transaction(IDB_STORE, 'readwrite'); tx.objectStore(IDB_STORE).put(v, k); tx.oncomplete = function() { res(); }; tx.onerror = function() { rej(tx.error); }; }); }); }
+function idbGet(k) { return idbOpen().then(function(db) { return new Promise(function(res, rej) { var tx = db.transaction(IDB_STORE, 'readonly'); var q = tx.objectStore(IDB_STORE).get(k); q.onsuccess = function() { res(q.result); }; q.onerror = function() { rej(q.error); }; }); }); }
+function idbDel(k) { return idbOpen().then(function(db) { return new Promise(function(res, rej) { var tx = db.transaction(IDB_STORE, 'readwrite'); tx.objectStore(IDB_STORE).delete(k); tx.oncomplete = function() { res(); }; tx.onerror = function() { rej(tx.error); }; }); }); }
+var audioKeys = {};
+try { (JSON.parse(localStorage.getItem('chordph2_audiokeys') || '[]')).forEach(function(k) { audioKeys[k] = 1; }); } catch (e) {}
+function saveAudioKeys() { localStorage.setItem('chordph2_audiokeys', JSON.stringify(Object.keys(audioKeys))); }
+
+var practice = { el: null, url: null, a: null, b: null, loop: false, rate: 1, open: false, ready: false };
+function practiceAudioEl() {
+    if (!practice.el) {
+        var a = document.createElement('audio');
+        a.preload = 'metadata';
+        a.addEventListener('timeupdate', onPracticeTime);
+        a.addEventListener('loadedmetadata', renderAudioPanel);
+        a.addEventListener('play', renderAudioControls);
+        a.addEventListener('pause', renderAudioControls);
+        a.addEventListener('ended', renderAudioControls);
+        practice.el = a;
+    }
+    return practice.el;
+}
+function fmtTime(s) { s = Math.max(0, s || 0); var m = Math.floor(s / 60); var r = Math.floor(s % 60); return m + ':' + (r < 10 ? '0' : '') + r; }
+function stopPractice() {
+    if (practice.el) { try { practice.el.pause(); } catch (e) {} practice.el.removeAttribute('src'); practice.el.load(); }
+    if (practice.url) { URL.revokeObjectURL(practice.url); practice.url = null; }
+    practice.a = practice.b = null; practice.loop = false; practice.rate = 1; practice.ready = false;
+}
+function onPracticeTime() {
+    if (practice.loop && practice.a != null && practice.b != null && practice.el.currentTime >= practice.b) {
+        practice.el.currentTime = practice.a;
+    }
+    var seek = document.getElementById('audio-seek'), t = document.getElementById('audio-time');
+    if (seek && !seek._dragging) seek.value = practice.el.currentTime || 0;
+    if (t && practice.el.duration) t.textContent = fmtTime(practice.el.currentTime) + ' / ' + fmtTime(practice.el.duration);
+}
+function pickPracticeAudio() { var i = document.getElementById('audio-input'); if (i) { i.value = ''; i.click(); } }
+function onPracticeFile(ev) {
+    var f = ev.target.files && ev.target.files[0]; if (!f) return;
+    if (!/audio\//.test(f.type) && !/\.(mp3|m4a|aac|ogg|wav)$/i.test(f.name)) { toast('Choose an audio file (mp3, m4a…).'); return; }
+    if (f.size > 30 * 1024 * 1024) { toast('That file is over 30 MB — try a smaller one.'); return; }
+    var id = currentSongId;
+    idbPut('song:' + id, f).then(function() {
+        audioKeys[id] = 1; saveAudioKeys();
+        practice.open = true;
+        loadPracticeAudio(id, true);
+    }).catch(function() { toast('Couldn’t save that file.'); });
+}
+function removePracticeAudio() {
+    var id = currentSongId;
+    return idbDel('song:' + id).then(function() { delete audioKeys[id]; saveAudioKeys(); stopPractice(); practice.open = false; renderAudioPanel(); });
+}
+function loadPracticeAudio(id, autoplay) {
+    return idbGet('song:' + id).then(function(blob) {
+        if (!blob) { renderAudioPanel(); return; }
+        stopPractice();
+        practice.url = URL.createObjectURL(blob);
+        var el = practiceAudioEl();
+        el.src = practice.url; el.playbackRate = practice.rate;
+        if ('preservesPitch' in el) el.preservesPitch = true;
+        practice.ready = true;
+        renderAudioPanel();
+        if (autoplay) el.play().catch(function() {});
+    }).catch(function() { renderAudioPanel(); });
+}
+/* called from renderChart + openChart */
+function renderAudioPanel() {
+    var box = document.getElementById('chart-audio'); if (!box) return;
+    var id = currentSongId;
+    if (!audioKeys[id]) { box.innerHTML = '<button class="listen-btn ghost audio-add" onclick="pickPracticeAudio()"><span class="sp">♫</span> Add practice audio (MP3)</button>'; return; }
+    if (!practice.open || !practice.ready) {
+        box.innerHTML = '<button class="listen-btn" onclick="practice.open=true;loadPracticeAudio(currentSongId,false)"><span class="sp">▶</span> Practice track (A/B loop)</button>';
+        return;
+    }
+    box.innerHTML = '<div class="audio-panel">' +
+        '<div class="audio-row">' +
+        '<button class="audio-play" id="audio-play" onclick="togglePracticePlay()" aria-label="Play/pause"></button>' +
+        '<input type="range" class="audio-seek" id="audio-seek" min="0" max="' + (practice.el.duration || 0) + '" step="0.01" value="' + (practice.el.currentTime || 0) + '" oninput="seekPractice(this.value)">' +
+        '<span class="audio-time" id="audio-time">' + fmtTime(practice.el.currentTime) + ' / ' + fmtTime(practice.el.duration) + '</span></div>' +
+        '<div class="audio-ab">' +
+        '<button class="ab-btn" onclick="setPracticeMark(\'a\')">Set A</button>' +
+        '<button class="ab-btn" onclick="setPracticeMark(\'b\')">Set B</button>' +
+        '<button class="ab-btn' + (practice.loop ? ' on' : '') + '" onclick="togglePracticeLoop()">Loop A–B</button>' +
+        '<span class="ab-mark">A ' + (practice.a != null ? fmtTime(practice.a) : '—') + ' · B ' + (practice.b != null ? fmtTime(practice.b) : '—') + '</span></div>' +
+        '<div class="audio-speed"><span>Speed</span>' +
+        [0.5, 0.75, 1, 1.25].map(function(r) { return '<button class="sp-btn' + (practice.rate === r ? ' on' : '') + '" onclick="setPracticeRate(' + r + ')">' + r + '×</button>'; }).join('') +
+        '</div>' +
+        '<div class="audio-foot"><button class="tap" onclick="practice.open=false;renderAudioPanel()">Hide</button>' +
+        '<button class="tap danger" onclick="removePracticeAudio()">Remove audio</button></div></div>';
+    renderAudioControls();
+}
+function renderAudioControls() {
+    var b = document.getElementById('audio-play'); if (!b || !practice.el) return;
+    var playing = !practice.el.paused && !practice.el.ended;
+    b.innerHTML = playing
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+}
+function togglePracticePlay() { if (!practice.el) return; if (practice.el.paused) practice.el.play().catch(function() {}); else practice.el.pause(); }
+function seekPractice(v) { if (practice.el) practice.el.currentTime = parseFloat(v) || 0; }
+function setPracticeMark(which) {
+    if (!practice.el) return;
+    practice[which] = practice.el.currentTime;
+    if (practice.a != null && practice.b != null && practice.a > practice.b) { var t = practice.a; practice.a = practice.b; practice.b = t; }
+    renderAudioPanel();
+}
+function togglePracticeLoop() {
+    if (practice.a == null || practice.b == null) { toast('Set point A and B first.'); return; }
+    practice.loop = !practice.loop;
+    if (practice.loop && practice.el && (practice.el.currentTime < practice.a || practice.el.currentTime > practice.b)) practice.el.currentTime = practice.a;
+    renderAudioPanel();
+}
+function setPracticeRate(r) { practice.rate = r; if (practice.el) practice.el.playbackRate = r; renderAudioPanel(); }
 function renderChordStrip(strip, chartText) {
     var names = uniqueChords(chartText);
     var html = names.map(function(n) {
@@ -5122,6 +5274,7 @@ function init() {
 init();
 </script>
 <input type="file" id="import-input" accept=".json" style="display:none;" onchange="importBackup(event)">
+<input type="file" id="audio-input" accept="audio/*,.mp3,.m4a,.aac,.ogg,.wav" style="display:none;" onchange="onPracticeFile(event)">
 <input type="file" id="chordpro-input" accept=".cho,.chopro,.crd,.pro,.chord,.txt,text/plain" multiple style="display:none;" onchange="importChordProFiles(event)">
 </body>
 </html>
