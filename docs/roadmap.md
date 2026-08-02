@@ -158,7 +158,8 @@ Build in this order:
    return path. Each song restores its last position, loop and speed locally.
 2. ✅ **Waveform — DONE** — decoded from the attached audio, keyboard/touch
    scrubbing, played progress, highlighted loop range and visible A/B markers.
-3. **Named loops**, such as “Bridge entrance” or “Chorus harmony”.
+3. ✅ **Named loops — DONE** — save, label, recall and remove multiple A/B
+   rehearsal ranges per song on the current device.
 4. ✅ **Speed control without changing pitch — DONE** for the native practice
    player (0.5×, 0.75×, 1× and 1.25× with browser pitch preservation enabled).
 5. **Optional pitch/key shifting without changing speed**.

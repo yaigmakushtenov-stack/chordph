@@ -458,6 +458,15 @@
             border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--muted); }
         .audio-ab .ab-btn.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
         .audio-ab .ab-mark { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+        .audio-loops { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
+        .audio-loops-label { margin-right: 2px; color: var(--muted); font-size: 11px; font-weight: 650; }
+        .named-loop { display: inline-flex; align-items: stretch; overflow: hidden; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); }
+        .named-loop.on { border-color: var(--accent); background: var(--accent-soft); }
+        .named-loop-load, .named-loop-remove { border: 0; background: none; color: var(--muted); cursor: pointer; font: inherit; }
+        .named-loop-load { max-width: 180px; padding: 5px 5px 5px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+        .named-loop.on .named-loop-load { color: var(--accent); font-weight: 650; }
+        .named-loop-remove { padding: 4px 8px 4px 5px; color: var(--faint); font-size: 13px; }
+        .named-loop-load:focus-visible, .named-loop-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
         .audio-speed { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--muted); }
         .audio-speed .sp-btn { font: inherit; font-size: 12px; cursor: pointer; padding: 4px 9px; border-radius: 8px;
             border: 1px solid var(--border); background: none; color: var(--muted); }
@@ -4202,8 +4211,10 @@ var practiceSessions = {};
 try { practiceSessions = JSON.parse(localStorage.getItem('chordph2_practice_sessions') || '{}') || {}; } catch (e) { practiceSessions = {}; }
 var practiceSaveTimer = null;
 function practiceSession(id) {
-    if (!practiceSessions[id]) practiceSessions[id] = { position: 0, a: null, b: null, loop: false, rate: 1 };
-    return practiceSessions[id];
+    if (!practiceSessions[id]) practiceSessions[id] = { position: 0, a: null, b: null, loop: false, rate: 1, loops: [], activeLoopId: null };
+    var session = practiceSessions[id];
+    if (!Array.isArray(session.loops)) session.loops = [];
+    return session;
 }
 function flushPracticeSessions() {
     if (practiceSaveTimer) { clearTimeout(practiceSaveTimer); practiceSaveTimer = null; }
@@ -4214,7 +4225,7 @@ function queuePracticeSessionSave() {
     practiceSaveTimer = setTimeout(flushPracticeSessions, 700);
 }
 var practice = { el: null, url: null, songId: null, chartFrom: 'songs', a: null, b: null, loop: false,
-                 rate: 1, open: false, ready: false, peaks: null, pendingPosition: 0, loopTimer: null };
+                 rate: 1, loops: [], activeLoopId: null, open: false, ready: false, peaks: null, pendingPosition: 0, loopTimer: null };
 function practiceAudioEl() {
     if (!practice.el) {
         var a = document.createElement('audio');
@@ -4233,6 +4244,7 @@ function capturePracticeSession(immediate) {
     var s = practiceSession(practice.songId);
     if (practice.el && isFinite(practice.el.currentTime)) s.position = practice.el.currentTime || 0;
     s.a = practice.a; s.b = practice.b; s.loop = practice.loop; s.rate = practice.rate;
+    s.loops = practice.loops.slice(); s.activeLoopId = practice.activeLoopId;
     if (immediate) flushPracticeSessions(); else queuePracticeSessionSave();
 }
 function startPracticeLoopGuard() {
@@ -4257,7 +4269,7 @@ function stopPractice(discardSession) {
     practice.songId = null; // pause/load events must not recreate a discarded session
     if (practice.el) { try { practice.el.pause(); } catch (e) {} practice.el.removeAttribute('src'); practice.el.load(); }
     if (practice.url) { URL.revokeObjectURL(practice.url); practice.url = null; }
-    practice.a = practice.b = null; practice.loop = false; practice.rate = 1;
+    practice.a = practice.b = null; practice.loop = false; practice.rate = 1; practice.loops = []; practice.activeLoopId = null;
     practice.ready = false; practice.peaks = null; practice.pendingPosition = 0;
     updateStageNowPlaying();
 }
@@ -4304,6 +4316,11 @@ function loadPracticeAudio(id, autoplay) {
         practice.songId = id; practice.chartFrom = state.chartFrom || 'songs';
         practice.a = saved.a == null ? null : saved.a; practice.b = saved.b == null ? null : saved.b;
         practice.loop = !!saved.loop; practice.rate = Number(saved.rate) || 1;
+        practice.loops = saved.loops.filter(function(item) {
+            return item && /^[a-zA-Z0-9_-]+$/.test(String(item.id)) && typeof item.name === 'string' && item.name &&
+                isFinite(item.a) && isFinite(item.b) && item.b - item.a >= 0.25;
+        });
+        practice.activeLoopId = practice.loops.some(function(item) { return item.id === saved.activeLoopId; }) ? saved.activeLoopId : null;
         practice.pendingPosition = Number(saved.position) || 0; practice.peaks = null;
         el.src = practice.url; applyPracticeRate();
         practice.ready = true;
@@ -4387,6 +4404,15 @@ function practiceWaveformHTML() {
         '<span class="wave-marker" id="wave-marker-a"></span><span class="wave-marker" id="wave-marker-b"></span>' +
         (!bars ? '<div class="wave-empty">Preparing waveform&hellip;</div>' : '') + '</div>';
 }
+function namedPracticeLoopsHTML() {
+    if (!practice.loops.length) return '';
+    return '<div class="audio-loops"><span class="audio-loops-label">Saved loops</span>' + practice.loops.map(function(item) {
+        var active = practice.activeLoopId === item.id;
+        return '<span class="named-loop' + (active ? ' on' : '') + '">' +
+            '<button class="named-loop-load" onclick="loadNamedPracticeLoop(\'' + item.id + '\')" title="' + esc(item.name) + ': ' + fmtTime(item.a) + ' to ' + fmtTime(item.b) + '">' + esc(item.name) + '</button>' +
+            '<button class="named-loop-remove" onclick="removeNamedPracticeLoop(\'' + item.id + '\')" aria-label="Delete saved loop ' + esc(item.name) + '">&times;</button></span>';
+    }).join('') + '</div>';
+}
 /* called from renderChart + openChart */
 function renderAudioPanel() {
     var box = document.getElementById('chart-audio'); if (!box) return;
@@ -4406,8 +4432,10 @@ function renderAudioPanel() {
         '<div class="audio-ab">' +
         '<button class="ab-btn' + (practice.a != null ? ' on' : '') + '" onclick="setPracticeMark(\'a\')">Set A</button>' +
         '<button class="ab-btn' + (practice.b != null ? ' on' : '') + '" onclick="setPracticeMark(\'b\')">Set B</button>' +
+        ((practice.a != null && practice.b != null && practice.b - practice.a >= 0.25) ? '<button class="ab-btn" onclick="saveNamedPracticeLoop()">Save loop</button>' : '') +
         ((practice.a != null || practice.b != null) ? '<button class="ab-btn" onclick="clearPracticeAB()">Clear</button>' : '') +
         '<span class="ab-mark">A ' + (practice.a != null ? fmtTime(practice.a) : '—') + ' · B ' + (practice.b != null ? fmtTime(practice.b) : '—') + (practice.loop ? ' · looping ↺' : '') + '</span></div>' +
+        namedPracticeLoopsHTML() +
         '<div class="audio-speed"><span>Speed</span>' +
         [0.5, 0.75, 1, 1.25].map(function(r) { return '<button class="sp-btn' + (practice.rate === r ? ' on' : '') + '" onclick="setPracticeRate(' + r + ')">' + r + '×</button>'; }).join('') +
         '<span class="ab-mark">Pitch stays natural</span></div>' +
@@ -4486,6 +4514,7 @@ function updatePracticeProgress() {
 function setPracticeMark(which) {
     if (!practice.el) return;
     practice[which] = practice.el.currentTime;
+    practice.activeLoopId = null;
     // once BOTH A and B are set, loop between them automatically
     if (practice.a != null && practice.b != null) {
         if (practice.a > practice.b) { var t = practice.a; practice.a = practice.b; practice.b = t; }
@@ -4503,7 +4532,30 @@ function applyPracticeRate() {
     if ('mozPreservesPitch' in practice.el) practice.el.mozPreservesPitch = true;
 }
 function setPracticeRate(r) { practice.rate = r; applyPracticeRate(); capturePracticeSession(true); renderAudioPanel(); }
-function clearPracticeAB() { practice.a = null; practice.b = null; practice.loop = false; capturePracticeSession(true); renderAudioPanel(); }
+function saveNamedPracticeLoop() {
+    if (practice.a == null || practice.b == null || practice.b - practice.a < 0.25) { toast('Set A and B before saving a loop.'); return; }
+    var name = prompt('Name this rehearsal loop', 'Chorus practice');
+    if (name == null) return;
+    name = name.trim().slice(0, 60);
+    if (!name) { toast('Give the loop a short name.'); return; }
+    var item = { id: String(Date.now()) + String(Math.floor(Math.random() * 1000)), name: name, a: practice.a, b: practice.b };
+    practice.loops.push(item); practice.activeLoopId = item.id; practice.loop = true;
+    capturePracticeSession(true); renderAudioPanel(); toast('Saved “' + name + '”.');
+}
+function loadNamedPracticeLoop(id) {
+    var item = practice.loops.find(function(loop) { return loop.id === id; });
+    if (!item || !practice.el) return;
+    practice.a = item.a; practice.b = item.b; practice.loop = true; practice.activeLoopId = item.id;
+    seekPractice(item.a); capturePracticeSession(true); renderAudioPanel();
+}
+function removeNamedPracticeLoop(id) {
+    var item = practice.loops.find(function(loop) { return loop.id === id; });
+    practice.loops = practice.loops.filter(function(loop) { return loop.id !== id; });
+    if (practice.activeLoopId === id) practice.activeLoopId = null;
+    capturePracticeSession(true); renderAudioPanel();
+    if (item) toast('Removed “' + item.name + '”.');
+}
+function clearPracticeAB() { practice.a = null; practice.b = null; practice.loop = false; practice.activeLoopId = null; capturePracticeSession(true); renderAudioPanel(); }
 function renderChordStrip(strip, chartText, instrumentView) {
     var names = uniqueChords(chartText);
     var html = names.map(function(n) {

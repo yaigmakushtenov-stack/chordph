@@ -35,6 +35,16 @@ test('A and B markers have a visible loop range and a precise playback guard', (
   assert.match(app, /practice\.b - practice\.a >= 0\.25/);
 });
 
+test('named rehearsal loops are saved per song and can be recalled or removed', () => {
+  assert.match(app, /function saveNamedPracticeLoop/);
+  assert.match(app, /function loadNamedPracticeLoop/);
+  assert.match(app, /function removeNamedPracticeLoop/);
+  assert.match(app, /s\.loops = practice\.loops\.slice\(\)/);
+  assert.match(app, /practice\.a = item\.a; practice\.b = item\.b; practice\.loop = true/);
+  assert.match(app, />Saved loops</);
+  assert.match(app, /aria-label="Delete saved loop/);
+});
+
 test('position, loop and speed persist per song without storing the audio in localStorage', () => {
   assert.match(app, /chordph2_practice_sessions/);
   assert.match(app, /s\.position = practice\.el\.currentTime/);
