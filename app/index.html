@@ -86,6 +86,13 @@
             text-rendering: optimizeLegibility;
             touch-action: pan-x pan-y;   /* allow scroll, block double-tap/pinch zoom */
         }
+        .preview-banner {
+            display: none; position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+            z-index: 1200; padding: 5px 12px; border-radius: 0 0 10px 10px;
+            background: #7b55ff; color: #fff; box-shadow: var(--shadow-sm);
+            font-size: 11px; font-weight: 700; letter-spacing: .15px; text-align: center;
+        }
+        body.preview-deployment .preview-banner { display: block; }
 
         ::selection { background: rgba(91, 140, 255, 0.35); }
         ::-webkit-scrollbar { width: 8px; }
@@ -1007,6 +1014,8 @@
 </head>
 <body>
 
+<div class="preview-banner" id="preview-banner" role="status">V2 preview · device-only test changes · cloud writes and AI are off</div>
+
 <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
 
 <nav class="drawer" id="drawer">
@@ -1735,7 +1744,9 @@ function refreshAdminFlag() {
     }).catch(function() {});
 }
 
-function syncEnabled() { return !!(SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey && window.supabase); }
+var IS_PREVIEW_DEPLOYMENT = /\.vercel\.app$/i.test(location.hostname) || /^v2[.-]/i.test(location.hostname);
+function applyDeploymentMode() { document.body.classList.toggle('preview-deployment', IS_PREVIEW_DEPLOYMENT); }
+function syncEnabled() { return !IS_PREVIEW_DEPLOYMENT && !!(SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey && window.supabase); }
 
 function localSnapshot() {
     return {
@@ -5783,6 +5794,7 @@ function blockPinchZoom() {
     }, { passive: false });
 }
 function init() {
+    applyDeploymentMode();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function() {});
     migrate();
     load();
