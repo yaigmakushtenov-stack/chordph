@@ -868,6 +868,9 @@
         }
         .field-row { display: flex; gap: 18px; }
         .field-row .field { flex: 1; }
+        .field-group { flex: 1; min-width: 0; }
+        .field-label { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; font-weight: 600; }
+        .field-label + .field { margin-top: 0; }
         .form-error { color: var(--danger); font-size: 12px; margin-top: 6px; display: none; }
 
         /* keep the search bar reachable while scrolling the song list */
@@ -2474,6 +2477,18 @@ function closeDrawer() {
 /* =========================================================
    SONG LIST / FAVORITES
    ========================================================= */
+function makeKeyboardAction(el, label, action) {
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    if (label) el.setAttribute('aria-label', label);
+    el.onclick = action;
+    el.onkeydown = function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            action(e);
+        }
+    };
+}
 function songRow(song, opts) {
     opts = opts || {};
     var row = document.createElement('div');
@@ -2514,7 +2529,9 @@ function songRow(song, opts) {
         star.onclick = function(e) { e.stopPropagation(); toggleFav(song.id); };
         row.appendChild(star);
     }
-    row.onclick = function() { if (opts.onOpen) opts.onOpen(song); else openChart(song.id, 'songs'); };
+    makeKeyboardAction(main, 'Open ' + song.title + ' by ' + (song.artist || 'unknown artist'), function() {
+        if (opts.onOpen) opts.onOpen(song); else openChart(song.id, 'songs');
+    });
     return row;
 }
 
@@ -3578,7 +3595,7 @@ function renderMediaPanel() {
         ? '<button class="listen-btn" id="media-find" onclick="autoFindLinks()"><span class="sp">✨</span> Auto-find links</button>' : '';
     box.innerHTML = '<div class="media-body">' + findBtn +
         '<div id="chart-spotify"></div><div id="chart-youtube"></div><div id="chart-audio"></div>' +
-        '<button class="tap" onclick="mediaOpen=false;renderMediaPanel()" style="margin-top:4px;">Hide</button></div>';
+        '<button class="tap" aria-label="Hide Listen and learn" onclick="mediaOpen=false;renderMediaPanel()" style="margin-top:4px;">Hide</button></div>';
     renderSpotifyPanel(); renderYouTube(); renderAudioPanel();
 }
 /* AI: find this song's Spotify + YouTube links by title+artist (Edge Function
@@ -3805,7 +3822,7 @@ function renderAudioPanel() {
         [0.5, 0.75, 1, 1.25].map(function(r) { return '<button class="sp-btn' + (practice.rate === r ? ' on' : '') + '" onclick="setPracticeRate(' + r + ')">' + r + '×</button>'; }).join('') +
         '</div>' +
         '<div class="media-note">Your MP3 stays on this device — it’s never uploaded.</div>' +
-        '<div class="audio-foot"><button class="tap" onclick="practice.open=false;renderAudioPanel()">Hide</button>' +
+        '<div class="audio-foot"><button class="tap" aria-label="Hide practice player" onclick="practice.open=false;renderAudioPanel()">Hide</button>' +
         '<button class="tap danger" onclick="removePracticeAudio()">Remove audio</button></div></div>';
     renderAudioControls();
 }
@@ -3961,6 +3978,13 @@ var stageMode = false;
 function chartFontSize() { return Math.round(state.fontSize * (stageMode ? 1.6 : 1)); }
 function toggleStage() { setStage(!stageMode); }
 function setStage(on) {
+    if (on) {
+        mediaOpen = false;
+        practice.open = false;
+        spotifyOpen = false;
+        youtubeOpen = false;
+        if (practice.el && !practice.el.paused) practice.el.pause();
+    }
     stageMode = on;
     document.body.classList.toggle('stage-mode', on);
     var c = document.getElementById('chart-stage'); if (c) c.classList.toggle('on', on);
@@ -4547,7 +4571,7 @@ function renderBandSetlists(box) {
         row.innerHTML = '<div class="row-main"><div class="row-title">' + esc(ts.name) + '</div>' +
             '<div class="row-sub">' + n + ' song' + (n !== 1 ? 's' : '') + ' · from ' + esc(teamName) + '</div></div>' +
             '<span class="tap" style="font-size:12px;color:var(--accent);">Open ›</span>';
-        row.onclick = function() { openTeamSetlist(ts); };
+        makeKeyboardAction(row.querySelector('.row-main'), 'Open shared setlist ' + ts.name, function() { openTeamSetlist(ts); });
         box.appendChild(row);
     });
 }
@@ -4611,7 +4635,7 @@ function renderSetlists() {
                 });
             });
         } else {
-            row.onclick = function() { openSetlist(sl.id); };
+            makeKeyboardAction(main, 'Open setlist ' + sl.name + ', ' + n + ' songs', function() { openSetlist(sl.id); });
         }
         box.appendChild(row);
     });
@@ -4934,7 +4958,7 @@ function openAddToSetlistSheet() {
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
         '<div class="sheet-title">Add to ' + esc(sl.name) + '</div>' +
         '<button class="tap primary" onclick="closeSheet()">Done</button></div>' +
-        '<input class="field" id="sh-add-search" placeholder="Search songs&hellip;" oninput="filterAddList()" autocomplete="off" style="margin-bottom:0;">' +
+        '<input class="field" id="sh-add-search" aria-label="Search songs to add" placeholder="Search songs&hellip;" oninput="filterAddList()" autocomplete="off" style="margin-bottom:0;">' +
         '</div>' +
         '<div class="sheet-scroll" id="sh-add-list"></div>';
     openSheet(html, true);
@@ -4955,10 +4979,12 @@ function renderAddList() {
             esc(s.title) + ' <span style="color:var(--faint);font-size:12px;">' + esc(s.key) + '</span></div></div>' +
             '<span class="tap' + (added ? '' : ' primary') + '" style="font-size:13px;">' + (added ? 'Added ✓' : '+ Add') + '</span>';
         if (!added) {
-            row.onclick = function() {
+            makeKeyboardAction(row, 'Add ' + s.title + ' to ' + sl.name, function() {
                 sl.songIds.push(s.id);
                 save(); renderAddList(); renderSetlistDetail();
-            };
+            });
+        } else {
+            row.setAttribute('aria-label', s.title + ' is already in ' + sl.name);
         }
         box.appendChild(row);
     });
@@ -4975,7 +5001,7 @@ function openMedleySheet() {
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
         '<div class="sheet-title">Add to medley</div>' +
         '<button class="tap" onclick="closeSheet()">Cancel</button></div>' +
-        '<input class="field" id="sh-medley-search" placeholder="Search songs&hellip;" oninput="renderMedleyList()" autocomplete="off" style="margin-bottom:0;">' +
+        '<input class="field" id="sh-medley-search" aria-label="Search songs for medley" placeholder="Search songs&hellip;" oninput="renderMedleyList()" autocomplete="off" style="margin-bottom:0;">' +
         '</div>' +
         '<div class="sheet-scroll" id="sh-medley-list"></div>',
         true
@@ -4997,7 +5023,7 @@ function renderMedleyList() {
         row.innerHTML = '<div class="row-main"><div class="row-title" style="font-weight:500;">' + esc(s.title) +
             ' <span style="color:var(--faint);font-size:12px;">' + esc(s.key) + '</span></div></div>' +
             '<span class="tap primary" style="font-size:13px;">Choose &rsaquo;</span>';
-        row.onclick = function() { medleyStep2(s.id); };
+        makeKeyboardAction(row, 'Choose ' + s.title + ' for the medley', function() { medleyStep2(s.id); });
         box.appendChild(row);
     });
 }
@@ -5103,17 +5129,20 @@ function openSongSheet(songId) {
         '<div class="sheet-head"><div class="sheet-title">' + title + '</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + note + '</div></div>' +
         '<div class="sheet-scroll">' +
-        '<input class="field" id="sh-song-title" placeholder="Song title *" value="' + (song ? esc(song.title) : '') + '" autocomplete="off">' +
-        '<input class="field" id="sh-song-artist" placeholder="Artist / band *" value="' + (song ? esc(song.artist) : '') + '" autocomplete="off">' +
+        '<label class="field-label" for="sh-song-title">Song title *</label>' +
+        '<input class="field" id="sh-song-title" placeholder="e.g. Goodness of God" value="' + (song ? esc(song.title) : '') + '" autocomplete="off">' +
+        '<label class="field-label" for="sh-song-artist">Artist or band *</label>' +
+        '<input class="field" id="sh-song-artist" placeholder="e.g. Bethel Music" value="' + (song ? esc(song.artist) : '') + '" autocomplete="off">' +
         '<div class="field-row">' +
-        '<select class="field" id="sh-song-key"><option value="">Key *</option>' + keyOpts + '</select>' +
-        '<input class="field" id="sh-song-tempo" type="number" placeholder="BPM" value="' + (song && song.tempo ? song.tempo : '') + '">' +
+        '<div class="field-group"><label class="field-label" for="sh-song-key">Original key *</label><select class="field" id="sh-song-key"><option value="">Choose key</option>' + keyOpts + '</select></div>' +
+        '<div class="field-group"><label class="field-label" for="sh-song-tempo">Tempo (BPM)</label><input class="field" id="sh-song-tempo" type="number" min="20" max="300" inputmode="numeric" placeholder="e.g. 72" value="' + (song && song.tempo ? song.tempo : '') + '"></div>' +
         '</div>' +
-        '<select class="field" id="sh-song-feel"><option value="">Song feel</option>' + feels + '</select>' +
+        '<label class="field-label" for="sh-song-feel">Song feel</label><select class="field" id="sh-song-feel"><option value="">Choose feel (optional)</option>' + feels + '</select>' +
+        '<label class="field-label" for="sh-song-tags">Tags</label>' +
         '<input class="field" id="sh-song-tags" placeholder="Tags, comma-separated — e.g. Worship, Filipino, Mellow" value="' + (song && song.tags ? esc(song.tags.join(', ')) : '') + '" autocomplete="off">' +
         '<div class="chart-tools"><button type="button" class="chart-clean-btn" id="chart-clean-btn" onclick="cleanChartWithAI()"><span class="sp">✨</span> Clean up chart</button>' +
         '<span class="chart-clean-hint">Reformats messy text — keeps your chords &amp; lyrics.</span></div>' +
-        '<textarea class="field" id="sh-song-chart" placeholder="Chord chart *&#10;&#10;[Verse 1]&#10;G              D&#10;Your lyrics here" style="min-height:160px;">' + (song ? esc(song.chart) : '') + '</textarea>' +
+        '<label class="field-label" for="sh-song-chart">Chord chart *</label><textarea class="field" id="sh-song-chart" placeholder="[Verse 1]&#10;G              D&#10;Your lyrics here" style="min-height:160px;">' + (song ? esc(song.chart) : '') + '</textarea>' +
         '<div class="form-error" id="sh-song-err"></div>' +
         '</div>' +
         '<div class="sheet-actions">' + actions + '</div>',
