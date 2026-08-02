@@ -162,7 +162,9 @@ Build in this order:
    rehearsal ranges per song on the current device.
 4. ✅ **Speed control without changing pitch — DONE** for the native practice
    player (0.5×, 0.75×, 1× and 1.25× with browser pitch preservation enabled).
-5. **Optional pitch/key shifting without changing speed**.
+5. ✅ **Optional pitch/key shifting without changing speed — DONE** for native practice
+   audio — shift down or up by six semitones, restore per song, and return to
+   the unprocessed original without changing the chart or playback rate.
 6. **Count-in before a loop restarts**.
 7. **Chart-section bookmarks linked to audio positions**.
 8. **Personal rehearsal notes and chart annotations**.

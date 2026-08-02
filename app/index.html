@@ -471,6 +471,12 @@
         .audio-speed .sp-btn { font: inherit; font-size: 12px; cursor: pointer; padding: 4px 9px; border-radius: 8px;
             border: 1px solid var(--border); background: none; color: var(--muted); }
         .audio-speed .sp-btn.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+        .audio-pitch { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 9px; font-size: 12px; color: var(--muted); }
+        .pitch-step { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 50%; background: none; color: var(--text); cursor: pointer; font: inherit; font-size: 17px; line-height: 1; }
+        .pitch-step:disabled { opacity: .35; cursor: default; }
+        .pitch-value { min-width: 104px; color: var(--text); font-size: 12px; font-weight: 650; text-align: center; font-variant-numeric: tabular-nums; }
+        .pitch-reset { border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; font-size: 11px; font-weight: 650; }
+        .pitch-step:focus-visible, .pitch-reset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .audio-foot { display: flex; justify-content: space-between; margin-top: 10px; }
         .listen-btn.audio-add .sp { color: var(--accent); }
         /* Listen & learn consolidated panel */
@@ -4211,7 +4217,7 @@ var practiceSessions = {};
 try { practiceSessions = JSON.parse(localStorage.getItem('chordph2_practice_sessions') || '{}') || {}; } catch (e) { practiceSessions = {}; }
 var practiceSaveTimer = null;
 function practiceSession(id) {
-    if (!practiceSessions[id]) practiceSessions[id] = { position: 0, a: null, b: null, loop: false, rate: 1, loops: [], activeLoopId: null };
+    if (!practiceSessions[id]) practiceSessions[id] = { position: 0, a: null, b: null, loop: false, rate: 1, pitch: 0, loops: [], activeLoopId: null };
     var session = practiceSessions[id];
     if (!Array.isArray(session.loops)) session.loops = [];
     return session;
@@ -4225,7 +4231,7 @@ function queuePracticeSessionSave() {
     practiceSaveTimer = setTimeout(flushPracticeSessions, 700);
 }
 var practice = { el: null, url: null, songId: null, chartFrom: 'songs', a: null, b: null, loop: false,
-                 rate: 1, loops: [], activeLoopId: null, open: false, ready: false, peaks: null, pendingPosition: 0, loopTimer: null };
+                 rate: 1, pitch: 0, pitchGraph: null, loops: [], activeLoopId: null, open: false, ready: false, peaks: null, pendingPosition: 0, loopTimer: null };
 function practiceAudioEl() {
     if (!practice.el) {
         var a = document.createElement('audio');
@@ -4243,7 +4249,7 @@ function capturePracticeSession(immediate) {
     if (!practice.songId) return;
     var s = practiceSession(practice.songId);
     if (practice.el && isFinite(practice.el.currentTime)) s.position = practice.el.currentTime || 0;
-    s.a = practice.a; s.b = practice.b; s.loop = practice.loop; s.rate = practice.rate;
+    s.a = practice.a; s.b = practice.b; s.loop = practice.loop; s.rate = practice.rate; s.pitch = practice.pitch;
     s.loops = practice.loops.slice(); s.activeLoopId = practice.activeLoopId;
     if (immediate) flushPracticeSessions(); else queuePracticeSessionSave();
 }
@@ -4269,7 +4275,8 @@ function stopPractice(discardSession) {
     practice.songId = null; // pause/load events must not recreate a discarded session
     if (practice.el) { try { practice.el.pause(); } catch (e) {} practice.el.removeAttribute('src'); practice.el.load(); }
     if (practice.url) { URL.revokeObjectURL(practice.url); practice.url = null; }
-    practice.a = practice.b = null; practice.loop = false; practice.rate = 1; practice.loops = []; practice.activeLoopId = null;
+    practice.a = practice.b = null; practice.loop = false; practice.rate = 1; practice.pitch = 0; practice.loops = []; practice.activeLoopId = null;
+    applyPracticePitch();
     practice.ready = false; practice.peaks = null; practice.pendingPosition = 0;
     updateStageNowPlaying();
 }
@@ -4316,18 +4323,19 @@ function loadPracticeAudio(id, autoplay) {
         practice.songId = id; practice.chartFrom = state.chartFrom || 'songs';
         practice.a = saved.a == null ? null : saved.a; practice.b = saved.b == null ? null : saved.b;
         practice.loop = !!saved.loop; practice.rate = Number(saved.rate) || 1;
+        practice.pitch = Math.max(-6, Math.min(6, Math.round(Number(saved.pitch) || 0)));
         practice.loops = saved.loops.filter(function(item) {
             return item && /^[a-zA-Z0-9_-]+$/.test(String(item.id)) && typeof item.name === 'string' && item.name &&
                 isFinite(item.a) && isFinite(item.b) && item.b - item.a >= 0.25;
         });
         practice.activeLoopId = practice.loops.some(function(item) { return item.id === saved.activeLoopId; }) ? saved.activeLoopId : null;
         practice.pendingPosition = Number(saved.position) || 0; practice.peaks = null;
-        el.src = practice.url; applyPracticeRate();
+        el.src = practice.url; applyPracticeRate(); applyPracticePitch();
         practice.ready = true;
         setupPracticeMediaSession();
         renderAudioPanel(); updateStageNowPlaying();
         loadPracticeWaveform(id, blob);
-        if (autoplay) el.play().catch(function() {});
+        if (autoplay) playPracticeAudio();
     }).catch(function() { renderAudioPanel(); });
 }
 /* re-open the player without reloading — so hiding/showing keeps it playing and
@@ -4344,7 +4352,7 @@ function setupPracticeMediaSession() {
         navigator.mediaSession.metadata = new MediaMetadata({
             title: song ? song.title : 'Practice track', artist: song ? (song.artist || 'Chord.ph') : 'Chord.ph', album: 'Chord.ph rehearsal'
         });
-        navigator.mediaSession.setActionHandler('play', function() { practice.el.play().catch(function() {}); });
+        navigator.mediaSession.setActionHandler('play', playPracticeAudio);
         navigator.mediaSession.setActionHandler('pause', function() { practice.el.pause(); });
         navigator.mediaSession.setActionHandler('seekbackward', function(d) { seekPractice(practice.el.currentTime - ((d && d.seekOffset) || 10)); });
         navigator.mediaSession.setActionHandler('seekforward', function(d) { seekPractice(practice.el.currentTime + ((d && d.seekOffset) || 10)); });
@@ -4439,6 +4447,12 @@ function renderAudioPanel() {
         '<div class="audio-speed"><span>Speed</span>' +
         [0.5, 0.75, 1, 1.25].map(function(r) { return '<button class="sp-btn' + (practice.rate === r ? ' on' : '') + '" onclick="setPracticeRate(' + r + ')">' + r + '×</button>'; }).join('') +
         '<span class="ab-mark">Pitch stays natural</span></div>' +
+        '<div class="audio-pitch"><span>Audio key</span>' +
+        '<button class="pitch-step" onclick="changePracticePitch(-1)" aria-label="Lower audio by one semitone"' + (practice.pitch <= -6 ? ' disabled' : '') + '>&minus;</button>' +
+        '<span class="pitch-value">' + practicePitchLabel() + '</span>' +
+        '<button class="pitch-step" onclick="changePracticePitch(1)" aria-label="Raise audio by one semitone"' + (practice.pitch >= 6 ? ' disabled' : '') + '>+</button>' +
+        (practice.pitch ? '<button class="pitch-reset" onclick="setPracticePitch(0)">Original</button>' : '') +
+        '<span class="ab-mark">Practice audio only; chart stays unchanged</span></div>' +
         '<div class="media-note">Your MP3 stays on this device — it’s never uploaded.</div>' +
         '<div class="audio-foot"><button class="tap" aria-label="Hide practice player" onclick="practice.open=false;renderAudioPanel()">Hide</button>' +
         '<button class="tap danger" onclick="removePracticeAudio()">Remove audio</button></div></div>';
@@ -4456,7 +4470,13 @@ function renderAudioControls() {
         compact.setAttribute('aria-label', playing ? 'Pause practice track' : 'Play practice track');
     }
 }
-function togglePracticePlay() { if (!practice.el) return; if (practice.el.paused) practice.el.play().catch(function() {}); else practice.el.pause(); }
+function playPracticeAudio() {
+    if (!practice.el) return;
+    var graph = practice.pitch !== 0 ? ensurePracticePitchGraph() : practice.pitchGraph;
+    if (graph && graph.ctx.state === 'suspended') graph.ctx.resume().catch(function() {});
+    practice.el.play().catch(function() {});
+}
+function togglePracticePlay() { if (!practice.el) return; if (practice.el.paused) playPracticeAudio(); else practice.el.pause(); }
 function seekPractice(v) {
     if (!practice.el) return;
     practice.el.currentTime = Math.max(0, Math.min(practice.el.duration || 0, parseFloat(v) || 0));
@@ -4531,6 +4551,80 @@ function applyPracticeRate() {
     if ('webkitPreservesPitch' in practice.el) practice.el.webkitPreservesPitch = true;
     if ('mozPreservesPitch' in practice.el) practice.el.mozPreservesPitch = true;
 }
+function practicePitchLabel() {
+    if (!practice.pitch) return 'Original';
+    var amount = Math.abs(practice.pitch), direction = practice.pitch > 0 ? 'Up ' : 'Down ';
+    return direction + amount + ' semitone' + (amount === 1 ? '' : 's');
+}
+function pitchControlBuffers(ctx, descending) {
+    var length = Math.max(2048, Math.round(ctx.sampleRate)), delay = ctx.createBuffer(1, length, ctx.sampleRate);
+    var gain = ctx.createBuffer(1, length, ctx.sampleRate), delayData = delay.getChannelData(0), gainData = gain.getChannelData(0);
+    for (var i = 0; i < length; i++) {
+        var phase = i / length;
+        delayData[i] = descending ? 1 - phase : phase;
+        gainData[i] = Math.sin(Math.PI * phase);
+    }
+    return { delay: delay, gain: gain };
+}
+function clearPracticePitchPath(graph) {
+    if (!graph || !graph.paths) return;
+    graph.paths.forEach(function(path) {
+        try { graph.source.disconnect(path.delay); } catch (e) {}
+        path.sources.forEach(function(source) { try { source.stop(); } catch (e) {} try { source.disconnect(); } catch (e) {} });
+        [path.delayDepth, path.delay, path.gain].forEach(function(node) { try { node.disconnect(); } catch (e) {} });
+    });
+    graph.paths = [];
+}
+function rebuildPracticePitchPath() {
+    var graph = practice.pitchGraph; if (!graph) return;
+    clearPracticePitchPath(graph);
+    var now = graph.ctx.currentTime;
+    graph.dry.gain.cancelScheduledValues(now); graph.wet.gain.cancelScheduledValues(now);
+    if (!practice.pitch) {
+        graph.dry.gain.setTargetAtTime(1, now, 0.012); graph.wet.gain.setTargetAtTime(0, now, 0.012);
+        return;
+    }
+    var ratio = Math.pow(2, practice.pitch / 12), windowSeconds = 0.08;
+    var cycleRate = Math.max(0.08, Math.abs(1 - ratio) / windowSeconds);
+    var buffers = pitchControlBuffers(graph.ctx, ratio > 1);
+    graph.dry.gain.setTargetAtTime(0, now, 0.012); graph.wet.gain.setTargetAtTime(0.72, now, 0.012);
+    // Two half-cycle delay ramps read the stream faster or slower; their
+    // overlapping gain envelopes hide each ramp's wrap without changing time.
+    [0, 0.5].forEach(function(offset) {
+        var delay = graph.ctx.createDelay(0.12), delayDepth = graph.ctx.createGain(), pathGain = graph.ctx.createGain();
+        var delayControl = graph.ctx.createBufferSource(), gainControl = graph.ctx.createBufferSource();
+        delay.delayTime.value = 0.004; delayDepth.gain.value = windowSeconds; pathGain.gain.value = 0;
+        delayControl.buffer = buffers.delay; delayControl.loop = true; delayControl.playbackRate.value = cycleRate;
+        gainControl.buffer = buffers.gain; gainControl.loop = true; gainControl.playbackRate.value = cycleRate;
+        graph.source.connect(delay); delay.connect(pathGain); pathGain.connect(graph.wet);
+        delayControl.connect(delayDepth); delayDepth.connect(delay.delayTime); gainControl.connect(pathGain.gain);
+        delayControl.start(0, offset); gainControl.start(0, offset);
+        graph.paths.push({ delay: delay, delayDepth: delayDepth, gain: pathGain, sources: [delayControl, gainControl] });
+    });
+}
+function ensurePracticePitchGraph() {
+    if (practice.pitchGraph) return practice.pitchGraph;
+    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx || !practice.el) return null;
+    try {
+        var ctx = new AudioCtx(), source = ctx.createMediaElementSource(practice.el);
+        var dry = ctx.createGain(), wet = ctx.createGain(), master = ctx.createGain();
+        dry.gain.value = practice.pitch ? 0 : 1; wet.gain.value = 0;
+        source.connect(dry); dry.connect(master); wet.connect(master); master.connect(ctx.destination);
+        practice.pitchGraph = { ctx: ctx, source: source, dry: dry, wet: wet, master: master, paths: [] };
+        rebuildPracticePitchPath();
+        return practice.pitchGraph;
+    } catch (e) { return null; }
+}
+function applyPracticePitch() { if (practice.pitchGraph) rebuildPracticePitchPath(); }
+function setPracticePitch(value) {
+    var target = Math.max(-6, Math.min(6, Math.round(Number(value) || 0)));
+    if (target !== 0 && !ensurePracticePitchGraph()) { toast('Pitch shifting is not supported by this browser.'); return; }
+    practice.pitch = target; applyPracticePitch();
+    if (practice.pitchGraph && practice.pitchGraph.ctx.state === 'suspended') practice.pitchGraph.ctx.resume().catch(function() {});
+    capturePracticeSession(true); renderAudioPanel();
+}
+function changePracticePitch(amount) { setPracticePitch(practice.pitch + amount); }
 function setPracticeRate(r) { practice.rate = r; applyPracticeRate(); capturePracticeSession(true); renderAudioPanel(); }
 function saveNamedPracticeLoop() {
     if (practice.a == null || practice.b == null || practice.b - practice.a < 0.25) { toast('Set A and B before saving a loop.'); return; }

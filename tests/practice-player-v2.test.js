@@ -49,6 +49,7 @@ test('position, loop and speed persist per song without storing the audio in loc
   assert.match(app, /chordph2_practice_sessions/);
   assert.match(app, /s\.position = practice\.el\.currentTime/);
   assert.match(app, /s\.a = practice\.a; s\.b = practice\.b; s\.loop = practice\.loop; s\.rate = practice\.rate/);
+  assert.match(app, /s\.pitch = practice\.pitch/);
   assert.match(app, /idbPut\('song:' \+ id, f\)/);
   assert.doesNotMatch(app, /localStorage\.setItem\([^\n]+practice\.url/);
 });
@@ -59,4 +60,18 @@ test('slower playback asks the browser to preserve pitch and exposes media contr
   assert.match(app, /function setupPracticeMediaSession/);
   assert.match(app, /setActionHandler\('seekto'/);
   assert.match(app, /setPositionState/);
+});
+
+test('audio key shifting is independent from playback speed and is locally processed', () => {
+  assert.match(app, /function ensurePracticePitchGraph/);
+  assert.match(app, /createMediaElementSource\(practice\.el\)/);
+  assert.match(app, /dry\.gain\.value = practice\.pitch \? 0 : 1; wet\.gain\.value = 0/);
+  assert.match(app, /function rebuildPracticePitchPath/);
+  assert.match(app, /Math\.pow\(2, practice\.pitch \/ 12\)/);
+  assert.match(app, /createDelay\(0\.12\)/);
+  assert.match(app, /Lower audio by one semitone/);
+  assert.match(app, /Raise audio by one semitone/);
+  assert.match(app, /Practice audio only; chart stays unchanged/);
+  assert.match(app, /Math\.max\(-6, Math\.min\(6/);
+  assert.doesNotMatch(app, /setPracticePitch[\s\S]{0,500}playbackRate\s*=/);
 });
