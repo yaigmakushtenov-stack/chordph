@@ -3532,10 +3532,35 @@ function renderMediaPanel() {
         box.innerHTML = '<button class="listen-btn" onclick="mediaOpen=true;renderMediaPanel()"><span class="sp">🎧</span> Listen &amp; learn' + (n ? ' <span class="media-count">' + n + '</span>' : '') + '</button>';
         return;
     }
-    box.innerHTML = '<div class="media-body">' +
+    var readonly = state.chartFrom === 'shared' || state.chartFrom === 'shared-set';
+    var song = songById(currentSongId);
+    var missing = song && (!state.spotify[currentSongId] || !state.youtube[currentSongId]);
+    var findBtn = (supa && currentUser && !readonly && missing && song && song.title)
+        ? '<button class="listen-btn" id="media-find" onclick="autoFindLinks()"><span class="sp">✨</span> Auto-find links</button>' : '';
+    box.innerHTML = '<div class="media-body">' + findBtn +
         '<div id="chart-spotify"></div><div id="chart-youtube"></div><div id="chart-audio"></div>' +
         '<button class="tap" onclick="mediaOpen=false;renderMediaPanel()" style="margin-top:4px;">Hide</button></div>';
     renderSpotifyPanel(); renderYouTube(); renderAudioPanel();
+}
+/* AI: find this song's Spotify + YouTube links by title+artist (Edge Function
+   find-links; needs it deployed with the API-key secrets set) */
+async function autoFindLinks() {
+    if (!supa || !currentUser) { toast('Sign in to auto-find links.'); return; }
+    var song = songById(currentSongId); if (!song || !song.title) return;
+    var btn = document.getElementById('media-find');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="sp">✨</span> Searching…'; }
+    try {
+        var res = await supa.functions.invoke('find-links', { body: { title: song.title, artist: song.artist || '' } });
+        if (res.error) throw res.error;
+        var d = res.data || {}, found = 0;
+        if (d.spotify && !state.spotify[currentSongId]) { state.spotify[currentSongId] = d.spotify; found++; }
+        if (d.youtube && !state.youtube[currentSongId]) { state.youtube[currentSongId] = d.youtube; found++; }
+        if (found) { save(); toast('Found ' + found + ' link' + (found > 1 ? 's' : '') + ' — check they’re right.'); }
+        else toast('Couldn’t find links for “' + song.title + '”. Add them manually.');
+    } catch (e) {
+        toast('Auto-find isn’t set up yet (needs the find-links function).');
+    }
+    renderMediaPanel();
 }
 
 /* ---- YouTube "learn the song" video (paste a link) ---- */
