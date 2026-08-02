@@ -593,6 +593,7 @@
         .ctl svg { width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.7; fill: none; stroke-linecap: round; stroke-linejoin: round; }
         @media (hover: hover) { .ctl:hover { background: var(--hover); color: var(--text); } }
         .ctl.on { color: var(--accent); background: rgba(91,140,255,.13); }
+        .ctl.ctl-group-start { border-left: 1px solid var(--hairline); border-radius: 0 11px 11px 0; margin-left: 5px; padding-left: 15px; }
         #ctl-pad.playing { color: var(--accent-2); }
         /* labels off (set in Appearance settings) — icons only, tighter */
         body.icons-only .ctl span { display: none; }
@@ -657,7 +658,16 @@
             text-transform: uppercase;
             margin-top: 1.3em;
             margin-bottom: 0.1em;
+            scroll-margin-top: 24px;
         }
+        .section-jumps { display: flex; gap: 7px; overflow-x: auto; padding: 11px 0 3px; margin-top: 7px;
+            scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 94%, transparent);
+            mask-image: linear-gradient(90deg, #000 94%, transparent); }
+        .section-jumps::-webkit-scrollbar { display: none; }
+        .section-jump { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 999px; padding: 6px 10px;
+            color: var(--muted); background: var(--surface); font: inherit; font-size: 12px; cursor: pointer; }
+        .section-jump:hover, .section-jump:focus-visible { color: var(--text); border-color: var(--accent); }
+        body.stage-mode .section-jumps { display: none !important; }
 
         .medley-sep {
             border-top: 1px dashed rgba(155, 107, 255, 0.4);
@@ -1201,9 +1211,9 @@
                 <button class="ctl" id="ctl-capo" onclick="toggleLayer('capo')" aria-label="Capo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M12 4v16M17 4v16"/><rect x="3" y="8.5" width="18" height="3.4" rx="1.5"/></svg><span>Capo</span></button>
                 <button class="ctl" id="ctl-numbers" onclick="toggleNashville()" aria-label="Nashville numbers"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v16M16 4v16M4 9h16M4 15h16"/></svg><span>Numbers</span></button>
                 <button class="ctl" id="ctl-diagrams" onclick="toggleDiagrams()" aria-label="Chord diagrams"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14M5 9h14M5 14h14M5 19h14M9 4v15M15 4v15"/><circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/></svg><span>Chords</span></button>
-                <button class="ctl" id="ctl-lyrics" onclick="toggleLyrics()" aria-label="Lyrics only"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 10h14M5 14h9M5 18h11"/></svg><span>Lyrics</span></button>
+                <button class="ctl ctl-group-start" id="ctl-lyrics" onclick="toggleLyrics()" aria-label="Lyrics only"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 10h14M5 14h9M5 18h11"/></svg><span>Lyrics</span></button>
                 <button class="ctl" id="ctl-text" onclick="toggleLayer('text')" aria-label="Text size"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l4.5-12 4.5 12M4.6 14h5.8M15 18l2.5-7 2.5 7M16 16h3"/></svg><span>Text</span></button>
-                <button class="ctl" id="ctl-click" onclick="toggleLayer('click')" aria-label="Metronome click"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l3 16H6zM12 4v9M12 13l4-3"/></svg><span>Click</span></button>
+                <button class="ctl ctl-group-start" id="ctl-click" onclick="toggleLayer('click')" aria-label="Metronome click"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l3 16H6zM12 4v9M12 13l4-3"/></svg><span>Click</span></button>
                 <button class="ctl" id="ctl-pad" onclick="toggleLayer('pad')" aria-label="Ambient pad"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-6 3 13 3-16 3 12 2-3h3"/></svg><span>Pad</span></button>
                 <button class="ctl" id="ctl-medley" onclick="openMedleySheet()" style="display:none;" aria-label="Medley"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h10a2 2 0 0 1 2 2v10M16 8H6a1.8 1.8 0 0 0-1.8 1.8V19a1.8 1.8 0 0 0 1.8 1.8h9.5A1.8 1.8 0 0 0 17.3 19V9.8A1.8 1.8 0 0 0 15.5 8Z"/></svg><span>Medley</span></button>
             </div>
@@ -1241,6 +1251,7 @@
             </div>
         </div>
 
+        <nav class="section-jumps" id="section-jumps" aria-label="Jump to song section" style="display:none;"></nav>
         <div class="chord-strip" id="chord-strip" style="display:none;"></div>
         <div class="chart" id="chart-body"></div>
         <div id="medley-blocks"></div>
@@ -3677,6 +3688,33 @@ function viewFor() {
     return INSTRUMENT_VIEWS[state.profile ? state.profile.instrument : 'Vocalist'] || 'vocalist';
 }
 
+function jumpToSection(id) {
+    var section = document.getElementById(id);
+    if (!section) return;
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function renderSectionJumps() {
+    var nav = document.getElementById('section-jumps');
+    var body = document.getElementById('chart-body');
+    if (!nav || !body) return;
+    nav.innerHTML = '';
+    var heads = Array.prototype.slice.call(body.querySelectorAll('.sec-head'));
+    if (heads.length < 2) { nav.style.display = 'none'; return; }
+    heads.forEach(function(head, index) {
+        var id = 'chart-section-' + index;
+        var label = (head.textContent || '').replace(/^\s*\[|\]\s*$/g, '') || 'Section ' + (index + 1);
+        head.id = id;
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'section-jump';
+        button.textContent = label;
+        button.setAttribute('aria-label', 'Jump to ' + label);
+        button.onclick = function() { jumpToSection(id); };
+        nav.appendChild(button);
+    });
+    nav.style.display = 'flex';
+}
+
 function renderChart() {
     var song = songById(currentSongId);
     if (!song) { go('songs'); return; }
@@ -3780,6 +3818,7 @@ function renderChart() {
     } else {
         body.innerHTML = formatChart(displayedChart);
     }
+    renderSectionJumps();
 
     // Instrument-specific chord reference: guitar fingering or keyboard tones.
     var strip = document.getElementById('chord-strip');

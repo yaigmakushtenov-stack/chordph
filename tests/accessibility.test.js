@@ -87,3 +87,17 @@ test('chord diagrams follow the selected instrument instead of defaulting to gui
   assert.match(app, /Keyboard chord tones/);
   assert.match(app, /diagramCtl\.style\.display = diagramCapable/);
 });
+
+test('long charts expose section jump navigation without cluttering stage mode', () => {
+  assert.match(app, /id="section-jumps"[^>]+aria-label="Jump to song section"/);
+  assert.match(app, /function renderSectionJumps/);
+  assert.match(app, /function jumpToSection/);
+  assert.match(app, /button\.setAttribute\('aria-label', 'Jump to ' \+ label\)/);
+  assert.match(app, /body\.stage-mode \.section-jumps/);
+});
+
+test('chart controls visually separate notation, display, and rehearsal tools', () => {
+  assert.match(app, /class="ctl ctl-group-start" id="ctl-lyrics"/);
+  assert.match(app, /class="ctl ctl-group-start" id="ctl-click"/);
+  assert.match(app, /\.ctl\.ctl-group-start/);
+});
