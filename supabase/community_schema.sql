@@ -40,6 +40,7 @@ create table if not exists public.submissions (
     created_at      timestamptz not null default now(),
     submitter_id    uuid not null references auth.users(id) on delete cascade,
     submitter_email text not null,
+    submitter_name  text,
     song_id         text references public.songs(id) on delete set null, -- set when adding a version to an existing song; null = new song
     title           text not null,
     artist          text,
@@ -79,7 +80,7 @@ create table if not exists public.song_versions (
     id                uuid primary key default gen_random_uuid(),
     song_id           text not null references public.songs(id) on delete cascade,
     created_at        timestamptz not null default now(),
-    contributor_email text,
+    contributor_name  text,
     "key"             text,
     type              text not null default 'chord' check (type in ('chord','tab')),
     instrument        text,

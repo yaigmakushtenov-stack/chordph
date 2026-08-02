@@ -18,20 +18,21 @@ A friendlier, click-by-click version is the published guide (ask Claude for the 
 You now have 3 keys: Spotify Client ID, Spotify Client secret, YouTube key.
 
 ## Part 3 — Add the function to Supabase
-7. Open **supabase.com/dashboard** → your Chord.ph project → **Edge Functions**.
-8. Click **Create a function** (via editor). Name it **exactly** `find-links`.
-9. Delete any sample code, paste the contents of `index.ts` (in this folder), then **Deploy**.
+7. Run `supabase/ai_security.sql` once in the project's SQL editor. This enables signed-in daily quotas.
+8. Open **supabase.com/dashboard** → your Chord.ph project → **Edge Functions**.
+9. Click **Create a function** (via editor). Name it **exactly** `find-links`.
+10. Delete any sample code, paste the contents of `index.ts` (in this folder), then **Deploy**.
 
 ## Part 4 — Paste the 3 keys (Secrets)
-10. In **Edge Functions → Secrets** (or Project Settings → Edge Functions → Secrets), add three secrets, names **exactly**:
+11. In **Edge Functions → Secrets** (or Project Settings → Edge Functions → Secrets), add three secrets, names **exactly**:
     - `SPOTIFY_CLIENT_ID` → your Spotify Client ID
     - `SPOTIFY_CLIENT_SECRET` → your Spotify Client secret
     - `YOUTUBE_API_KEY` → your YouTube key
     Save.
 
 ## Part 5 — Test
-11. In the app, sign in, open a song with no links, tap **🎧 Listen & learn → ✨ Auto-find links**. Links should appear — check they're the right song.
+12. In the app, sign in, open a song with no links, tap **🎧 Listen & learn → ✨ Auto-find links**. Links should appear — check they're the right song.
 
 **If the button says "not set up yet":** the function name must be exactly `find-links` and the 3 secret names must match exactly (all caps, underscores).
 
-Both APIs have free tiers (YouTube ~100 searches/day; Spotify free), so this costs nothing at normal use.
+Users must be signed in and are limited to 10 searches per day. Both APIs have provider quotas, so monitor usage before raising this limit.

@@ -11,12 +11,7 @@
 //   supa.functions.invoke('clean-chart', { body: { text, key } })
 
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { authorizeAndConsume, jsonResponse, preflightResponse } from "../_shared/security.ts";
 
 const MODEL = "claude-sonnet-5";
 const MAX_INPUT = 8000; // characters — chord charts are small; guard cost/abuse
@@ -41,18 +36,20 @@ REMOVE this kind of junk if present: website navigation, ads, "Tabs by", capo/tu
 Return ONLY the finished chart text.`;
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+  if (req.method === "OPTIONS") return preflightResponse(req);
+  if (req.method !== "POST") return jsonResponse(req, { error: "method_not_allowed" }, 405);
 
   try {
+    const access = await authorizeAndConsume(req, "clean-chart", 20);
+    if (access instanceof Response) return access;
+
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) return json({ error: "not_configured" }, 501);
+    if (!apiKey) return jsonResponse(req, { error: "not_configured" }, 501);
 
     const { text, key } = await req.json();
     const raw = String(text || "").trim();
-    if (!raw) return json({ error: "text required" }, 400);
-    if (raw.length > MAX_INPUT) return json({ error: "too_long" }, 413);
+    if (!raw) return jsonResponse(req, { error: "text_required" }, 400);
+    if (raw.length > MAX_INPUT) return jsonResponse(req, { error: "too_long" }, 413);
 
     const userMsg =
       (key ? `Song key: ${String(key)}\n\n` : "") +
@@ -68,7 +65,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 2000,
-        temperature: 0,
+        thinking: { type: "disabled" },
         system: SYSTEM,
         messages: [{ role: "user", content: userMsg }],
       }),
@@ -76,15 +73,25 @@ serve(async (req) => {
 
     if (!r.ok) {
       const detail = await r.text().catch(() => "");
-      return json({ error: "ai_failed", status: r.status, detail: detail.slice(0, 300) }, 502);
+      console.error("clean-chart provider failure", r.status, detail.slice(0, 500));
+      return jsonResponse(req, { error: "ai_failed" }, 502);
     }
 
     const j = await r.json();
     const chart = (j.content?.[0]?.text ?? "").trim();
-    if (!chart) return json({ error: "empty" }, 502);
+    if (!chart) return jsonResponse(req, { error: "empty_result" }, 502);
 
-    return json({ chart });
+    const chordPattern = /\b[A-G][b#]?(?:m|maj|min|sus|add|dim|aug|[0-9])*(?:\/[A-G][b#]?)?\b/g;
+    const inputChords = raw.match(chordPattern) || [];
+    const outputChords = chart.match(chordPattern) || [];
+    if (inputChords.join("|") !== outputChords.join("|")) {
+      console.error("clean-chart rejected a result that changed chords");
+      return jsonResponse(req, { error: "chords_changed" }, 422);
+    }
+
+    return jsonResponse(req, { chart });
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    console.error("clean-chart internal failure", e);
+    return jsonResponse(req, { error: "internal_error" }, 500);
   }
 });

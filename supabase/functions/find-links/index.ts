@@ -1,7 +1,7 @@
 // Chord.ph — Edge Function: find a song's Spotify track + YouTube video by
 // title + artist. Keys stay server-side (set as function secrets).
 //
-// Deploy:   supabase functions deploy find-links --no-verify-jwt
+// Deploy:   supabase functions deploy find-links
 // Secrets:  supabase secrets set SPOTIFY_CLIENT_ID=... SPOTIFY_CLIENT_SECRET=... YOUTUBE_API_KEY=...
 //   - Spotify: create an app at developer.spotify.com/dashboard -> Client ID/Secret
 //   - YouTube: a Google Cloud API key with "YouTube Data API v3" enabled
@@ -9,12 +9,7 @@
 // The client calls it with supa.functions.invoke('find-links', { body: { title, artist } }).
 
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { authorizeAndConsume, jsonResponse, preflightResponse } from "../_shared/security.ts";
 
 async function spotifyToken(): Promise<string | null> {
   const id = Deno.env.get("SPOTIFY_CLIENT_ID");
@@ -72,18 +67,24 @@ async function findYouTube(title: string, artist: string): Promise<string | null
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+  if (req.method === "OPTIONS") return preflightResponse(req);
+  if (req.method !== "POST") return jsonResponse(req, { error: "method_not_allowed" }, 405);
   try {
+    const access = await authorizeAndConsume(req, "find-links", 10);
+    if (access instanceof Response) return access;
+
     const { title, artist } = await req.json();
-    if (!title || !String(title).trim()) return json({ error: "title required" }, 400);
+    const clean = (value: unknown) => String(value || "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 200);
+    const cleanTitle = clean(title);
+    const cleanArtist = clean(artist);
+    if (!cleanTitle) return jsonResponse(req, { error: "title_required" }, 400);
     const [spotify, youtube] = await Promise.all([
-      findSpotify(String(title).trim(), String(artist || "").trim()).catch(() => null),
-      findYouTube(String(title).trim(), String(artist || "").trim()).catch(() => null),
+      findSpotify(cleanTitle, cleanArtist).catch(() => null),
+      findYouTube(cleanTitle, cleanArtist).catch(() => null),
     ]);
-    return json({ spotify, youtube });
+    return jsonResponse(req, { spotify, youtube });
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    console.error("find-links internal failure", e);
+    return jsonResponse(req, { error: "internal_error" }, 500);
   }
 });

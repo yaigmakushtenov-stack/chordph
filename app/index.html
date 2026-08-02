@@ -2002,6 +2002,7 @@ function submitChart() {
     }
     supa.from('submissions').insert({
         submitter_id: currentUser.id, submitter_email: currentUser.email, song_id: songId,
+        submitter_name: (state.profile && state.profile.name) || 'Community musician',
         title: title, artist: artist, key: key, tempo: tempo || null, feel: null, tags: tags,
         type: type, instrument: instrument || null, reference_url: ref, chart: chart
     }).then(function(res) {
@@ -2058,7 +2059,7 @@ async function createApprovedSong(s) {
         if (ins.error) throw ins.error;
     }
     var v = await supa.from('song_versions').insert({
-        song_id: songId, contributor_email: s.submitter_email, key: s.key,
+        song_id: songId, contributor_name: s.submitter_name || 'Community musician', key: s.key,
         type: s.type, instrument: s.instrument, reference_url: s.reference_url, chart: s.chart
     });
     if (v.error) throw v.error;
@@ -2235,7 +2236,9 @@ async function openVersionsSheet(songId) {
     openSheet('<div class="sheet-title">Community versions</div><div class="sheet-scroll" id="ver-list"><div class="empty">Loading…</div></div>' +
         '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button></div>', true);
     try {
-        var vres = await supa.from('song_versions').select('*').eq('song_id', songId).order('votes', { ascending: false });
+        var vres = await supa.from('song_versions')
+            .select('id,song_id,created_at,key,type,instrument,reference_url,chart,votes,contributor_name')
+            .eq('song_id', songId).order('votes', { ascending: false });
         if (vres.error) throw vres.error;
         var versions = vres.data || [];
         var mine = {};
@@ -2255,7 +2258,7 @@ function versionCard(v, voted) {
     var tag = v.type === 'tab' ? 'Tab' + (v.instrument ? ' · ' + esc(v.instrument) : '') : 'Chords';
     return '<div class="sub-card">' +
         '<div class="sc-tags"><span class="sc-tag">' + tag + '</span><span class="sc-tag">Key ' + esc(v.key || '?') + '</span>' +
-        (v.contributor_email ? '<span class="sc-tag">' + esc(v.contributor_email.split('@')[0]) + '</span>' : '') + '</div>' +
+        (v.contributor_name ? '<span class="sc-tag">' + esc(v.contributor_name) + '</span>' : '') + '</div>' +
         '<pre class="sc-chart">' + esc(v.chart) + '</pre>' +
         '<div class="sc-actions">' +
         '<button class="vote-btn' + (voted ? ' voted' : '') + '" id="vote-' + v.id + '" onclick="toggleVote(\'' + v.id + '\')">' +
