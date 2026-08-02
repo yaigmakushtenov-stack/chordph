@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0f1117">
-<meta name="description" content="Chord charts, instant transpose, capo, setlists and a key & BPM analyzer — built for Filipino worship teams. Free, works offline.">
-<title>Chord.ph — Your chords. Your key. Your music.</title>
+<meta name="description" content="Prepare songs, rehearse with the track, and carry a stage-ready setlist into Sunday. Chord.ph is the practice and performance workspace for Filipino worship teams.">
+<title>Chord.ph — Prepare. Rehearse. Play Sunday-ready.</title>
 <style>
     :root {
         --bg: #0f1117;
@@ -160,6 +160,140 @@
     .audience h2 { font-size: clamp(24px, 3.6vw, 32px); font-weight: 750; letter-spacing: -0.5px; margin: 10px 0 14px; }
     .audience p { color: var(--muted); max-width: 620px; margin: 0 auto; font-size: 16px; }
 
+    /* v2 landing story: prepare → rehearse → perform */
+    .section-kicker {
+        display: inline-block; color: var(--accent-2); font-size: 11px; font-weight: 750;
+        letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;
+    }
+    .hero { text-align: left; padding: 86px 0 72px; }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(370px, .82fr); align-items: center; gap: 48px; }
+    .hero .eyebrow { margin-bottom: 20px; }
+    .hero h1 { font-size: clamp(42px, 4.5vw, 58px); letter-spacing: -1.8px; margin-bottom: 22px; }
+    .hero p.lead { max-width: 620px; margin: 0 0 30px; font-size: clamp(17px, 1.7vw, 20px); }
+    .hero .cta { justify-content: flex-start; }
+    .trust-row { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 22px; color: var(--muted); font-size: 12px; }
+    .trust-row span { display: inline-flex; align-items: center; gap: 6px; }
+    .trust-row b { color: #63d29a; }
+    .hero-visual { position: relative; padding: 12px 12px 42px; }
+    .hero-visual::before {
+        content: ''; position: absolute; inset: 4% -8% 0; z-index: -1;
+        background: radial-gradient(circle, rgba(79,140,255,.20), rgba(155,107,255,.07) 48%, transparent 72%);
+        filter: blur(12px);
+    }
+    .hero .preview { margin: 0; max-width: none; border-color: rgba(255,255,255,.11); transform: rotate(.5deg); }
+    .preview-bar .t { display: flex; flex-direction: column; line-height: 1.25; }
+    .preview-bar .t small { color: var(--faint); font-size: 10px; font-weight: 500; }
+    .practice-float, .set-float {
+        position: absolute; background: rgba(24,29,40,.96); border: 1px solid rgba(255,255,255,.11);
+        box-shadow: 0 16px 38px rgba(0,0,0,.48); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .practice-float {
+        left: -18px; bottom: 2px; display: flex; align-items: center; gap: 10px;
+        min-width: 244px; padding: 10px 12px; border-radius: 13px;
+    }
+    .pf-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; background: var(--grad); font-size: 11px; }
+    .practice-float > span:nth-child(2) { display: flex; flex-direction: column; line-height: 1.25; }
+    .practice-float b { font-size: 12px; }
+    .practice-float small { color: var(--muted); font-size: 10px; }
+    .pf-speed { margin-left: auto; color: var(--accent); font-weight: 700; font-size: 11px; }
+    .set-float { right: -18px; top: 46px; display: flex; flex-direction: column; padding: 9px 12px; border-radius: 11px; line-height: 1.25; }
+    .set-float span { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+    .set-float b { font-size: 11px; color: #63d29a; }
+
+    .problem-section { padding: 34px 0 66px; }
+    .problem-card {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
+        padding: 42px; border: 1px solid var(--hairline); border-radius: 22px;
+        background: linear-gradient(135deg, rgba(255,255,255,.035), rgba(79,140,255,.035));
+    }
+    .problem-copy h2 { font-size: clamp(25px, 3vw, 34px); line-height: 1.2; letter-spacing: -.6px; margin-bottom: 13px; }
+    .problem-copy p { color: var(--muted); font-size: 15px; }
+    .scatter-flow { display: grid; grid-template-columns: 1fr auto 1.18fr; gap: 14px; align-items: center; }
+    .scatter-items { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; }
+    .scatter-items span { color: var(--muted); font-size: 10px; border: 1px solid var(--hairline); border-radius: 999px; padding: 5px 8px; background: rgba(0,0,0,.12); }
+    .flow-arrow { color: var(--accent-2); font-size: 24px; }
+    .one-workspace { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px solid rgba(79,140,255,.32); border-radius: 14px; background: rgba(79,140,255,.08); }
+    .ow-mark { display: grid; place-items: center; flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; background: var(--grad); color: #fff; font-weight: 800; }
+    .one-workspace > span:last-child { display: flex; flex-direction: column; line-height: 1.3; }
+    .one-workspace b { font-size: 12px; }
+    .one-workspace small { color: var(--muted); font-size: 9px; }
+
+    #workflow { padding-top: 72px; }
+    .workflow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .flow-card {
+        position: relative; overflow: hidden; min-height: 430px; padding: 28px 26px;
+        background: var(--panel); border: 1px solid var(--hairline); border-radius: 18px;
+    }
+    .flow-card::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--card-accent); }
+    .flow-card.prepare { --card-accent: #4f8cff; }
+    .flow-card.rehearse { --card-accent: #9b6bff; }
+    .flow-card.perform { --card-accent: #36c6a3; }
+    .flow-num { color: var(--faint); font: 700 12px/1 "Cascadia Mono", Consolas, monospace; }
+    .flow-label { float: right; color: var(--card-accent); font-size: 11px; font-weight: 750; letter-spacing: 1.3px; text-transform: uppercase; }
+    .flow-card h3 { font-size: 22px; line-height: 1.28; letter-spacing: -.35px; margin: 32px 0 13px; }
+    .flow-card p { color: var(--muted); font-size: 14px; }
+    .flow-card ul { list-style: none; margin-top: 28px; display: grid; gap: 9px; }
+    .flow-card li { color: #b7bdc9; font-size: 12px; padding-left: 18px; position: relative; }
+    .flow-card li::before { content: '✓'; position: absolute; left: 0; color: var(--card-accent); font-weight: 800; }
+    .proof-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin-top: 56px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 18px; overflow: hidden; }
+    .proof-item { display: flex; gap: 16px; align-items: flex-start; padding: 24px; background: var(--bg); }
+    .proof-item > span { display: grid; place-items: center; flex: 0 0 auto; width: 38px; height: 38px; border-radius: 11px; background: rgba(79,140,255,.10); color: var(--accent); font-size: 18px; font-weight: 750; }
+    .proof-item h3 { font-size: 15px; margin-bottom: 5px; }
+    .proof-item p { color: var(--muted); font-size: 12px; }
+
+    .spotlight-section { padding: 76px 0; }
+    .spotlight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .spotlight-grid .band, .spotlight-grid .audience { min-height: 390px; padding: 42px 38px; text-align: left; }
+    .spotlight-grid .band { display: flex; flex-direction: column; align-items: flex-start; }
+    .spotlight-grid .band .ico { margin: 18px 0 0; color: var(--accent); }
+    .spotlight-grid .band p { margin: 0 0 24px; }
+    .spotlight-grid .audience { border: 1px solid var(--hairline); border-radius: 20px; background: linear-gradient(145deg, rgba(155,107,255,.08), rgba(255,255,255,.02)); }
+    .spotlight-grid .audience .flag { display: block; margin-bottom: 20px; }
+    .spotlight-grid .audience h2 { margin: 8px 0 12px; }
+    .spotlight-grid .audience p { margin: 0; }
+    .local-note { display: inline-block; margin-top: 28px; color: #b7bdc9; font-size: 11px; border-top: 1px solid var(--hairline); padding-top: 14px; }
+    .final { max-width: 760px; padding: 58px 34px; border: 1px solid var(--hairline); border-radius: 22px; background: radial-gradient(circle at 50% 0, rgba(79,140,255,.14), transparent 65%); }
+
+    @media (max-width: 980px) {
+        .hero { padding-top: 58px; }
+        .hero-grid { grid-template-columns: 1fr; gap: 44px; }
+        .hero-copy { max-width: 680px; }
+        .hero-visual { max-width: 560px; width: 100%; margin: 0 auto; }
+        .problem-card { grid-template-columns: 1fr; gap: 28px; }
+        .workflow-grid { grid-template-columns: 1fr; }
+        .flow-card { min-height: 0; }
+        .spotlight-grid { grid-template-columns: 1fr; }
+        .spotlight-grid .band, .spotlight-grid .audience { min-height: 0; }
+    }
+    @media (max-width: 600px) {
+        section { padding: 44px 0; }
+        .hero { padding: 52px 0 48px; }
+        .hero h1 { font-size: clamp(38px, 11.2vw, 48px); letter-spacing: -1.4px; }
+        .hero p.lead { font-size: 16px; }
+        .hero .cta { align-items: stretch; flex-direction: column; }
+        .hero .cta .btn { width: 100%; text-align: center; }
+        .trust-row { display: grid; gap: 7px; }
+        .hero-visual { padding: 4px 0 58px; }
+        .hero .preview { transform: none; }
+        .preview-ctrls { gap: 12px; overflow-x: auto; }
+        .preview-chart { font-size: 12px; }
+        .practice-float { left: 10px; right: 26px; bottom: 4px; min-width: 0; }
+        .set-float { right: -4px; top: 38px; }
+        .problem-section { padding-top: 18px; }
+        .problem-card { padding: 28px 22px; }
+        .scatter-flow { grid-template-columns: 1fr; }
+        .scatter-items { justify-content: flex-start; }
+        .flow-arrow { transform: rotate(90deg); width: fit-content; margin: -3px auto; }
+        .section-head { margin-bottom: 30px; }
+        .workflow-grid { gap: 12px; }
+        .flow-card { padding: 24px 22px; }
+        .flow-card h3 { margin-top: 24px; }
+        .proof-grid { grid-template-columns: 1fr; margin-top: 38px; }
+        .proof-item { padding: 20px; }
+        .spotlight-grid .band, .spotlight-grid .audience { padding: 30px 24px; }
+        .final { padding: 42px 22px; }
+    }
+
     /* final cta */
     /* contact form */
     #contact .wrap { max-width: 620px; }
@@ -245,7 +379,7 @@
             <span class="links" id="nav-links">
                 <a href="/app/" class="nav-app">Open app</a>
                 <a href="/analyzer/">Analyzer</a>
-                <a href="#features" onclick="closeNavMenu()">Features</a>
+                <a href="#workflow" onclick="closeNavMenu()">How it works</a>
                 <a href="#contact" onclick="closeNavMenu()">Contact</a>
                 <a href="#about" onclick="closeNavMenu()">About</a>
                 <a href="#legal" onclick="closeNavMenu()">Terms</a>
@@ -265,23 +399,30 @@
     </div>
 </section>
 
-<header class="hero wrap">
-    <span class="eyebrow">Free · works offline</span>
-    <h1>Your chords. Your key.<br><span class="g">Your music.</span></h1>
-    <p class="lead">The chord-chart app built for worship teams — instant transpose, capo shapes,
-        setlists and medleys, all in a clean, stage-ready view.</p>
-    <div class="cta">
-        <a class="btn btn-primary" href="/app/">Open Chord.ph &rarr;</a>
-        <a class="btn btn-ghost" href="/analyzer/">Try the Key &amp; BPM Analyzer</a>
-    </div>
-    <div class="note">No sign-up. Add it to your home screen and use it offline on stage.</div>
-
-    <div class="preview" aria-hidden="true">
-        <div class="preview-bar">
-            <span class="t">Lilim</span>
-            <span class="k">Key of E</span>
+<header class="hero">
+    <div class="wrap hero-grid">
+        <div class="hero-copy">
+            <span class="eyebrow">Built for Filipino worship teams</span>
+            <h1>Prepare the songs.<br>Rehearse the set.<br><span class="g">Play Sunday-ready.</span></h1>
+            <p class="lead">One clean workspace for chord charts, practice tracks, setlists and stage view—so your team spends less time hunting for files and more time making music.</p>
+            <div class="cta">
+                <a class="btn btn-primary" href="/app/">Build this Sunday’s setlist &rarr;</a>
+                <a class="btn btn-ghost" href="#workflow">See how it works</a>
+            </div>
+            <div class="trust-row" aria-label="Product benefits">
+                <span><b>✓</b> No sign-up to start</span>
+                <span><b>✓</b> Works offline</span>
+                <span><b>✓</b> Free for musicians</span>
+            </div>
         </div>
-        <div class="preview-ctrls"><span class="on">Transpose</span><span>Capo</span><span>Text</span><span>Scroll</span></div>
+
+        <div class="hero-visual" aria-label="Chord.ph chart and practice preview">
+            <div class="preview">
+                <div class="preview-bar">
+                    <span class="t">Lilim <small>Victory Worship</small></span>
+                    <span class="k">Key of E</span>
+                </div>
+                <div class="preview-ctrls"><span class="on">Transpose</span><span>Numbers</span><span>Keys</span><span>Lyrics</span></div>
 <div class="preview-chart"><span class="h">[VERSE 1]</span>
 <span class="c">E           G#m       A</span>
 Panginoon ang nais ko
@@ -293,57 +434,98 @@ Kagandahan Mo ay pagmasdan
 Mananatili sa Iyong lilim
 <span class="c">A          C#m       B</span>
 At sasambahin ka sa dakong lihim</div>
+            </div>
+            <div class="practice-float">
+                <span class="pf-icon">▶</span>
+                <span><b>Practice loop</b><small>Bridge · 0:48–1:12</small></span>
+                <span class="pf-speed">0.75×</span>
+            </div>
+            <div class="set-float"><span>Sunday set</span><b>4 songs ready</b></div>
+        </div>
     </div>
 </header>
 
-<section id="features">
+<section class="problem-section">
+    <div class="wrap">
+        <div class="problem-card reveal">
+            <div class="problem-copy">
+                <span class="section-kicker">The familiar Sunday problem</span>
+                <h2>Your team shouldn’t rebuild the set every week.</h2>
+                <p>Screenshots in Messenger. A PDF in someone’s phone. The old key in a notebook. A YouTube link buried in the group chat. Chord.ph brings the whole flow into one place.</p>
+            </div>
+            <div class="scatter-flow" aria-label="Scattered files become one shared Sunday workspace">
+                <div class="scatter-items"><span>Screenshot</span><span>Messenger link</span><span>PDF chart</span><span>Notebook key</span></div>
+                <span class="flow-arrow" aria-hidden="true">→</span>
+                <div class="one-workspace"><span class="ow-mark">C</span><span><b>One Sunday workspace</b><small>Clean, transposable, ready to play</small></span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="workflow">
     <div class="wrap">
         <div class="section-head reveal">
-            <h2>Everything a worship team needs</h2>
-            <p>Purpose-built for how bands actually rehearse and play — not a generic chord dump.</p>
+            <span class="section-kicker">From first listen to final song</span>
+            <h2>One workflow for the whole week</h2>
+            <p>Chord.ph follows how worship musicians actually work—not just how chord websites store songs.</p>
         </div>
-        <div class="features">
-            <div class="feature reveal"><span class="ico">🎚️</span><h3>Instant transpose</h3><p>Change key with a tap. Chords recolor live, and singers get the key that fits.</p></div>
-            <div class="feature reveal"><span class="ico">🔢</span><h3>Nashville numbers</h3><p>Flip any chart to scale degrees — 1, 4, 5, 6m. Key-independent, so the whole band reads one sheet in any key.</p></div>
-            <div class="feature reveal"><span class="ico">🎸</span><h3>Capo calculator</h3><p>Guitarists see the easy shapes and exact capo fret for any key, instantly.</p></div>
-            <div class="feature reveal"><span class="ico">🎯</span><h3>Chord diagrams</h3><p>Fretboard shapes for every chord in the song, including barre chords — no guessing.</p></div>
-            <div class="feature reveal"><span class="ico">📋</span><h3>Setlists</h3><p>Build a Sunday set, drag songs into order, and swipe between them on stage. Keys you set stay put.</p></div>
-            <div class="feature reveal"><span class="ico">🔀</span><h3>Medleys</h3><p>Chain songs together and pick exactly which parts — verse, chorus, bridge — to flow into.</p></div>
-            <div class="feature reveal"><span class="ico">🥁</span><h3>Click &amp; metronome</h3><p>A count-in click at the song's tempo, plus a standalone metronome with tap tempo and any time signature.</p></div>
-            <div class="feature reveal"><span class="ico">🎧</span><h3>Key &amp; BPM analyzer</h3><p>Drop in a track — or let it listen — and get the key, tempo and Camelot code. Runs entirely on your device.</p></div>
-            <div class="feature reveal"><span class="ico">🤝</span><h3>Community library</h3><p>Submit your charts and tabs, vote on the best version of each song, and play from a library the whole scene builds.</p></div>
-            <div class="feature reveal"><span class="ico">🔗</span><h3>Share a link</h3><p>Send a song or a whole setlist to your team. They open it read-only — no account, no app install.</p></div>
-            <div class="feature reveal"><span class="ico">🔎</span><h3>Tags &amp; search</h3><p>Filter by Worship, Filipino, Mellow, Upbeat and more; sort by title, artist, key or tempo.</p></div>
-            <div class="feature reveal"><span class="ico">☁️</span><h3>Cloud sync &amp; offline</h3><p>Your songs and setlists follow you across phone and PC — and still work with no signal.</p></div>
-            <div class="feature reveal"><span class="ico">🥁</span><h3>Plays your part</h3><p>Pick your instrument and the chart adapts — drummers see feel &amp; tempo, guitarists see capo.</p></div>
-            <div class="feature reveal"><span class="ico">📖</span><h3>Readable on stage</h3><p>Chords highlighted, controls that stay in reach while you scroll, adjustable text size and auto-scroll.</p></div>
-            <div class="feature reveal"><span class="ico">👥</span><h3>Band sync</h3><p>Share one live library and setlist with your team — updates appear instantly, with member roles and a switcher for multiple bands.</p></div>
-            <div class="feature reveal"><span class="ico">🎧</span><h3>Listen &amp; learn</h3><p>Attach a Spotify track and a YouTube tutorial to any song, right on the chart — hear it while you practice.</p></div>
-            <div class="feature reveal"><span class="ico">🔁</span><h3>MP3 A/B practice</h3><p>Load your own audio and loop a tricky section (A→B) at half speed until it's yours. Everything stays on your device.</p></div>
-            <div class="feature reveal"><span class="ico">✨</span><h3>AI clean-up</h3><p>Paste a messy chart from anywhere and let AI reformat it into a tidy chord chart — your chords and lyrics kept exactly as they are.</p></div>
+        <div class="workflow-grid">
+            <article class="flow-card prepare reveal">
+                <span class="flow-num">01</span><span class="flow-label">Prepare</span>
+                <h3>Turn the song into a chart your band can use.</h3>
+                <p>Create or import a chart, find the key and tempo, then transpose, use Nashville numbers, or choose easier capo shapes.</p>
+                <ul><li>Clean chord charts</li><li>Key &amp; BPM analyzer</li><li>Guitar and keyboard references</li></ul>
+            </article>
+            <article class="flow-card rehearse reveal">
+                <span class="flow-num">02</span><span class="flow-label">Rehearse</span>
+                <h3>Practice with the track without leaving the chart.</h3>
+                <p>Keep Spotify, YouTube or your own practice audio beside the music. Slow it down and loop the difficult entrance until it feels natural.</p>
+                <ul><li>Listen &amp; learn</li><li>A–B repeat and speed control</li><li>Click, pad and rehearsal tools</li></ul>
+            </article>
+            <article class="flow-card perform reveal">
+                <span class="flow-num">03</span><span class="flow-label">Perform</span>
+                <h3>Carry one ordered, stage-ready set into Sunday.</h3>
+                <p>Build the lineup, keep every chosen key, connect medleys and move through the set in a clean view that still works without signal.</p>
+                <ul><li>Setlists and medleys</li><li>Readable stage mode</li><li>Offline and shareable</li></ul>
+            </article>
+        </div>
+
+        <div class="proof-grid" id="features">
+            <div class="proof-item reveal"><span>♯</span><div><h3>The right key for everyone</h3><p>Transpose instantly, switch to Nashville numbers, and show instrument-specific references.</p></div></div>
+            <div class="proof-item reveal"><span>↻</span><div><h3>Practice the hard part</h3><p>Attach a listening link or load your own audio, slow it down and repeat A–B sections.</p></div></div>
+            <div class="proof-item reveal"><span>≡</span><div><h3>Keep the Sunday flow</h3><p>Order songs, preserve keys, combine selected sections into medleys and swipe through the set.</p></div></div>
+            <div class="proof-item reveal"><span>◐</span><div><h3>Ready when Wi-Fi isn’t</h3><p>Install it to your home screen and keep locally saved charts available offline.</p></div></div>
+            <div class="proof-item reveal"><span>⌁</span><div><h3>Share without friction</h3><p>Send a chart or setlist link that bandmates can open without creating an account.</p></div></div>
+            <div class="proof-item reveal"><span>✨</span><div><h3>Clean up messy charts</h3><p>Reformat pasted charts into a readable draft while keeping the chords and lyrics intact.</p></div></div>
         </div>
     </div>
 </section>
 
-<section>
-    <div class="wrap">
+<section class="spotlight-section">
+    <div class="wrap spotlight-grid">
         <div class="band reveal">
-            <span class="ico">🎧</span>
-            <h2>Know any song's key &amp; BPM</h2>
-            <p>Heard a song you want to play Sunday? Drop in the audio — or listen live — and the
-                built-in analyzer detects its key, tempo and even the instruments. Runs entirely on your device.</p>
-            <a class="btn btn-primary" href="/analyzer/">Open the Analyzer &rarr;</a>
+            <span class="section-kicker">Free on-device tool</span>
+            <span class="ico">◉</span>
+            <h2>Know the key before rehearsal starts</h2>
+            <p>Upload a track—or let Chord.ph listen—and get its key and tempo without sending the audio to a server.</p>
+            <a class="btn btn-primary" href="/analyzer/">Try the Key &amp; BPM Analyzer &rarr;</a>
+        </div>
+        <div class="audience reveal">
+            <span class="flag">🇵🇭</span>
+            <span class="section-kicker">Made here, for how we play here</span>
+            <h2>Built around the Filipino church week</h2>
+            <p>Tagalog worship, quick singer key changes, capo help before soundcheck, last-minute lineup edits and charts that remain readable on stage.</p>
+            <div class="local-note">Made in the Philippines · Built with working musicians</div>
         </div>
     </div>
 </section>
 
 <section>
-    <div class="wrap audience reveal">
-        <span class="flag">🇵🇭</span>
-        <h2>Made for the Filipino church</h2>
-        <p>From Tagalog worship to Hillsong covers, Chord.ph is built for how local worship teams
-            play — quick key changes for the singer, capo help for the guitarist, and setlists ready
-            before soundcheck. Free to use, and yours to keep offline.</p>
+    <div class="wrap final reveal">
+        <span class="section-kicker">Start with one song</span>
+        <h2>Make this Sunday feel <span class="g">less scattered.</span></h2>
+        <p>No install and no account required. Open the app, add a chart and build the set.</p>
+        <a class="btn btn-primary" href="/app/" style="font-size:16px;padding:14px 30px;">Build this Sunday’s setlist &rarr;</a>
     </div>
 </section>
 
@@ -373,14 +555,6 @@ At sasambahin ka sa dakong lihim</div>
             <button class="btn btn-primary" id="cf-submit" type="submit">Send message</button>
             <div id="cf-note" aria-live="polite"></div>
         </form>
-    </div>
-</section>
-
-<section>
-    <div class="wrap final reveal">
-        <h2>Ready for <span class="g">Sunday</span>?</h2>
-        <p>Open Chord.ph in your browser — no install, no account needed.</p>
-        <a class="btn btn-primary" href="/app/" style="font-size:16px;padding:14px 30px;">Open Chord.ph &rarr;</a>
     </div>
 </section>
 
@@ -452,7 +626,7 @@ At sasambahin ka sa dakong lihim</div>
         <div class="flinks">
             <a href="/app/">App</a>
             <a href="/analyzer/">Analyzer</a>
-            <a href="#features">Features</a>
+            <a href="#workflow">How it works</a>
             <a href="#contact">Contact</a>
             <a href="#about">About</a>
             <a href="#legal">Terms</a>
