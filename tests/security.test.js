@@ -44,3 +44,12 @@ test('find-links deployment retains JWT verification and sanitizes query text', 
   assert.match(findLinks, /slice\(0, 200\)/);
   assert.match(findLinks, /method_not_allowed/);
 });
+
+test('client distinguishes quota, expired session, provider, and chord-safety errors', () => {
+  assert.match(app, /function edgeErrorCode/);
+  for (const code of ['daily_limit_reached', 'sign_in_required', 'service_unavailable', 'ai_failed', 'chords_changed']) {
+    assert.ok(app.includes(`code === '${code}'`), `${code} should have client copy`);
+  }
+  assert.match(app, /Your original is safe/);
+  assert.match(app, /AI changed a chord/);
+});

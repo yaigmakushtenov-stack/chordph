@@ -3600,6 +3600,15 @@ function renderMediaPanel() {
 }
 /* AI: find this song's Spotify + YouTube links by title+artist (Edge Function
    find-links; needs it deployed with the API-key secrets set) */
+async function edgeErrorCode(error) {
+    try {
+        if (error && error.context && typeof error.context.json === 'function') {
+            var body = await error.context.json();
+            return body && body.error ? String(body.error) : '';
+        }
+    } catch (ignored) {}
+    return '';
+}
 async function autoFindLinks() {
     if (!supa || !currentUser) { toast('Sign in to auto-find links.'); return; }
     var song = songById(currentSongId); if (!song || !song.title) return;
@@ -3614,7 +3623,11 @@ async function autoFindLinks() {
         if (found) { save(); toast('Found ' + found + ' link' + (found > 1 ? 's' : '') + ' — check they’re right.'); }
         else toast('Couldn’t find links for “' + song.title + '”. Add them manually.');
     } catch (e) {
-        toast('Auto-find isn’t set up yet (needs the find-links function).');
+        var code = await edgeErrorCode(e);
+        if (code === 'daily_limit_reached') toast('You’ve used today’s 10 link searches. Try again tomorrow.');
+        else if (code === 'sign_in_required') toast('Your session expired. Sign in again to auto-find links.');
+        else if (code === 'service_unavailable' || code === 'ai_failed') toast('Auto-find is temporarily unavailable. Try again shortly.');
+        else toast('Auto-find isn’t configured yet.');
     }
     renderMediaPanel();
 }
@@ -5195,7 +5208,12 @@ async function cleanChartWithAI() {
         setCleanBtn('undo');
         toast('Cleaned up — check it looks right.');
     } catch (e) {
-        toast('Clean up isn’t set up yet (needs the clean-chart function).');
+        var code = await edgeErrorCode(e);
+        if (code === 'daily_limit_reached') toast('You’ve used today’s 20 chart clean-ups. Try again tomorrow.');
+        else if (code === 'chords_changed') toast('The AI changed a chord, so Chord.ph rejected the result. Try a smaller section.');
+        else if (code === 'sign_in_required') toast('Your session expired. Sign in again to clean this chart.');
+        else if (code === 'service_unavailable' || code === 'ai_failed') toast('Chart clean-up is temporarily unavailable. Your original is safe.');
+        else toast('Chart clean-up isn’t configured yet.');
         setCleanBtn('idle');
     }
 }
