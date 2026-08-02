@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'product_foundation_v2.sql'), 'utf8');
 const architecture = fs.readFileSync(path.join(__dirname, '..', 'docs', 'v2-product-architecture.md'), 'utf8');
+const roadmap = fs.readFileSync(path.join(__dirname, '..', 'docs', 'roadmap.md'), 'utf8');
 
 test('ministry foundation separates organizations, members, teams, and billing', () => {
   assert.match(sql, /create table if not exists public\.organizations/i);
@@ -33,4 +34,22 @@ test('paid authorization stays server-side and local charts remain resilient', (
   assert.match(architecture, /only the server may authorize paid work/i);
   assert.match(architecture, /payment provider webhook is the only writer/i);
   assert.match(architecture, /Local\/offline charts remain usable/i);
+});
+
+test('practice roadmap keeps playback in the chart and covers the agreed rehearsal tools', () => {
+  assert.match(roadmap, /not a separate page/i);
+  assert.match(roadmap, /compact \*\*Now playing\*\* strip/i);
+  for (const feature of [
+    'Persistent player', 'Waveform', 'Named loops', 'Speed control without changing pitch',
+    'pitch/key shifting', 'Count-in', 'Chart-section bookmarks', 'Personal rehearsal notes',
+    'Offline-downloadable setlist practice packs', 'Team practice assignments',
+    'Practice history', 'Foot-pedal/MIDI controls',
+  ]) assert.ok(roadmap.includes(feature), `${feature} should remain on the roadmap`);
+});
+
+test('paid team cloud workflow is private, quota-backed, and music-director managed', () => {
+  assert.match(roadmap, /music\s+director uploads an MP3 once/i);
+  assert.match(roadmap, /storage and monthly transfer allowances/i);
+  assert.match(roadmap, /Raw audio is never public/i);
+  assert.match(roadmap, /subscription\s+revenue pays for storage, bandwidth, backups and retention/i);
 });

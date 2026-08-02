@@ -116,8 +116,11 @@ Analyzer** (MUST stay free — CC BY-NC-SA models can't be paywalled); Spotify l
 Everything in Free, plus: **band/team sync** (live setlists, shared band song
 library, member editing, multi-band switcher); **ambient pads** + percussion
 beds; **audio practice player** — import your own MP3 + **A/B repeat** + speed
-control (see Spotify note); keep-awake; band roles. This is the paid-team-sync
-anchor; one Supabase Pro ($25/mo) comfortably covers many teams.
+control (see Spotify note); **private team practice-track storage** — a music
+director uploads an MP3 once and assigns it to the team/setlist; keep-awake;
+band roles. Cloud audio must have per-ministry storage quotas because its
+subscription revenue pays for storage, bandwidth, backups and retention. This
+is the paid-team-sync and rehearsal anchor.
 
 ### PREMIUM — "Studio / Pro" (~₱249–349/mo) — heavy AI + audio
 Everything in Pro, plus: **chord & lyric detection from audio** (needs
@@ -136,6 +139,45 @@ URL) with **A/B loop markers + speed control** — full control, no licensing/SD
 needed (user supplies audio they own; we never host/distribute it). Ship this as
 the real "learn a section" tool (Pro). Keep Spotify link as a convenience only;
 its full-playback/SDK path stays a later Premium extra.
+
+### Practice workspace — product direction (agreed Aug 2)
+
+The chart remains the main screen. “Separate playback from chart rendering” is
+an internal component boundary, not a separate page: musicians still read the
+chart while listening. Chart actions must never destroy or restart the player.
+The expanded practice controls live inside the chart and can collapse to a
+compact **Now playing** strip that keeps playback, elapsed time and play/pause
+available without covering the music.
+
+Build in this order:
+
+1. **Persistent player** that survives transpose, Nashville numbers, lyrics
+   mode, chord diagrams, text-size changes and editor actions.
+2. **Waveform** with accurate scrubbing and visible A/B markers.
+3. **Named loops**, such as “Bridge entrance” or “Chorus harmony”.
+4. **Speed control without changing pitch**.
+5. **Optional pitch/key shifting without changing speed**.
+6. **Count-in before a loop restarts**.
+7. **Chart-section bookmarks linked to audio positions**.
+8. **Personal rehearsal notes and chart annotations**.
+9. **Offline-downloadable setlist practice packs**, with explicit device-storage
+   usage and removal controls.
+10. **Team practice assignments**, such as “Learn Bridge by Friday”.
+11. **Practice history** showing difficult or repeatedly looped sections.
+12. **Foot-pedal/MIDI controls** for playback, loop markers and chart navigation.
+
+**Team cloud workflow (paid):** a music director uploads a legally obtained
+practice MP3 to a private ministry/team library, attaches it to a song or
+setlist, optionally adds named loops/bookmarks and assigns it to members. Team
+members stream it with short-lived authorization or download an encrypted/offline
+practice copy where supported. Access ends when membership is removed. The plan
+needs storage and monthly transfer allowances, visible usage meters, automatic
+orphan cleanup, retention controls and an upgrade path instead of unlimited
+storage. Raw audio is never public and never embedded in shared chart JSON.
+
+Spotify and YouTube remain useful reference sources, but provider/browser rules
+make them less dependable for background playback and precise looping. The
+native local or private-cloud practice track is the reliable rehearsal source.
 
 ---
 
