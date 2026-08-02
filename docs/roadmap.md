@@ -165,7 +165,9 @@ Build in this order:
 5. ✅ **Optional pitch/key shifting without changing speed — DONE** for native practice
    audio — shift down or up by six semitones, restore per song, and return to
    the unprocessed original without changing the chart or playback rate.
-6. **Count-in before a loop restarts**.
+6. ✅ **Count-in before a loop restarts — DONE** — an optional one-bar click
+   count follows the song's time signature and the practice speed, then resumes
+   precisely at A; the preference restores per song.
 7. **Chart-section bookmarks linked to audio positions**.
 8. **Personal rehearsal notes and chart annotations**.
 9. **Offline-downloadable setlist practice packs**, with explicit device-storage

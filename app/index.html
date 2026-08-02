@@ -4232,7 +4232,7 @@ var practiceSessions = {};
 try { practiceSessions = JSON.parse(localStorage.getItem('chordph2_practice_sessions') || '{}') || {}; } catch (e) { practiceSessions = {}; }
 var practiceSaveTimer = null;
 function practiceSession(id) {
-    if (!practiceSessions[id]) practiceSessions[id] = { position: 0, a: null, b: null, loop: false, rate: 1, pitch: 0, loops: [], activeLoopId: null };
+    if (!practiceSessions[id]) practiceSessions[id] = { position: 0, a: null, b: null, loop: false, countIn: false, rate: 1, pitch: 0, loops: [], activeLoopId: null };
     var session = practiceSessions[id];
     if (!Array.isArray(session.loops)) session.loops = [];
     return session;
@@ -4246,6 +4246,7 @@ function queuePracticeSessionSave() {
     practiceSaveTimer = setTimeout(flushPracticeSessions, 700);
 }
 var practice = { el: null, url: null, songId: null, chartFrom: 'songs', a: null, b: null, loop: false,
+                 countIn: false, countingIn: false, countInBeat: 0, countInBeats: 0, countInTimer: null, countInBeatTimers: [], countInSources: [], countCtx: null,
                  rate: 1, pitch: 0, pitchGraph: null, loops: [], activeLoopId: null, open: false, ready: false, peaks: null, pendingPosition: 0, loopTimer: null };
 function practiceAudioEl() {
     if (!practice.el) {
@@ -4264,7 +4265,7 @@ function capturePracticeSession(immediate) {
     if (!practice.songId) return;
     var s = practiceSession(practice.songId);
     if (practice.el && isFinite(practice.el.currentTime)) s.position = practice.el.currentTime || 0;
-    s.a = practice.a; s.b = practice.b; s.loop = practice.loop; s.rate = practice.rate; s.pitch = practice.pitch;
+    s.a = practice.a; s.b = practice.b; s.loop = practice.loop; s.countIn = practice.countIn; s.rate = practice.rate; s.pitch = practice.pitch;
     s.loops = practice.loops.slice(); s.activeLoopId = practice.activeLoopId;
     if (immediate) flushPracticeSessions(); else queuePracticeSessionSave();
 }
@@ -4273,10 +4274,76 @@ function startPracticeLoopGuard() {
     practice.loopTimer = setInterval(enforcePracticeLoop, 25);
 }
 function stopPracticeLoopGuard() { if (practice.loopTimer) clearInterval(practice.loopTimer); practice.loopTimer = null; }
+function practiceCountInStatus() {
+    if (practice.countingIn) return ' · count-in ' + Math.max(1, practice.countInBeat) + '/' + practice.countInBeats;
+    return practice.countIn ? ' · count-in on' : '';
+}
+function updatePracticeLoopStatus() {
+    var status = document.getElementById('practice-loop-status');
+    if (!status) return;
+    status.textContent = 'A ' + (practice.a != null ? fmtTime(practice.a) : '—') + ' · B ' +
+        (practice.b != null ? fmtTime(practice.b) : '—') + (practice.loop ? ' · looping ↺' : '') + practiceCountInStatus();
+}
+function practiceCountContext() {
+    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    if (!practice.countCtx || practice.countCtx.state === 'closed') practice.countCtx = new AudioCtx();
+    if (practice.countCtx.state === 'suspended') practice.countCtx.resume().catch(function() {});
+    return practice.countCtx;
+}
+function practiceCountClickAt(ctx, time, accent) {
+    var osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.frequency.value = accent ? 1250 : 850;
+    gain.gain.setValueAtTime(accent ? 0.19 : 0.12, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(time); osc.stop(time + 0.05);
+    return osc;
+}
+function cancelPracticeCountIn() {
+    if (practice.countInTimer) clearTimeout(practice.countInTimer);
+    practice.countInBeatTimers.forEach(clearTimeout);
+    practice.countInSources.forEach(function(source) { try { source.stop(); } catch (e) {} });
+    practice.countInTimer = null; practice.countInBeatTimers = []; practice.countInSources = [];
+    practice.countingIn = false; practice.countInBeat = 0; practice.countInBeats = 0;
+    updatePracticeLoopStatus();
+}
+function startPracticeCountIn() {
+    if (practice.countingIn || !practice.el || practice.a == null) return;
+    var song = songById(practice.songId), bpm = Math.max(30, Number(song && song.tempo) || 120);
+    var beats = Math.max(1, parseInt(song && song.timesig, 10) || 4), secondsPerBeat = 60 / (bpm * practice.rate);
+    var ctx = practiceCountContext();
+    if (!ctx || ctx.state !== 'running') { practice.el.currentTime = practice.a; return; }
+    practice.countingIn = true; practice.countInBeat = 1; practice.countInBeats = beats;
+    practice.el.pause(); practice.el.currentTime = practice.a; updatePracticeProgress(); updatePracticeLoopStatus();
+    var start = ctx.currentTime + 0.04;
+    for (var i = 0; i < beats; i++) {
+        practice.countInSources.push(practiceCountClickAt(ctx, start + i * secondsPerBeat, i === 0));
+        (function(beat) {
+            practice.countInBeatTimers.push(setTimeout(function() {
+                if (!practice.countingIn) return;
+                practice.countInBeat = beat; updatePracticeLoopStatus();
+            }, Math.max(0, (0.04 + (beat - 1) * secondsPerBeat) * 1000)));
+        })(i + 1);
+    }
+    practice.countInTimer = setTimeout(function() {
+        if (!practice.countingIn) return;
+        practice.countingIn = false; practice.countInTimer = null; practice.countInBeatTimers = []; practice.countInSources = [];
+        practice.el.currentTime = practice.a; updatePracticeLoopStatus(); playPracticeAudio();
+    }, (0.04 + beats * secondsPerBeat) * 1000);
+}
+function togglePracticeCountIn() {
+    if (practice.countingIn) cancelPracticeCountIn();
+    practice.countIn = !practice.countIn;
+    if (practice.countIn && !practiceCountContext()) { practice.countIn = false; toast('Count-in is not supported by this browser.'); }
+    capturePracticeSession(true); renderAudioPanel();
+}
 function enforcePracticeLoop() {
     if (!practice.el || !practice.loop || practice.a == null || practice.b == null) return;
+    if (practice.countingIn) return;
     if (practice.b - practice.a < 0.25) return;
-    if (practice.el.currentTime >= practice.b - 0.025) practice.el.currentTime = practice.a;
+    if (practice.el.currentTime >= practice.b - 0.025) {
+        if (practice.countIn) startPracticeCountIn(); else practice.el.currentTime = practice.a;
+    }
 }
 function onPracticePlaybackChange() {
     if (practice.el && !practice.el.paused && !practice.el.ended) startPracticeLoopGuard(); else stopPracticeLoopGuard();
@@ -4286,11 +4353,12 @@ window.addEventListener('pagehide', function() { capturePracticeSession(true); }
 function fmtTime(s) { s = Math.max(0, s || 0); var m = Math.floor(s / 60); var r = Math.floor(s % 60); return m + ':' + (r < 10 ? '0' : '') + r; }
 function stopPractice(discardSession) {
     if (!discardSession) capturePracticeSession(true);
+    cancelPracticeCountIn();
     stopPracticeLoopGuard();
     practice.songId = null; // pause/load events must not recreate a discarded session
     if (practice.el) { try { practice.el.pause(); } catch (e) {} practice.el.removeAttribute('src'); practice.el.load(); }
     if (practice.url) { URL.revokeObjectURL(practice.url); practice.url = null; }
-    practice.a = practice.b = null; practice.loop = false; practice.rate = 1; practice.pitch = 0; practice.loops = []; practice.activeLoopId = null;
+    practice.a = practice.b = null; practice.loop = false; practice.countIn = false; practice.rate = 1; practice.pitch = 0; practice.loops = []; practice.activeLoopId = null;
     applyPracticePitch();
     practice.ready = false; practice.peaks = null; practice.pendingPosition = 0;
     updateStageNowPlaying();
@@ -4337,7 +4405,7 @@ function loadPracticeAudio(id, autoplay) {
         var el = practiceAudioEl();
         practice.songId = id; practice.chartFrom = state.chartFrom || 'songs';
         practice.a = saved.a == null ? null : saved.a; practice.b = saved.b == null ? null : saved.b;
-        practice.loop = !!saved.loop; practice.rate = Number(saved.rate) || 1;
+        practice.loop = !!saved.loop; practice.countIn = !!saved.countIn; practice.rate = Number(saved.rate) || 1;
         practice.pitch = Math.max(-6, Math.min(6, Math.round(Number(saved.pitch) || 0)));
         practice.loops = saved.loops.filter(function(item) {
             return item && /^[a-zA-Z0-9_-]+$/.test(String(item.id)) && typeof item.name === 'string' && item.name &&
@@ -4456,8 +4524,9 @@ function renderAudioPanel() {
         '<button class="ab-btn' + (practice.a != null ? ' on' : '') + '" onclick="setPracticeMark(\'a\')">Set A</button>' +
         '<button class="ab-btn' + (practice.b != null ? ' on' : '') + '" onclick="setPracticeMark(\'b\')">Set B</button>' +
         ((practice.a != null && practice.b != null && practice.b - practice.a >= 0.25) ? '<button class="ab-btn" onclick="saveNamedPracticeLoop()">Save loop</button>' : '') +
+        '<button class="ab-btn' + (practice.countIn ? ' on' : '') + '" onclick="togglePracticeCountIn()" title="Play one bar of clicks before the loop restarts">Count-in</button>' +
         ((practice.a != null || practice.b != null) ? '<button class="ab-btn" onclick="clearPracticeAB()">Clear</button>' : '') +
-        '<span class="ab-mark">A ' + (practice.a != null ? fmtTime(practice.a) : '—') + ' · B ' + (practice.b != null ? fmtTime(practice.b) : '—') + (practice.loop ? ' · looping ↺' : '') + '</span></div>' +
+        '<span class="ab-mark" id="practice-loop-status">A ' + (practice.a != null ? fmtTime(practice.a) : '—') + ' · B ' + (practice.b != null ? fmtTime(practice.b) : '—') + (practice.loop ? ' · looping ↺' : '') + practiceCountInStatus() + '</span></div>' +
         namedPracticeLoopsHTML() +
         '<div class="audio-speed"><span>Speed</span>' +
         [0.5, 0.75, 1, 1.25].map(function(r) { return '<button class="sp-btn' + (practice.rate === r ? ' on' : '') + '" onclick="setPracticeRate(' + r + ')">' + r + '×</button>'; }).join('') +
@@ -4487,6 +4556,8 @@ function renderAudioControls() {
 }
 function playPracticeAudio() {
     if (!practice.el) return;
+    if (practice.countingIn) cancelPracticeCountIn();
+    if (practice.countIn) practiceCountContext();
     var graph = practice.pitch !== 0 ? ensurePracticePitchGraph() : practice.pitchGraph;
     if (graph && graph.ctx.state === 'suspended') graph.ctx.resume().catch(function() {});
     practice.el.play().catch(function() {});
@@ -4494,6 +4565,7 @@ function playPracticeAudio() {
 function togglePracticePlay() { if (!practice.el) return; if (practice.el.paused) playPracticeAudio(); else practice.el.pause(); }
 function seekPractice(v) {
     if (!practice.el) return;
+    if (practice.countingIn) cancelPracticeCountIn();
     practice.el.currentTime = Math.max(0, Math.min(practice.el.duration || 0, parseFloat(v) || 0));
     updatePracticeProgress(); capturePracticeSession(false);
 }
@@ -4548,6 +4620,7 @@ function updatePracticeProgress() {
 }
 function setPracticeMark(which) {
     if (!practice.el) return;
+    if (practice.countingIn) cancelPracticeCountIn();
     practice[which] = practice.el.currentTime;
     practice.activeLoopId = null;
     // once BOTH A and B are set, loop between them automatically
@@ -4633,6 +4706,7 @@ function ensurePracticePitchGraph() {
 }
 function applyPracticePitch() { if (practice.pitchGraph) rebuildPracticePitchPath(); }
 function setPracticePitch(value) {
+    if (practice.countingIn) cancelPracticeCountIn();
     var target = Math.max(-6, Math.min(6, Math.round(Number(value) || 0)));
     if (target !== 0 && !ensurePracticePitchGraph()) { toast('Pitch shifting is not supported by this browser.'); return; }
     practice.pitch = target; applyPracticePitch();
@@ -4640,7 +4714,7 @@ function setPracticePitch(value) {
     capturePracticeSession(true); renderAudioPanel();
 }
 function changePracticePitch(amount) { setPracticePitch(practice.pitch + amount); }
-function setPracticeRate(r) { practice.rate = r; applyPracticeRate(); capturePracticeSession(true); renderAudioPanel(); }
+function setPracticeRate(r) { if (practice.countingIn) cancelPracticeCountIn(); practice.rate = r; applyPracticeRate(); capturePracticeSession(true); renderAudioPanel(); }
 function saveNamedPracticeLoop() {
     if (practice.a == null || practice.b == null || practice.b - practice.a < 0.25) { toast('Set A and B before saving a loop.'); return; }
     var name = prompt('Name this rehearsal loop', 'Chorus practice');
@@ -4654,6 +4728,7 @@ function saveNamedPracticeLoop() {
 function loadNamedPracticeLoop(id) {
     var item = practice.loops.find(function(loop) { return loop.id === id; });
     if (!item || !practice.el) return;
+    if (practice.countingIn) cancelPracticeCountIn();
     practice.a = item.a; practice.b = item.b; practice.loop = true; practice.activeLoopId = item.id;
     seekPractice(item.a); capturePracticeSession(true); renderAudioPanel();
 }
@@ -4664,7 +4739,7 @@ function removeNamedPracticeLoop(id) {
     capturePracticeSession(true); renderAudioPanel();
     if (item) toast('Removed “' + item.name + '”.');
 }
-function clearPracticeAB() { practice.a = null; practice.b = null; practice.loop = false; practice.activeLoopId = null; capturePracticeSession(true); renderAudioPanel(); }
+function clearPracticeAB() { if (practice.countingIn) cancelPracticeCountIn(); practice.a = null; practice.b = null; practice.loop = false; practice.activeLoopId = null; capturePracticeSession(true); renderAudioPanel(); }
 function renderChordStrip(strip, chartText, instrumentView) {
     var names = uniqueChords(chartText);
     var html = names.map(function(n) {

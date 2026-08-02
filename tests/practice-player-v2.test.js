@@ -48,7 +48,7 @@ test('named rehearsal loops are saved per song and can be recalled or removed', 
 test('position, loop and speed persist per song without storing the audio in localStorage', () => {
   assert.match(app, /chordph2_practice_sessions/);
   assert.match(app, /s\.position = practice\.el\.currentTime/);
-  assert.match(app, /s\.a = practice\.a; s\.b = practice\.b; s\.loop = practice\.loop; s\.rate = practice\.rate/);
+  assert.match(app, /s\.a = practice\.a; s\.b = practice\.b; s\.loop = practice\.loop; s\.countIn = practice\.countIn; s\.rate = practice\.rate/);
   assert.match(app, /s\.pitch = practice\.pitch/);
   assert.match(app, /idbPut\('song:' \+ id, f\)/);
   assert.doesNotMatch(app, /localStorage\.setItem\([^\n]+practice\.url/);
@@ -74,4 +74,16 @@ test('audio key shifting is independent from playback speed and is locally proce
   assert.match(app, /Practice audio only; chart stays unchanged/);
   assert.match(app, /Math\.max\(-6, Math\.min\(6/);
   assert.doesNotMatch(app, /setPracticePitch[\s\S]{0,500}playbackRate\s*=/);
+});
+
+test('loop count-in pauses at B and counts one tempo-aware bar before A', () => {
+  assert.match(app, /function startPracticeCountIn/);
+  assert.match(app, /if \(practice\.countIn\) startPracticeCountIn\(\)/);
+  assert.match(app, /parseInt\(song && song\.timesig, 10\) \|\| 4/);
+  assert.match(app, /60 \/ \(bpm \* practice\.rate\)/);
+  assert.match(app, /practice\.el\.pause\(\); practice\.el\.currentTime = practice\.a/);
+  assert.match(app, /playPracticeAudio\(\)/);
+  assert.match(app, /s\.countIn = practice\.countIn/);
+  assert.match(app, /Play one bar of clicks before the loop restarts/);
+  assert.match(app, /practice\.countInSources\.forEach/);
 });
