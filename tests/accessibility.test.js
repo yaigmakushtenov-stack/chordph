@@ -51,3 +51,12 @@ test('autoscroll remains in floating controls but is removed from the function t
   assert.match(app, /id="stage-speed"/);
   assert.doesNotMatch(app, /id="ctl-scroll"|id="layer-scroll"|id="scroll-toggle"/);
 });
+
+test('chord diagrams follow the selected instrument instead of defaulting to guitar', () => {
+  assert.match(app, /function renderKeyboardDiagram/);
+  assert.match(app, /function keyboardChordTones/);
+  assert.match(app, /instrumentView === 'keys'/);
+  assert.match(app, /view === 'guitarist' \|\| view === 'keys'/);
+  assert.match(app, /Keyboard chord tones/);
+  assert.match(app, /diagramCtl\.style\.display = diagramCapable/);
+});

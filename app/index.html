@@ -625,7 +625,7 @@
         .chart > div:first-child { margin-top: 0; }
         /* right after a section header, don't add the big pre-chord gap */
         .chart .sec-head + .chord-line, .chart .sec-head + .lyric-line { margin-top: 0.35em; }
-        /* guitar chord diagram reference strip */
+        /* instrument-specific chord reference strip */
         .chord-strip {
             display: flex; gap: 14px; overflow-x: auto;
             padding: 14px 0 12px; margin-top: 8px;
@@ -633,6 +633,7 @@
         }
         .chord-dia { flex-shrink: 0; text-align: center; }
         .cd-name { font-size: 12px; font-weight: 700; color: var(--chord-color); margin-bottom: 3px; }
+        .cd-notes { font-size: 9px; color: var(--muted); margin-top: 2px; letter-spacing: .15px; }
         .chord-strip .cd-missing { font-size: 11px; color: var(--faint); align-self: center; }
         .chart .sec-head {
             color: var(--accent-2);
@@ -1541,6 +1542,55 @@ function renderChordDiagram(name, frets) {
     }
     s += '</svg>';
     return '<div class="chord-dia"><div class="cd-name">' + esc(name) + '</div>' + s + '</div>';
+}
+
+/* Compact keyboard reference. This deliberately shows chord tones rather than
+   prescribing a single inversion, so a keyboardist can choose a voicing that
+   fits the arrangement. The root uses the accent colour; remaining tones use
+   the configured chord colour. */
+function keyboardChordTones(name) {
+    var m = String(name || '').match(/^([A-G][b#]?)(.*)$/);
+    if (!m) return null;
+    var root = getNoteIndex(m[1]);
+    if (root < 0) return null;
+    var quality = (m[2] || '').replace(/\([^)]*\)/g, '').toLowerCase();
+    var intervals;
+    if (/^(dim|o)/.test(quality)) intervals = [0,3,6];
+    else if (/^(aug|\+)/.test(quality)) intervals = [0,4,8];
+    else if (/^sus2/.test(quality)) intervals = [0,2,7];
+    else if (/^sus/.test(quality)) intervals = [0,5,7];
+    else if (/^(m|min|-)(?!aj)/.test(quality)) intervals = [0,3,7];
+    else intervals = [0,4,7];
+    if (/maj7|m7|^7/.test(quality)) intervals.push(/maj7/.test(quality) ? 11 : 10);
+    else if (/6/.test(quality)) intervals.push(9);
+    if (/add9|9/.test(quality)) intervals.push(2);
+    var tones = [], seen = {};
+    intervals.forEach(function(i) {
+        var pc = (root + i) % 12;
+        if (!seen[pc]) { seen[pc] = true; tones.push(pc); }
+    });
+    return { root: root, tones: tones };
+}
+function renderKeyboardDiagram(name) {
+    var chord = keyboardChordTones(name);
+    if (!chord) return '';
+    var W = 104, H = 44, x0 = 2, ww = 14, whiteH = 38, blackW = 9, blackH = 23;
+    var whitePcs = [0,2,4,5,7,9,11], blackPcs = [1,3,6,8,10], blackAfter = [1,2,4,5,6];
+    function fill(pc, fallback) {
+        if (chord.tones.indexOf(pc) < 0) return fallback;
+        return pc === chord.root ? 'var(--accent)' : 'var(--chord-color)';
+    }
+    var s = '<svg class="keyboard-dia" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(name) + ' keyboard chord tones">';
+    whitePcs.forEach(function(pc, i) {
+        s += '<rect x="' + (x0 + i * ww) + '" y="1" width="' + ww + '" height="' + whiteH + '" rx="1" fill="' + fill(pc, '#f3f5f8') + '" stroke="#616a7b" stroke-width=".8"/>';
+    });
+    blackPcs.forEach(function(pc, i) {
+        var x = x0 + blackAfter[i] * ww - blackW / 2;
+        s += '<rect x="' + x + '" y="1" width="' + blackW + '" height="' + blackH + '" rx="1" fill="' + fill(pc, '#202630') + '" stroke="#11151b" stroke-width=".7"/>';
+    });
+    s += '</svg>';
+    var labels = chord.tones.map(function(pc) { return noteName(pc); }).join(' · ');
+    return '<div class="chord-dia"><div class="cd-name">' + esc(name) + '</div>' + s + '<div class="cd-notes">' + esc(labels) + '</div></div>';
 }
 
 /* =========================================================
@@ -3523,6 +3573,12 @@ function renderChart() {
     // controls: capo only for guitarists
     document.getElementById('ctl-capo').style.display = view === 'guitarist' ? '' : 'none';
     if (view !== 'guitarist' && state.openLayer === 'capo') state.openLayer = null;
+    var diagramCtl = document.getElementById('ctl-diagrams');
+    var diagramCapable = view === 'guitarist' || view === 'keys';
+    diagramCtl.style.display = diagramCapable ? '' : 'none';
+    diagramCtl.setAttribute('aria-label', view === 'keys' ? 'Keyboard chord tones' : 'Guitar chord diagrams');
+    var diagramLabel = diagramCtl.querySelector('span');
+    if (diagramLabel) diagramLabel.textContent = view === 'keys' ? 'Keys' : 'Chords';
 
     // layers — show transpose as the shortest signed move (−5..+6), not a raw counter
     var disp = steps > 6 ? steps - 12 : steps;
@@ -3545,7 +3601,7 @@ function renderChart() {
     updatePadUI();
     var lyricsOnly = lyricsActive();
     document.getElementById('ctl-numbers').classList.toggle('on', state.nashville);
-    document.getElementById('ctl-diagrams').classList.toggle('on', state.showDiagrams);
+    diagramCtl.classList.toggle('on', state.showDiagrams && diagramCapable);
     document.getElementById('ctl-lyrics').classList.toggle('on', lyricsOnly);
 
     // body
@@ -3562,10 +3618,10 @@ function renderChart() {
         body.innerHTML = formatChart(displayedChart);
     }
 
-    // chord diagram strip (guitar fingering for each unique fingered chord)
+    // Instrument-specific chord reference: guitar fingering or keyboard tones.
     var strip = document.getElementById('chord-strip');
-    if (state.showDiagrams && view !== 'drummer' && !state.nashville && !lyricsOnly) {
-        renderChordStrip(strip, displayedChart);
+    if (state.showDiagrams && diagramCapable && !state.nashville && !lyricsOnly) {
+        renderChordStrip(strip, displayedChart, view);
         strip.style.display = 'flex';
     } else {
         strip.style.display = 'none';
@@ -3875,9 +3931,10 @@ function setPracticeMark(which) {
 }
 function setPracticeRate(r) { practice.rate = r; if (practice.el) practice.el.playbackRate = r; renderAudioPanel(); }
 function clearPracticeAB() { practice.a = null; practice.b = null; practice.loop = false; renderAudioPanel(); }
-function renderChordStrip(strip, chartText) {
+function renderChordStrip(strip, chartText, instrumentView) {
     var names = uniqueChords(chartText);
     var html = names.map(function(n) {
+        if (instrumentView === 'keys') return renderKeyboardDiagram(n);
         var shape = getGuitarShape(n);
         return shape ? renderChordDiagram(n, shape) : '';
     }).filter(Boolean).join('');
@@ -4066,10 +4123,13 @@ function renderStageFuncs() {
     var txtOpts = stageActiveFunc === 'text'
         ? '<div class="sf-opts"><button onclick="fontBy(-2);renderStageFuncs()">A&minus;</button><span class="sf-val">' + state.fontSize + '</span><button onclick="fontBy(2);renderStageFuncs()">A+</button></div>'
         : '';
+    var diagramRow = (viewFor() === 'guitarist' || viewFor() === 'keys')
+        ? row('', 'chords', state.showDiagrams)
+        : '';
     list.innerHTML =
         row(trOpts, 'transpose', stageActiveFunc === 'transpose') +
         row('', 'numbers', state.nashville) +
-        row('', 'chords', state.showDiagrams) +
+        diagramRow +
         row('', 'lyrics', lyricsOn) +
         row(txtOpts, 'text', stageActiveFunc === 'text');
 }
