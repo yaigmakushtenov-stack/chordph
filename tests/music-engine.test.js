@@ -20,8 +20,13 @@ test('recognizes chord lines without treating ordinary lyrics as chords', () => 
   assert.equal(music.isChordLine('C G/B Am7 Fmaj7'), true);
   assert.equal(music.isChordLine('|G| D/F#| Em7-Cadd9'), true);
   assert.equal(music.isChordLine('C#m7(b5) F#7sus4 Bm'), true);
+  assert.equal(music.isChordLine('G GM7'), true);
   assert.equal(music.isChordLine('Amazing grace how sweet the sound'), false);
   assert.equal(music.isChordLine('Sa atin na tunay'), false);
+});
+
+test('preserves uppercase major-quality notation while transposing', () => {
+  assert.equal(music.transposeChordText('G GM7', 2, false), 'A AM7');
 });
 
 test('parses chart sections and selects medley sections in order', () => {

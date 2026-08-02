@@ -28,6 +28,16 @@ test('song editor keeps persistent labels after placeholder text disappears', ()
   }
 });
 
+test('song editor expands into a chart-focused workspace without discarding metadata', () => {
+  assert.match(app, /sheet-editor/);
+  assert.match(app, /id="song-editor-meta"/);
+  assert.match(app, /id="song-editor-focus-btn"[^>]+aria-pressed="false"/);
+  assert.match(app, /function toggleSongEditorFocus/);
+  assert.match(app, /function setupSongEditorFocusSwipe/);
+  assert.match(app, /dy < -48/);
+  assert.match(app, /editor-focus \.song-editor-meta/);
+});
+
 test('stage mode hides expanded media without destroying playback', () => {
   const setStage = app.match(/function setStage\(on\) \{[\s\S]*?\n\}/)?.[0] || '';
   assert.doesNotMatch(setStage, /mediaOpen = false|practice\.open = false|practice\.el\.pause/);

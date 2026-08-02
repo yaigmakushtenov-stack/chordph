@@ -28,7 +28,7 @@
     }
 
     function transposeChordText(text, steps, useFlats) {
-        return String(text || '').replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|[|,:;)\]}-]|$)/gm,
+        return String(text || '').replace(/\b([A-G][b#]?)((?:m|M|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|[|,:;)\]}-]|$)/gm,
             function(match, chordRoot, quality, slash, bass) {
                 return transposeNoteBySteps(chordRoot, steps, useFlats) + (quality || '') +
                     (bass ? '/' + transposeNoteBySteps(bass, steps, useFlats) : '');
@@ -53,7 +53,7 @@
     }
 
     function toNashville(text, keyIndex, minor, useFlats) {
-        return String(text || '').replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|[|,:;)\]}-]|$)/gm,
+        return String(text || '').replace(/\b([A-G][b#]?)((?:m|M|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|[|,:;)\]}-]|$)/gm,
             function(match, chordRoot, quality, slash, bass) {
                 return nashDegree(chordRoot, keyIndex, minor, useFlats) + (quality || '') +
                     (bass ? '/' + nashDegree(bass, keyIndex, minor, useFlats) : '');
@@ -95,7 +95,7 @@
         // progression with dashes: |G|, D/F#| and G-D/F#-Em. Treat the joined
         // token as music only when every part is independently a valid chord.
         var parts = cleaned.split(/[-–—]/).filter(Boolean);
-        var chord = /^\(?[A-G][b#]?(?:(?:(?:maj|min|dim|aug|sus|add|no|m)\d*)|(?:[#b]?\d+)|[+°ø])*(?:\((?:(?:(?:maj|min|dim|aug|sus|add|no|m)\d*)|(?:[#b]?\d+)|[+°ø])+\))*(?:\/[A-G][b#]?)?\)?[,.]?$/;
+        var chord = /^\(?[A-G][b#]?(?:(?:(?:maj|min|dim|aug|sus|add|no|m|M)\d*)|(?:[#b]?\d+)|[+°ø])*(?:\((?:(?:(?:maj|min|dim|aug|sus|add|no|m|M)\d*)|(?:[#b]?\d+)|[+°ø])+\))*(?:\/[A-G][b#]?)?\)?[,.]?$/;
         return parts.length > 0 && parts.every(function(part) { return chord.test(part); });
     }
 

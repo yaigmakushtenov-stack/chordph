@@ -827,6 +827,26 @@
         .sheet-fit .sheet-scroll { flex: 0 1 auto; overflow-y: auto; padding: 4px 24px 8px; }
         .sheet-fit .sheet-actions { flex-shrink: 0; margin: 0; padding: 8px 24px 20px; }
 
+        /* Large chart-editing workspace with collapsible song metadata. */
+        .sheet.sheet-editor {
+            height: 94vh; height: 94dvh; max-height: 94vh; max-height: 94dvh;
+            max-width: 920px; padding: 0; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        .sheet-editor .sheet-head { position: static; margin: 0; flex-shrink: 0; padding: 18px 24px 10px; }
+        .song-editor-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        .song-editor-title-row .sheet-title { margin: 0; }
+        .song-editor-focus-btn { flex-shrink: 0; font-size: 13px; }
+        .sheet-editor .sheet-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 24px 18px; }
+        .sheet-editor .sheet-actions {
+            flex-shrink: 0; flex-wrap: wrap; margin: 0; padding: 10px 24px 18px;
+            border-top: 1px solid var(--hairline); background: var(--surface); gap: 10px 20px;
+        }
+        .sheet-editor #sh-song-chart { min-height: 44vh; resize: vertical; }
+        .sheet-editor.editor-focus .song-editor-meta,
+        .sheet-editor.editor-focus .song-editor-intro { display: none; }
+        .sheet-editor.editor-focus #sh-song-chart { min-height: 64vh; }
+
         /* dropdown menu anchored under a top-bar button (⋯) */
         .menu-scrim { display: none; position: fixed; inset: 0; z-index: 420; }
         .menu-scrim.open { display: block; }
@@ -930,6 +950,7 @@
             .controls { gap: 22px; font-size: 15px; padding: 11px 0; }
             .chart { font-size: 18px; }
             .sheet { max-width: 560px; border-radius: 18px; margin-bottom: 0; }
+            .sheet.sheet-editor { max-width: 760px; }
         }
 
         /* ============ DESKTOP — persistent sidebar + reading column ============ */
@@ -975,6 +996,7 @@
             .row { padding: 16px 4px; border-radius: 10px; padding-left: 10px; padding-right: 10px; transition: background .12s; }
             .row:hover { background: var(--hover); }
             .row:hover .row-title { color: var(--accent); }
+            .sheet.sheet-editor { max-width: min(920px, calc(100vw - 64px)); border-radius: 18px 18px 0 0; }
         }
 
         /* ============ WIDE DESKTOP — a little more air ============ */
@@ -1278,7 +1300,7 @@
 </div>
 
 <script src="lib/supabase.js"></script>
-<script src="lib/music-engine.js"></script>
+<script src="lib/music-engine.js?v=70"></script>
 <script>
 /* =========================================================
    MUSIC ENGINE (carried over, battle-tested)
@@ -1514,7 +1536,7 @@ function getGuitarShape(name) {
 // Unique chord names in appearance order (bass note dropped for the diagram)
 function uniqueChords(text) {
     var seen = {}, out = [];
-    text.replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
+    text.replace(/\b([A-G][b#]?)((?:m|M|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
         function(match, root, quality) {
             var name = root + (quality || '');
             if (!seen[name]) { seen[name] = 1; out.push(name); }
@@ -4987,7 +5009,7 @@ function renderSetlistNavbar(inSetlist) {
    ========================================================= */
 function openSheet(html, mode) {
     var sheet = document.getElementById('sheet');
-    var cls = mode === 'fit' ? ' sheet-fit' : (mode ? ' sheet-tall' : '');
+    var cls = mode === 'fit' ? ' sheet-fit' : (mode === 'editor' ? ' sheet-editor' : (mode ? ' sheet-tall' : ''));
     sheet.className = 'sheet' + cls;
     sheet.style.transform = ''; sheet.style.transition = '';   // clear any leftover drag
     sheet.innerHTML = html;
@@ -5217,9 +5239,11 @@ function openSongSheet(songId) {
           '<button class="tap" onclick="closeSheet()">Cancel</button>' +
           '<button class="tap primary" onclick="saveSong()">Save</button>';
     openSheet(
-        '<div class="sheet-head"><div class="sheet-title">' + title + '</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + note + '</div></div>' +
+        '<div class="sheet-head"><div class="song-editor-title-row"><div class="sheet-title">' + title + '</div>' +
+        '<button type="button" class="tap song-editor-focus-btn" id="song-editor-focus-btn" aria-pressed="false" onclick="toggleSongEditorFocus()">Focus chart</button></div>' +
+        '<div class="song-editor-intro" style="font-size:12px;color:var(--muted);margin-top:4px;">' + note + '</div></div>' +
         '<div class="sheet-scroll">' +
+        '<div class="song-editor-meta" id="song-editor-meta">' +
         '<label class="field-label" for="sh-song-title">Song title *</label>' +
         '<input class="field" id="sh-song-title" placeholder="e.g. Goodness of God" value="' + (song ? esc(song.title) : '') + '" autocomplete="off">' +
         '<label class="field-label" for="sh-song-artist">Artist or band *</label>' +
@@ -5231,14 +5255,47 @@ function openSongSheet(songId) {
         '<label class="field-label" for="sh-song-feel">Song feel</label><select class="field" id="sh-song-feel"><option value="">Choose feel (optional)</option>' + feels + '</select>' +
         '<label class="field-label" for="sh-song-tags">Tags</label>' +
         '<input class="field" id="sh-song-tags" placeholder="Tags, comma-separated — e.g. Worship, Filipino, Mellow" value="' + (song && song.tags ? esc(song.tags.join(', ')) : '') + '" autocomplete="off">' +
+        '</div>' +
         '<div class="chart-tools"><button type="button" class="chart-clean-btn" id="chart-clean-btn" onclick="cleanChartWithAI()"><span class="sp">✨</span> Clean up chart</button>' +
         '<span class="chart-clean-hint">Reformats messy text — keeps your chords &amp; lyrics.</span></div>' +
-        '<label class="field-label" for="sh-song-chart">Chord chart *</label><textarea class="field" id="sh-song-chart" placeholder="[Verse 1]&#10;G              D&#10;Your lyrics here" style="min-height:160px;">' + (song ? esc(song.chart) : '') + '</textarea>' +
+        '<label class="field-label" for="sh-song-chart">Chord chart *</label><textarea class="field" id="sh-song-chart" placeholder="[Verse 1]&#10;G              D&#10;Your lyrics here">' + (song ? esc(song.chart) : '') + '</textarea>' +
         '<div class="form-error" id="sh-song-err"></div>' +
         '</div>' +
         '<div class="sheet-actions">' + actions + '</div>',
-        'fit'
+        'editor'
     );
+    setupSongEditorFocusSwipe();
+}
+function toggleSongEditorFocus(force) {
+    var sheet = document.getElementById('sheet');
+    if (!sheet.classList.contains('sheet-editor')) return;
+    var focused = typeof force === 'boolean' ? force : !sheet.classList.contains('editor-focus');
+    sheet.classList.toggle('editor-focus', focused);
+    var button = document.getElementById('song-editor-focus-btn');
+    if (button) {
+        button.textContent = focused ? 'Show song details' : 'Focus chart';
+        button.setAttribute('aria-pressed', focused ? 'true' : 'false');
+    }
+    var scroller = sheet.querySelector('.sheet-scroll');
+    if (scroller) scroller.scrollTop = 0;
+    if (focused) {
+        var chart = document.getElementById('sh-song-chart');
+        if (chart) chart.focus({ preventScroll: true });
+    }
+}
+function setupSongEditorFocusSwipe() {
+    var head = document.querySelector('.sheet-editor .sheet-head');
+    if (!head) return;
+    var startY = 0;
+    head.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) startY = e.touches[0].clientY;
+    }, { passive: true });
+    head.addEventListener('touchend', function(e) {
+        if (!startY || !e.changedTouches.length) return;
+        var dy = e.changedTouches[0].clientY - startY;
+        startY = 0;
+        if (dy < -48) toggleSongEditorFocus(true);
+    }, { passive: true });
 }
 function readSongForm() {
     return {
