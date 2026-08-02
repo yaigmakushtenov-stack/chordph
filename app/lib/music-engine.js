@@ -28,7 +28,7 @@
     }
 
     function transposeChordText(text, steps, useFlats) {
-        return String(text || '').replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
+        return String(text || '').replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|[|,:;)\]}-]|$)/gm,
             function(match, chordRoot, quality, slash, bass) {
                 return transposeNoteBySteps(chordRoot, steps, useFlats) + (quality || '') +
                     (bass ? '/' + transposeNoteBySteps(bass, steps, useFlats) : '');
@@ -53,7 +53,7 @@
     }
 
     function toNashville(text, keyIndex, minor, useFlats) {
-        return String(text || '').replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|$)/gm,
+        return String(text || '').replace(/\b([A-G][b#]?)((?:m|maj|min|sus|add|dim|aug|[0-9])*)(\/([A-G][b#]?))?(?=\s|\[|[|,:;)\]}-]|$)/gm,
             function(match, chordRoot, quality, slash, bass) {
                 return nashDegree(chordRoot, keyIndex, minor, useFlats) + (quality || '') +
                     (bass ? '/' + nashDegree(bass, keyIndex, minor, useFlats) : '');
@@ -88,13 +88,21 @@
         return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    function isChordToken(token) {
+        var cleaned = String(token || '').replace(/^[|:]+|[|:;,]+$/g, '');
+        if (!cleaned || cleaned === '-' || cleaned === 'N.C.' || cleaned === 'x2' || cleaned === 'x4') return true;
+        // Charts copied from other tools commonly attach measure bars or join a
+        // progression with dashes: |G|, D/F#| and G-D/F#-Em. Treat the joined
+        // token as music only when every part is independently a valid chord.
+        var parts = cleaned.split(/[-–—]/).filter(Boolean);
+        var chord = /^\(?[A-G][b#]?(?:(?:(?:maj|min|dim|aug|sus|add|no|m)\d*)|(?:[#b]?\d+)|[+°ø])*(?:\((?:(?:(?:maj|min|dim|aug|sus|add|no|m)\d*)|(?:[#b]?\d+)|[+°ø])+\))*(?:\/[A-G][b#]?)?\)?[,.]?$/;
+        return parts.length > 0 && parts.every(function(part) { return chord.test(part); });
+    }
+
     function isChordLine(line) {
         var tokens = String(line || '').trim().split(/\s+/).filter(Boolean);
         if (!tokens.length) return false;
-        var chord = /^\(?[A-G][b#]?(?:m|maj|min|sus|add|dim|aug|[0-9])*(?:\/[A-G][b#]?)?\)?[,.]?$/;
-        var hits = tokens.filter(function(token) {
-            return chord.test(token) || token === '|' || token === '-' || token === 'N.C.' || token === 'x2' || token === 'x4';
-        }).length;
+        var hits = tokens.filter(isChordToken).length;
         return hits / tokens.length >= 0.7;
     }
 
@@ -128,6 +136,6 @@
         keyRoot: keyRoot, isMinorKey: isMinorKey, keyLabel: keyLabel, getStepsToReach: getStepsToReach,
         nashDegree: nashDegree, toNashville: toNashville,
         parseSections: parseSections, medleyChartText: medleyChartText,
-        escapeHtml: escapeHtml, isChordLine: isChordLine, stripChords: stripChords, formatChart: formatChart
+        escapeHtml: escapeHtml, isChordToken: isChordToken, isChordLine: isChordLine, stripChords: stripChords, formatChart: formatChart
     };
 });

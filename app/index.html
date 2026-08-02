@@ -363,11 +363,19 @@
         body.stage-mode .chart-meta,
         body.stage-mode #chart-versions,
         body.stage-mode #share-banner,
+        body.stage-mode #chart-media,
         body.stage-mode .chart-disclaimer,
         body.stage-mode #setlist-navbar { display: none !important; }
         body.stage-mode .drawer { display: none !important; }
         body.stage-mode #view-chart .wrap { max-width: none; margin: 0 auto; padding: 14px 20px 90px; }
         body.stage-mode .chart-title { font-size: 1.5em; margin-bottom: 12px; }
+        #stage-now-playing { position: fixed; z-index: 259; display: none; align-items: center; gap: 8px;
+            left: calc(14px + env(safe-area-inset-left)); bottom: calc(20px + env(safe-area-inset-bottom));
+            max-width: calc(100vw - 100px); padding: 8px 12px; border-radius: 999px;
+            background: var(--surface); border: 1px solid var(--border); color: var(--text);
+            box-shadow: var(--shadow-sm); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        body.stage-mode #stage-now-playing.has-media { display: flex; }
+        #stage-now-playing .np-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
         @media (min-width: 980px) {
             body.stage-mode #view-chart .wrap { margin-left: auto; margin-right: auto; max-width: 1040px; padding-left: 44px; padding-right: 44px; }
         }
@@ -1109,7 +1117,6 @@
                 <button class="ctl" id="ctl-diagrams" onclick="toggleDiagrams()" aria-label="Chord diagrams"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14M5 9h14M5 14h14M5 19h14M9 4v15M15 4v15"/><circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/></svg><span>Chords</span></button>
                 <button class="ctl" id="ctl-lyrics" onclick="toggleLyrics()" aria-label="Lyrics only"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 10h14M5 14h9M5 18h11"/></svg><span>Lyrics</span></button>
                 <button class="ctl" id="ctl-text" onclick="toggleLayer('text')" aria-label="Text size"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l4.5-12 4.5 12M4.6 14h5.8M15 18l2.5-7 2.5 7M16 16h3"/></svg><span>Text</span></button>
-                <button class="ctl" id="ctl-scroll" onclick="toggleLayer('scroll')" aria-label="Auto-scroll"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l5 5 5-5M7 12l5 5 5-5"/></svg><span>Scroll</span></button>
                 <button class="ctl" id="ctl-click" onclick="toggleLayer('click')" aria-label="Metronome click"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l3 16H6zM12 4v9M12 13l4-3"/></svg><span>Click</span></button>
                 <button class="ctl" id="ctl-pad" onclick="toggleLayer('pad')" aria-label="Ambient pad"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-6 3 13 3-16 3 12 2-3h3"/></svg><span>Pad</span></button>
                 <button class="ctl" id="ctl-medley" onclick="openMedleySheet()" style="display:none;" aria-label="Medley"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h10a2 2 0 0 1 2 2v10M16 8H6a1.8 1.8 0 0 0-1.8 1.8V19a1.8 1.8 0 0 0 1.8 1.8h9.5A1.8 1.8 0 0 0 17.3 19V9.8A1.8 1.8 0 0 0 15.5 8Z"/></svg><span>Medley</span></button>
@@ -1132,11 +1139,6 @@
                 <button class="tap glyph" onclick="fontBy(-2)" aria-label="Smaller text">A&minus;</button>
                 <span class="val" id="font-val" aria-live="polite">16</span>
                 <button class="tap glyph" onclick="fontBy(2)" aria-label="Larger text">A+</button>
-            </div>
-
-            <div class="layer" id="layer-scroll">
-                <button class="tap primary" id="scroll-toggle" onclick="toggleScroll()">&#9654; Play</button>
-                <span class="lbl">Speed is the &minus;/+ dial by the play button.</span>
             </div>
 
             <div class="layer" id="layer-click">
@@ -1253,6 +1255,7 @@
 </button>
 <!-- leave stage mode (only visible while in it) -->
 <button id="stage-exit" onclick="toggleStage()" aria-label="Exit stage mode">&times; Exit stage</button>
+<div id="stage-now-playing" aria-live="polite"><span class="np-dot" aria-hidden="true"></span><span id="stage-now-playing-text"></span></div>
 <!-- autoscroll speed, reachable in stage mode -->
 <div id="stage-speed" aria-hidden="true">
     <button onclick="scrollSpeedBy(0.5)" aria-label="Scroll faster">+</button>
@@ -3533,7 +3536,8 @@ function renderChart() {
     document.getElementById('ctl-click').style.display = song.tempo ? '' : 'none';
     if (!song.tempo && state.openLayer === 'click') state.openLayer = null;
     document.getElementById('click-bpm').textContent = song.tempo ? song.tempo + ' BPM' : '—';
-    ['transpose', 'capo', 'text', 'scroll', 'click', 'pad'].forEach(function(l) {
+    if (state.openLayer === 'scroll') state.openLayer = null;
+    ['transpose', 'capo', 'text', 'click', 'pad'].forEach(function(l) {
         document.getElementById('layer-' + l).classList.toggle('open', state.openLayer === l);
         document.getElementById('ctl-' + l).classList.toggle('on', state.openLayer === l);
     });
@@ -3568,12 +3572,18 @@ function renderChart() {
     }
     renderMedley(song, keyIdx, capo);
     buildTempoZones(song);
-    renderMediaPanel();
+    ensureMediaPanel();
+    updateStageNowPlaying();
 }
 /* ---- "Listen & learn": one collapsible home for the Spotify link, a YouTube
    "learn the song" video, and the MP3 A/B practice player — keeps the chart head
    uncluttered ---- */
 var mediaOpen = false;
+function ensureMediaPanel() {
+    var box = document.getElementById('chart-media');
+    if (!box) return;
+    if (box.dataset.songId !== String(currentSongId) || !box.firstElementChild) renderMediaPanel();
+}
 function mediaCount() {
     var n = 0;
     if (state.spotify[currentSongId]) n++;
@@ -3583,10 +3593,11 @@ function mediaCount() {
 }
 function renderMediaPanel() {
     var box = document.getElementById('chart-media'); if (!box) return;
+    box.dataset.songId = String(currentSongId);
     if (!mediaOpen) {
         var n = mediaCount();
         box.innerHTML = '<button class="listen-btn" onclick="mediaOpen=true;renderMediaPanel()"><span class="sp">🎧</span> Listen &amp; learn' + (n ? ' <span class="media-count">' + n + '</span>' : '') + '</button>';
-        return;
+        updateStageNowPlaying(); return;
     }
     var readonly = state.chartFrom === 'shared' || state.chartFrom === 'shared-set';
     var song = songById(currentSongId);
@@ -3596,7 +3607,7 @@ function renderMediaPanel() {
     box.innerHTML = '<div class="media-body">' + findBtn +
         '<div id="chart-spotify"></div><div id="chart-youtube"></div><div id="chart-audio"></div>' +
         '<button class="tap" aria-label="Hide Listen and learn" onclick="mediaOpen=false;renderMediaPanel()" style="margin-top:4px;">Hide</button></div>';
-    renderSpotifyPanel(); renderYouTube(); renderAudioPanel();
+    renderSpotifyPanel(); renderYouTube(); renderAudioPanel(); updateStageNowPlaying();
 }
 /* AI: find this song's Spotify + YouTube links by title+artist (Edge Function
    find-links; needs it deployed with the API-key secrets set) */
@@ -3656,6 +3667,7 @@ function renderYouTube() {
     } else if (!readonly) {
         box.innerHTML = '<button class="listen-btn ghost" onclick="promptYouTube()"><span class="sp" style="color:#ff4d4d;">▶</span> Add YouTube link</button>';
     } else box.innerHTML = '';
+    updateStageNowPlaying();
 }
 function promptYouTube() {
     var v = window.prompt('Paste a YouTube link (a tutorial or the official video):', state.youtube[currentSongId] || '');
@@ -3702,6 +3714,7 @@ function renderSpotifyPanel() {
     } else if (!readonly) {
         box.innerHTML = '<button class="listen-btn ghost" onclick="promptSpotify()"><span class="sp">&#9834;</span> Add Spotify link</button>';
     } else box.innerHTML = '';
+    updateStageNowPlaying();
 }
 function promptSpotify() {
     var v = window.prompt('Paste a Spotify link (Spotify → Share → Copy link):', state.spotify[currentSongId] || '');
@@ -3755,13 +3768,14 @@ function practiceAudioEl() {
         a.preload = 'metadata';
         a.addEventListener('timeupdate', onPracticeTime);
         a.addEventListener('loadedmetadata', renderAudioPanel);
-        a.addEventListener('play', renderAudioControls);
-        a.addEventListener('pause', renderAudioControls);
-        a.addEventListener('ended', renderAudioControls);
+        a.addEventListener('play', onPracticePlaybackChange);
+        a.addEventListener('pause', onPracticePlaybackChange);
+        a.addEventListener('ended', onPracticePlaybackChange);
         practice.el = a;
     }
     return practice.el;
 }
+function onPracticePlaybackChange() { renderAudioControls(); updateStageNowPlaying(); }
 function fmtTime(s) { s = Math.max(0, s || 0); var m = Math.floor(s / 60); var r = Math.floor(s % 60); return m + ':' + (r < 10 ? '0' : '') + r; }
 function stopPractice() {
     if (practice.el) { try { practice.el.pause(); } catch (e) {} practice.el.removeAttribute('src'); practice.el.load(); }
@@ -3990,14 +4004,18 @@ function fontBy(d) {
 var stageMode = false;
 function chartFontSize() { return Math.round(state.fontSize * (stageMode ? 1.6 : 1)); }
 function toggleStage() { setStage(!stageMode); }
+function updateStageNowPlaying() {
+    var bar = document.getElementById('stage-now-playing');
+    var text = document.getElementById('stage-now-playing-text');
+    if (!bar || !text) return;
+    var label = '';
+    if (practice.el && practice.ready && !practice.el.paused && !practice.el.ended) label = 'Now playing · Practice track';
+    else if (youtubeOpen && state.youtube[currentSongId]) label = 'Now playing · YouTube';
+    else if (spotifyOpen && state.spotify[currentSongId]) label = 'Now playing · Spotify';
+    text.textContent = label;
+    bar.classList.toggle('has-media', !!label);
+}
 function setStage(on) {
-    if (on) {
-        mediaOpen = false;
-        practice.open = false;
-        spotifyOpen = false;
-        youtubeOpen = false;
-        if (practice.el && !practice.el.paused) practice.el.pause();
-    }
     stageMode = on;
     document.body.classList.toggle('stage-mode', on);
     var c = document.getElementById('chart-stage'); if (c) c.classList.toggle('on', on);
@@ -4010,6 +4028,7 @@ function setStage(on) {
     if (on) { renderStageFuncs(); updateWakeLock(); }   // keep the screen awake on stage
     else if (!wakeLockNeeded()) updateWakeLock();
     renderChart();                     // re-apply the (scaled) chart font
+    updateStageNowPlaying();
 }
 /* ---- stage floating chart functions ---- */
 var stageFuncsOpen = false, stageActiveFunc = null;   // active = 'transpose' | 'text' | null
@@ -4086,7 +4105,6 @@ function toggleScroll() {
         state.scroll.playing = true;
         updateWakeLock();
         updateScrollFab();
-        document.getElementById('scroll-toggle').innerHTML = '&#10074;&#10074; Pause';
         var acc = 0, last = 0;
         // Time-based so the speed is identical on a 60Hz phone and a 120Hz+ PC
         // monitor (frame-based scrolling ran twice as fast on high-refresh screens).

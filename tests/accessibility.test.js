@@ -28,9 +28,26 @@ test('song editor keeps persistent labels after placeholder text disappears', ()
   }
 });
 
-test('stage mode collapses learning media and pauses practice playback', () => {
+test('stage mode hides expanded media without destroying playback', () => {
   const setStage = app.match(/function setStage\(on\) \{[\s\S]*?\n\}/)?.[0] || '';
-  assert.match(setStage, /mediaOpen = false/);
-  assert.match(setStage, /practice\.open = false/);
-  assert.match(setStage, /practice\.el\.pause\(\)/);
+  assert.doesNotMatch(setStage, /mediaOpen = false|practice\.open = false|practice\.el\.pause/);
+  assert.match(app, /body\.stage-mode #chart-media/);
+  assert.match(app, /id="stage-now-playing"/);
+  assert.match(app, /Now playing · Practice track/);
+});
+
+test('chart rendering preserves the existing media component and iframe nodes', () => {
+  assert.match(app, /function ensureMediaPanel/);
+  assert.match(app, /box\.dataset\.songId !== String\(currentSongId\)/);
+  const chartStart = app.indexOf('function renderChart()');
+  const chartEnd = app.indexOf('/* ---- "Listen & learn"', chartStart);
+  const renderChart = app.slice(chartStart, chartEnd);
+  assert.match(renderChart, /ensureMediaPanel\(\)/);
+  assert.doesNotMatch(renderChart, /renderMediaPanel\(\)/);
+});
+
+test('autoscroll remains in floating controls but is removed from the function toolbar', () => {
+  assert.match(app, /id="scroll-fab"/);
+  assert.match(app, /id="stage-speed"/);
+  assert.doesNotMatch(app, /id="ctl-scroll"|id="layer-scroll"|id="scroll-toggle"/);
 });
