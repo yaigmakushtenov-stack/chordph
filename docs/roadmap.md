@@ -1,7 +1,9 @@
 # Chord.ph — roadmap & parked work
 
 Everything discussed but not yet built. Kept here so nothing gets lost.
-Last updated: 2026-07-27.
+Last updated: 2026-08-02.
+
+The implementation boundary for ministries, subscriptions, private practice-track storage, and MP3-to-chart is now documented in `docs/v2-product-architecture.md`; the staging-only schema is `supabase/product_foundation_v2.sql`.
 
 ---
 
