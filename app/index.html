@@ -1271,6 +1271,7 @@
 </div>
 
 <script src="lib/supabase.js"></script>
+<script src="lib/music-engine.js"></script>
 <script>
 /* =========================================================
    MUSIC ENGINE (carried over, battle-tested)
@@ -1430,6 +1431,30 @@ function formatChartNashville(text, keyRootIndex, minor) {
     }).join('');
 }
 
+/* The browser and the dependency-free test suite share one music engine.
+   Keep the small state-aware wrappers here; pure chord logic lives in lib/. */
+SHARPS = window.ChordMusic.SHARPS;
+FLATS = window.ChordMusic.FLATS;
+getNoteIndex = window.ChordMusic.getNoteIndex;
+noteName = function(index) { return window.ChordMusic.noteName(index, state.useFlats); };
+transposeNoteBySteps = function(note, steps) { return window.ChordMusic.transposeNoteBySteps(note, steps, state.useFlats); };
+transposeChordText = function(text, steps) { return window.ChordMusic.transposeChordText(text, steps, state.useFlats); };
+keyRoot = window.ChordMusic.keyRoot;
+isMinorKey = window.ChordMusic.isMinorKey;
+keyLabel = function(index, minor) { return window.ChordMusic.keyLabel(index, minor, state.useFlats); };
+getStepsToReach = window.ChordMusic.getStepsToReach;
+nashDegree = function(note, keyIndex, minor) { return window.ChordMusic.nashDegree(note, keyIndex, minor, state.useFlats); };
+toNashville = function(text, keyIndex, minor) { return window.ChordMusic.toNashville(text, keyIndex, minor, state.useFlats); };
+parseSections = window.ChordMusic.parseSections;
+medleyChartText = window.ChordMusic.medleyChartText;
+esc = window.ChordMusic.escapeHtml;
+isChordLine = window.ChordMusic.isChordLine;
+stripChords = window.ChordMusic.stripChords;
+formatChart = function(text) { return window.ChordMusic.formatChart(text); };
+formatChartNashville = function(text, keyIndex, minor) {
+    return window.ChordMusic.formatChart(text, { nashville: true, keyIndex: keyIndex, minor: minor, useFlats: state.useFlats });
+};
+
 /* =========================================================
    GUITAR CHORD SHAPES + DIAGRAMS
    Fret arrays are 6 ints low-E→high-E: -1 mute, 0 open, n = fret.
@@ -1529,7 +1554,7 @@ var state = {
     customs: [],                // custom songs [{id:'c...', ...}]
     favorites: [],              // [songId]
     setlists: [],               // [{id, name, songIds:[]}]
-    transpose: {},              // { songId: steps } — sounding key change (for the singer)
+    transpose: {},              // session working values; durable values live in setlist.transposes
     capo: {},                   // { songId: fret } — guitarist fingering; sounding key unchanged
     fontSize: 16,
     useFlats: false,
@@ -1562,7 +1587,6 @@ function save() {
     localStorage.setItem('chordph2_customs', JSON.stringify(state.customs));
     localStorage.setItem('chordph2_favorites', JSON.stringify(state.favorites));
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
-    localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
     localStorage.setItem('chordph2_spotify', JSON.stringify(state.spotify));
@@ -1590,7 +1614,9 @@ function load() {
         state.customs = JSON.parse(localStorage.getItem('chordph2_customs') || '[]');
         state.favorites = JSON.parse(localStorage.getItem('chordph2_favorites') || '[]');
         state.setlists = JSON.parse(localStorage.getItem('chordph2_setlists') || '[]');
-        state.transpose = JSON.parse(localStorage.getItem('chordph2_transpose') || '{}');
+        // v2 originally persisted this working map globally. Transpose is now
+        // session-only outside a setlist, so discard stale library display keys.
+        localStorage.removeItem('chordph2_transpose');
         state.overrides = JSON.parse(localStorage.getItem('chordph2_overrides') || '{}');
         state.spotify = JSON.parse(localStorage.getItem('chordph2_spotify') || '{}');
         state.youtube = JSON.parse(localStorage.getItem('chordph2_youtube') || '{}');
@@ -1639,7 +1665,6 @@ function localSnapshot() {
         customs: state.customs,
         favorites: state.favorites,
         setlists: state.setlists,
-        transpose: state.transpose,
         overrides: state.overrides,
         spotify: state.spotify,
         youtube: state.youtube,
@@ -1654,7 +1679,6 @@ function applySnapshot(snap) {
     state.customs = snap.customs || [];
     state.favorites = snap.favorites || [];
     state.setlists = snap.setlists || [];
-    state.transpose = snap.transpose || {};
     state.overrides = snap.overrides || {};
     state.spotify = snap.spotify || {};
     state.youtube = snap.youtube || {};
@@ -1678,7 +1702,7 @@ function applySnapshot(snap) {
     localStorage.setItem('chordph2_customs', JSON.stringify(state.customs));
     localStorage.setItem('chordph2_favorites', JSON.stringify(state.favorites));
     localStorage.setItem('chordph2_setlists', JSON.stringify(state.setlists));
-    localStorage.setItem('chordph2_transpose', JSON.stringify(state.transpose));
+    localStorage.removeItem('chordph2_transpose');
     localStorage.setItem('chordph2_capo', JSON.stringify(state.capo));
     localStorage.setItem('chordph2_overrides', JSON.stringify(state.overrides));
     localStorage.setItem('chordph2_spotify', JSON.stringify(state.spotify));
@@ -1719,7 +1743,6 @@ function mergeData(local, cloud) {
         customs: mergeById(newer.customs, older.customs, tombCus),
         setlists: mergeById(newer.setlists, older.setlists, tombSet),
         favorites: Array.from(new Set((local.favorites || []).concat(cloud.favorites || []))),
-        transpose: Object.assign({}, older.transpose, newer.transpose),
         overrides: Object.assign({}, older.overrides, newer.overrides),
         spotify: Object.assign({}, older.spotify, newer.spotify),
         youtube: Object.assign({}, older.youtube, newer.youtube),
@@ -5381,7 +5404,7 @@ function exportBackup() {
     var blob = new Blob([JSON.stringify({
         version: '2.0', exportDate: new Date().toISOString(),
         profile: state.profile, customs: state.customs, favorites: state.favorites,
-        setlists: state.setlists, transpose: state.transpose, capo: state.capo,
+        setlists: state.setlists, capo: state.capo,
         settings: { fontSize: state.fontSize, useFlats: state.useFlats, nashville: state.nashville }
     }, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
@@ -5402,7 +5425,6 @@ function importBackup(event) {
                 if (b.customs) state.customs = b.customs;
                 if (b.favorites) state.favorites = b.favorites;
                 if (b.setlists) state.setlists = b.setlists;
-                if (b.transpose) state.transpose = b.transpose;
                 if (b.capo) state.capo = b.capo;
                 if (b.settings) {
                     state.fontSize = b.settings.fontSize || 16;
