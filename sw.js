@@ -1,5 +1,5 @@
 var CACHE_PREFIX = 'chordph-';
-var CACHE_NAME = CACHE_PREFIX + 'v71';
+var CACHE_NAME = CACHE_PREFIX + 'v72';
 var APP_SHELL = [
     '/',
     '/index.html',

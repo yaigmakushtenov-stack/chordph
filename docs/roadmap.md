@@ -153,11 +153,14 @@ available without covering the music.
 
 Build in this order:
 
-1. **Persistent player** that survives transpose, Nashville numbers, lyrics
-   mode, chord diagrams, text-size changes and editor actions.
-2. **Waveform** with accurate scrubbing and visible A/B markers.
+1. ✅ **Persistent player — DONE** for native practice audio — survives chart controls, editor and
+   app navigation; the compact strip exposes play/pause, elapsed time and a
+   return path. Each song restores its last position, loop and speed locally.
+2. ✅ **Waveform — DONE** — decoded from the attached audio, keyboard/touch
+   scrubbing, played progress, highlighted loop range and visible A/B markers.
 3. **Named loops**, such as “Bridge entrance” or “Chorus harmony”.
-4. **Speed control without changing pitch**.
+4. ✅ **Speed control without changing pitch — DONE** for the native practice
+   player (0.5×, 0.75×, 1× and 1.25× with browser pitch preservation enabled).
 5. **Optional pitch/key shifting without changing speed**.
 6. **Count-in before a loop restarts**.
 7. **Chart-section bookmarks linked to audio positions**.
