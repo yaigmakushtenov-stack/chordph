@@ -305,8 +305,10 @@ Candidate features (rough feasibility):
 - **Android APK** (user, Jul 27, HIGH — most PH musicians are Android) — package
   via PWABuilder. ✅ **In-app back button handling DONE** (history.pushState +
   popstate: back navigates views / closes overlays; root = press-back-twice to
-  exit). ⏳ still to do: build/sign the actual APK; confirm hardware-back exit on a
-  real device.
+  exit). ✅ **Post-Google-login Back isolation DONE** — the OAuth callback is
+  cleaned and guarded after Supabase finishes sign-in, while drawer/chart gestures
+  avoid the browser-owned screen edge. ⏳ still to do: build/sign the actual APK;
+  confirm hardware-back exit on a real device.
 - **Nashville number trainer** — a practice/learn mode for the number system.
 - **Chord detection from audio** — premium; heavy ML (audio → chords).
 - ✅ **Premium metronome redesign — DONE** (tempo dial, Italian tempo name, ring

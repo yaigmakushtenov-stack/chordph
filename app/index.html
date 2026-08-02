@@ -1979,6 +1979,9 @@ var SUPABASE_CONFIG = {
     anonKey: 'sb_publishable_MVJjUxOe827PftmJlDiTsQ_RN0hLIII'   // publishable key — safe in-browser (RLS protects data)
 };
 var supa = null, currentUser = null, pushTimer = null;
+// Capture this before Supabase consumes and removes the OAuth callback params.
+var oauthReturnPending = /(?:[?&]code=|[?#&](?:access_token|error|error_description)=)/.test(location.search + location.hash);
+var oauthHistorySealed = false;
 var ADMIN_EMAIL = 'yaigmakushtenov@gmail.com';   // owner — instant fallback before the DB allowlist check returns
 var isAdminUser = false;                          // authoritative: set from the DB admins allowlist (supports many admins)
 function isAdmin() { return isAdminUser || !!(currentUser && (currentUser.email || '').toLowerCase() === ADMIN_EMAIL); }
@@ -2094,12 +2097,14 @@ function initSync() {
         supa = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
     } catch (e) { console.warn('supabase init failed', e); return; }
     supa.auth.getSession().then(function(res) {
+        if (oauthReturnPending) sealOAuthReturnHistory();
         currentUser = res.data.session ? res.data.session.user : null;
         updateAuthUI();
         refreshAdminFlag();
         if (currentUser) { syncNow().then(ensureProfileFromAuth); initTeams(); }
-    });
+    }).catch(function() { if (oauthReturnPending) sealOAuthReturnHistory(); });
     supa.auth.onAuthStateChange(function(event, session) {
+        if (event === 'SIGNED_IN' && oauthReturnPending) sealOAuthReturnHistory();
         currentUser = session ? session.user : null;
         updateAuthUI();
         refreshAdminFlag();
@@ -2772,6 +2777,16 @@ function appBack() {
 }
 var backExitArmed = 0;
 function rearmBack() { if (navReady) history.pushState({ app: 1 }, ''); }
+function sealOAuthReturnHistory() {
+    if (!oauthReturnPending || oauthHistorySealed) return;
+    oauthHistorySealed = true; oauthReturnPending = false;
+    // The OAuth provider and account chooser remain behind the callback in the
+    // browser stack. Clean the callback URL and place a fresh same-page guard in
+    // front of them so a mobile edge swipe reaches appBack(), never Google.
+    history.replaceState({ app: 1, authReturn: 1 }, '', location.pathname);
+    history.pushState({ app: 1, authGuard: 1 }, '', location.pathname);
+    navReady = true;
+}
 window.addEventListener('popstate', function() {
     if (!navReady) return;
     // 1) an open overlay closes first
@@ -6655,7 +6670,10 @@ function setupEdgeSwipe() {
         if (window.innerWidth >= 980) return;
         var t = e.touches[0];
         if (drawerOpen()) { sx = t.clientX; sy = t.clientY; tracking = true; mode = 'close'; }
-        else if (!document.body.classList.contains('pre-app') && t.clientX <= 22) {
+        // Keep clear of the first 28px: iOS/Android browsers reserve the physical
+        // screen edge for their own Back gesture. The nearby safe zone still lets
+        // users swipe the drawer open without accidentally leaving the app.
+        else if (!document.body.classList.contains('pre-app') && t.clientX >= 28 && t.clientX <= 92) {
             sx = t.clientX; sy = t.clientY; tracking = true; mode = 'open';
         }
     }, { passive: true });
@@ -6677,22 +6695,23 @@ function setupEdgeSwipe() {
 /* Swipe left/right across a setlist chart to move to the next/previous song. */
 function setupChartSwipe() {
     var view = document.getElementById('view-chart');
-    var sx = 0, sy = 0, on = false;
+    var sx = 0, sy = 0, on = false, mode = null;
     view.addEventListener('touchstart', function(e) {
-        on = false;
+        on = false; mode = null;
         if (e.touches.length !== 1) return;
-        if (state.chartFrom !== 'setlist' && state.chartFrom !== 'shared-set') return;
         // don't treat scrolling the control toolbar / chord strip / sliders as a song swipe
-        if (e.target.closest('.control-dock') || e.target.closest('.chord-strip') || e.target.closest('input')) return;
+        if (e.target.closest('.control-dock, .chord-strip, .audio-panel, button, input, textarea, a')) return;
         var t = e.touches[0];
-        if (t.clientX <= 24) return;              // leave the left edge to the drawer swipe
+        if (t.clientX <= 96) return;              // safe drawer zone + browser-owned edge
         sx = t.clientX; sy = t.clientY; on = true;
+        mode = state.chartFrom === 'setlist' || state.chartFrom === 'shared-set' ? 'setlist' : 'back';
     }, { passive: true });
     view.addEventListener('touchend', function(e) {
         if (!on) return; on = false;
         var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
         if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return;   // mostly-horizontal only
-        setlistStep(dx < 0 ? 1 : -1);             // swipe left = next, right = previous
+        if (mode === 'setlist') setlistStep(dx < 0 ? 1 : -1); // left = next, right = previous
+        else if (dx > 0) chartBack();              // in-content right swipe = app Back
     }, { passive: true });
 }
 /* Block accidental pinch-zoom — the chart controls its own text size via A-/A+.
