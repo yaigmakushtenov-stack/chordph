@@ -162,6 +162,31 @@ its full-playback/SDK path stays a later Premium extra.
   contributions, daily caps, quality thresholds. Needs a credits ledger + redemption
   rule (e.g. X credits = 1 month Pro).
 
+## AI features — architecture + candidates (starting July 28)
+
+**How AI works in this app:** the app is a static PWA + Supabase. AI features run
+through **Supabase Edge Functions** (serverless) that hold the API keys server-side
+and call external services; the app just calls the Edge Function (works for web +
+APK). User must provision keys / deploy functions. Costs vary by service.
+
+Candidate features (rough feasibility):
+- **Auto-find Spotify / YouTube links** (user, Jul 28) — when a song has no link,
+  search by title + artist and fill them in. EASIEST + free: YouTube Data API +
+  Spotify Web API search (free quotas) via an Edge Function; optional LLM to pick
+  the best match. Good first AI feature (validates the pipeline). ⚠️ don't
+  auto-write to the shared library without review — fill for the user, or gate
+  cloud links behind admin approval.
+- **AI chord-chart builder** — two very different things: (a) **messy text → clean
+  chart** (LLM formats pasted lyrics/chords into sections + chord-over-lyric) =
+  achievable via LLM Edge Function; (b) **audio → chords** (detect chords from an
+  MP3) = HARD, needs a chord-recognition model / paid service (Klang.io, Music.ai,
+  etc.) — the real "self-building chart from audio". Clarify which.
+- **AI key/BPM** — the analyzer already does on-device key+BPM (free, Essentia).
+  "AI key detection" could mean surfacing it inside the chord app, or a metadata
+  lookup from a link. Cheap if metadata; already solved if on-device.
+- **AI chord + lyric mapping from audio** (Premium) — the full audio→chart+lyrics
+  pipeline; heaviest, paid model, later.
+
 ## Parked features (soon)
 
 - **Android file picker opens a chooser, not Files** (user, Jul 28) — on Android,
