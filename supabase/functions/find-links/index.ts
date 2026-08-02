@@ -36,13 +36,26 @@ async function spotifyToken(): Promise<string | null> {
 async function findSpotify(title: string, artist: string): Promise<string | null> {
   const token = await spotifyToken();
   if (!token) return null;
-  const q = encodeURIComponent(`track:${title}${artist ? ` artist:${artist}` : ""}`);
-  const r = await fetch(`https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`, {
-    headers: { "Authorization": `Bearer ${token}` },
-  });
-  if (!r.ok) return null;
-  const j = await r.json();
-  return j.tracks?.items?.[0]?.external_urls?.spotify ?? null;
+  // Try a strict field-filtered search first, then fall back to progressively
+  // looser free-text queries — Spotify's `track:`/`artist:` filters are very
+  // literal, so an exact-spelling miss should not mean "no result".
+  const queries = [
+    `track:${title}${artist ? ` artist:${artist}` : ""}`,
+    artist ? `${title} ${artist}` : title,
+    title,
+  ];
+  for (const raw of queries) {
+    const q = encodeURIComponent(raw.trim());
+    const r = await fetch(
+      `https://api.spotify.com/v1/search?q=${q}&type=track&limit=1&market=PH`,
+      { headers: { "Authorization": `Bearer ${token}` } },
+    );
+    if (!r.ok) continue;
+    const j = await r.json();
+    const url = j.tracks?.items?.[0]?.external_urls?.spotify;
+    if (url) return url;
+  }
+  return null;
 }
 
 async function findYouTube(title: string, artist: string): Promise<string | null> {

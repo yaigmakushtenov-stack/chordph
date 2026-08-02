@@ -419,6 +419,19 @@
             border: 1px solid var(--border); border-radius: 12px; background: var(--hover); }
         .media-count { display: inline-block; min-width: 17px; text-align: center; font-size: 11px; font-weight: 700;
             color: #fff; background: var(--accent); border-radius: 999px; padding: 0 5px; }
+        /* small helper note under a media player (Spotify preview / MP3 privacy) */
+        .media-note { margin-top: 8px; font-size: 11px; color: var(--faint); line-height: 1.55; }
+        .media-note a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
+        .media-note a:hover { text-decoration: underline; }
+        .audio-add-hint { margin: 6px 2px 0; font-size: 11px; color: var(--faint); line-height: 1.5; }
+        /* "Clean up chart" AI tool in the song editor */
+        .chart-tools { display: flex; align-items: center; gap: 8px; margin: 2px 0 6px; flex-wrap: wrap; }
+        .chart-clean-btn { font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+            border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft); }
+        .chart-clean-btn:disabled { opacity: .6; cursor: default; }
+        .chart-clean-btn.undo { border-color: var(--border); color: var(--muted); background: none; }
+        .chart-clean-hint { font-size: 11px; color: var(--faint); }
         /* small disclaimer under the chord chart */
         .chart-disclaimer { margin: 20px 0 6px; padding-top: 12px; border-top: 1px solid var(--hairline);
             font-size: 11px; color: var(--faint); line-height: 1.6; }
@@ -3626,7 +3639,8 @@ function renderSpotifyPanel() {
     if (valid && spotifyOpen) {
         box.innerHTML = '<div class="spotify-panel"><div class="spotify-embed-wrap">' + spotifyEmbed(url) +
             '<button class="spotify-kebab" onclick="openSpotifyMenu(this)" aria-label="Player options">&#8943;</button>' +
-            '</div></div>';
+            '</div><div class="media-note">Plays a 30-sec preview unless you’re signed into Spotify Premium on desktop. For the full song, ' +
+            '<a href="' + esc(url) + '" target="_blank" rel="noopener">open in Spotify ↗</a>.</div></div>';
     } else if (valid) {
         box.innerHTML = '<button class="listen-btn" onclick="spotifyOpen=true;renderSpotifyPanel()"><span class="sp">&#9654;</span> Listen on Spotify</button>';
     } else if (!readonly) {
@@ -3745,7 +3759,8 @@ function resumePracticePanel() {
 function renderAudioPanel() {
     var box = document.getElementById('chart-audio'); if (!box) return;
     var id = currentSongId;
-    if (!audioKeys[id]) { box.innerHTML = '<button class="listen-btn ghost audio-add" onclick="pickPracticeAudio()"><span class="sp">♫</span> Add practice audio (MP3)</button>'; return; }
+    if (!audioKeys[id]) { box.innerHTML = '<button class="listen-btn ghost audio-add" onclick="pickPracticeAudio()"><span class="sp">♫</span> Add practice audio (MP3)</button>' +
+        '<div class="audio-add-hint">Upload your own MP3 to loop &amp; slow down for practice. It stays on this device — your file is never uploaded.</div>'; return; }
     if (!practice.open || !practice.ready) {
         box.innerHTML = '<button class="listen-btn" onclick="practice.open=true;resumePracticePanel()"><span class="sp">▶</span> Practice track (A/B loop)</button>';
         return;
@@ -3763,6 +3778,7 @@ function renderAudioPanel() {
         '<div class="audio-speed"><span>Speed</span>' +
         [0.5, 0.75, 1, 1.25].map(function(r) { return '<button class="sp-btn' + (practice.rate === r ? ' on' : '') + '" onclick="setPracticeRate(' + r + ')">' + r + '×</button>'; }).join('') +
         '</div>' +
+        '<div class="media-note">Your MP3 stays on this device — it’s never uploaded.</div>' +
         '<div class="audio-foot"><button class="tap" onclick="practice.open=false;renderAudioPanel()">Hide</button>' +
         '<button class="tap danger" onclick="removePracticeAudio()">Remove audio</button></div></div>';
     renderAudioControls();
@@ -5031,6 +5047,7 @@ function rerenderAfterEdit() {
     if (document.getElementById('view-setlist').classList.contains('active')) renderSetlistDetail();
 }
 function openSongSheet(songId) {
+    chartCleanBackup = null;
     var song = songId ? songById(songId) : null;
     var isLib = song && isLibrarySong(song.id);
     if (song && !song.custom && !isLib) return;   // shared-link songs aren't editable here
@@ -5068,6 +5085,8 @@ function openSongSheet(songId) {
         '</div>' +
         '<select class="field" id="sh-song-feel"><option value="">Song feel</option>' + feels + '</select>' +
         '<input class="field" id="sh-song-tags" placeholder="Tags, comma-separated — e.g. Worship, Filipino, Mellow" value="' + (song && song.tags ? esc(song.tags.join(', ')) : '') + '" autocomplete="off">' +
+        '<div class="chart-tools"><button type="button" class="chart-clean-btn" id="chart-clean-btn" onclick="cleanChartWithAI()"><span class="sp">✨</span> Clean up chart</button>' +
+        '<span class="chart-clean-hint">Reformats messy text — keeps your chords &amp; lyrics.</span></div>' +
         '<textarea class="field" id="sh-song-chart" placeholder="Chord chart *&#10;&#10;[Verse 1]&#10;G              D&#10;Your lyrics here" style="min-height:160px;">' + (song ? esc(song.chart) : '') + '</textarea>' +
         '<div class="form-error" id="sh-song-err"></div>' +
         '</div>' +
@@ -5085,6 +5104,45 @@ function readSongForm() {
         tags: parseTags(document.getElementById('sh-song-tags').value),
         chart: document.getElementById('sh-song-chart').value.trim()
     };
+}
+/* AI "Clean up chart" — reformats messy pasted text into Chord.ph's native
+   chord-chart format via the clean-chart Edge Function. Toggles to Undo so the
+   original text is always one tap away. */
+var chartCleanBackup = null;
+function setCleanBtn(mode) {
+    var b = document.getElementById('chart-clean-btn'); if (!b) return;
+    b.disabled = false; b.classList.remove('undo');
+    if (mode === 'busy') { b.disabled = true; b.innerHTML = '<span class="sp">✨</span> Cleaning…'; }
+    else if (mode === 'undo') { b.classList.add('undo'); b.innerHTML = '<span class="sp">↶</span> Undo clean'; }
+    else b.innerHTML = '<span class="sp">✨</span> Clean up chart';
+}
+async function cleanChartWithAI() {
+    var ta = document.getElementById('sh-song-chart'); if (!ta) return;
+    // second tap = undo
+    if (chartCleanBackup !== null) {
+        ta.value = chartCleanBackup; chartCleanBackup = null; setCleanBtn('idle');
+        toast('Reverted to your original.');
+        return;
+    }
+    var raw = ta.value.trim();
+    if (!raw) { toast('Paste some chord/lyric text first.'); return; }
+    if (!supa || !currentUser) { toast('Sign in to use Clean up chart.'); return; }
+    setCleanBtn('busy');
+    try {
+        var keyEl = document.getElementById('sh-song-key');
+        var res = await supa.functions.invoke('clean-chart', { body: { text: raw, key: keyEl ? keyEl.value : '' } });
+        if (res.error) throw res.error;
+        var d = res.data || {};
+        if (d.error === 'not_configured') { toast('Clean up isn’t set up yet (needs the clean-chart function).'); setCleanBtn('idle'); return; }
+        if (!d.chart) { toast('Couldn’t clean that up — try again.'); setCleanBtn('idle'); return; }
+        chartCleanBackup = ta.value;
+        ta.value = d.chart;
+        setCleanBtn('undo');
+        toast('Cleaned up — check it looks right.');
+    } catch (e) {
+        toast('Clean up isn’t set up yet (needs the clean-chart function).');
+        setCleanBtn('idle');
+    }
 }
 function saveSong() {
     var f = readSongForm();
