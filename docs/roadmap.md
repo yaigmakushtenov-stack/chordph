@@ -176,6 +176,13 @@ Build in this order:
 11. **Practice history** showing difficult or repeatedly looped sections.
 12. **Foot-pedal/MIDI controls** for playback, loop markers and chart navigation.
 
+**Required V2 live-preview gate:** before production deployment, publish the
+`v2-stabilization` branch to an isolated Vercel preview URL with production cloud
+writes disabled. The owner tests Google login/back gestures, practice audio,
+mobile/desktop layout, offline installation and the core song/setlist workflow on
+real devices. Record any release-blocking bugs, fix and retest them, then make a
+separate explicit production go/no-go decision. Do not silently promote the preview.
+
 **Team cloud workflow (paid):** a music director uploads a legally obtained
 practice MP3 to a private ministry/team library, attaches it to a song or
 setlist, optionally adds named loops/bookmarks and assigns it to members. Team
