@@ -103,3 +103,12 @@ test('chart controls visually separate notation, display, and rehearsal tools', 
   assert.match(app, /class="ctl ctl-group-start" id="ctl-click"/);
   assert.match(app, /\.ctl\.ctl-group-start/);
 });
+
+test('medley creation is discoverable from the setlist instead of only inside a chart', () => {
+  assert.match(app, /id="setlist-flow"/);
+  assert.match(app, /Build a medley/);
+  assert.match(app, /function openSetlistMedleyBuilder/);
+  assert.match(app, /Where should the medley begin/);
+  assert.match(app, /Choose the next song/);
+  assert.match(app, /match its key, and choose only the sections/);
+});

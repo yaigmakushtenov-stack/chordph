@@ -196,6 +196,15 @@
         .row-action { color: var(--danger); font-size: 13px; padding: 8px 0 8px 14px; background: none; border: none; cursor: pointer; }
         .row-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
         .row-action.danger { color: var(--danger); }
+        .setlist-flow { margin: 15px 0 10px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+        .setlist-flow-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+        .setlist-flow-title { font-size: 14px; font-weight: 750; }
+        .setlist-flow-copy { max-width: 500px; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+        .setlist-flow-status { flex-shrink: 0; color: var(--accent-2); font-size: 11px; font-weight: 700; }
+        .setlist-flow-actions { display: flex; gap: 16px; margin-top: 11px; overflow-x: auto; scrollbar-width: none; }
+        .setlist-flow-actions::-webkit-scrollbar { display: none; }
+        .setlist-flow-actions button { padding: 3px 0; color: var(--accent); border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .setlist-flow-actions button:disabled { color: var(--faint); cursor: default; }
 
         /* drag-to-reorder */
         /* touch-action:none so the browser hands us the gesture instead of scrolling */
@@ -1251,6 +1260,20 @@
             <div class="chart-title" id="setlist-name"></div>
             <div class="chart-meta" id="setlist-count"></div>
         </div>
+        <section class="setlist-flow" id="setlist-flow" aria-labelledby="setlist-flow-title">
+            <div class="setlist-flow-head">
+                <div>
+                    <div class="setlist-flow-title" id="setlist-flow-title">Shape the Sunday flow</div>
+                    <div class="setlist-flow-copy">Join selected sections from another song, match the key, and keep playing without a hard stop.</div>
+                </div>
+                <span class="setlist-flow-status" id="setlist-flow-status"></span>
+            </div>
+            <div class="setlist-flow-actions">
+                <button type="button" onclick="openAddToSetlistSheet()">+ Add songs</button>
+                <button type="button" id="setlist-build-medley" onclick="openSetlistMedleyBuilder()">Build a medley &rarr;</button>
+                <button type="button" onclick="enterSetlistEdit()">Reorder set</button>
+            </div>
+        </section>
         <div id="setlist-songs"></div>
     </div>
 </div>
@@ -5039,12 +5062,25 @@ function openSetlist(id) {
     renderSetlistDetail();
     show('setlist');
 }
+function renderSetlistFlow(sl, valid, editing) {
+    var flow = document.getElementById('setlist-flow');
+    var status = document.getElementById('setlist-flow-status');
+    var build = document.getElementById('setlist-build-medley');
+    if (!flow || !status || !build) return;
+    flow.style.display = editing ? 'none' : '';
+    var parts = 0;
+    Object.keys(sl.medleys || {}).forEach(function(hostId) { parts += (sl.medleys[hostId] || []).length; });
+    status.textContent = parts ? parts + (parts === 1 ? ' linked part' : ' linked parts') : 'No links yet';
+    build.disabled = !valid.length;
+    build.setAttribute('aria-disabled', valid.length ? 'false' : 'true');
+}
 function renderSetlistDetail() {
     var sl = setlistById(state.currentSetlistId);
     if (!sl) { go('setlists'); return; }
     document.getElementById('setlist-name').textContent = sl.name;
     var valid = sl.songIds.map(songById).filter(Boolean);
     var editing = state.setlistEdit;
+    renderSetlistFlow(sl, valid, editing);
     document.getElementById('setlist-count').textContent =
         (editing ? 'Hold & drag to reorder · ' : '') + valid.length + ' song' + (valid.length !== 1 ? 's' : '');
     var menuBtn = document.getElementById('setlist-menu-btn');
@@ -5091,6 +5127,7 @@ function onSetlistMenuBtn() {
 function openSetlistMenu() {
     var items = [
         { label: 'Add song', icon: '＋', onClick: openAddToSetlistSheet },
+        { label: 'Build a medley', icon: '⤵', onClick: openSetlistMedleyBuilder },
         { label: 'Reorder & edit songs', icon: '⇅', onClick: enterSetlistEdit },
         { label: 'Share setlist (link)', icon: '↗', onClick: function() { shareSetlist(state.currentSetlistId); } }
     ];
@@ -5377,13 +5414,49 @@ function filterAddList() { renderAddList(); }
 /* ---- medley picker: step 1 pick a song, step 2 pick key + parts ---- */
 var medleyPick = null; // { songId, keyOption, sections:[idx] }
 
+function openSetlistMedleyBuilder() {
+    var sl = setlistById(state.currentSetlistId);
+    if (!sl) return;
+    var hosts = [];
+    sl.songIds.forEach(function(id, pos) {
+        var song = songById(id);
+        if (song) hosts.push({ song: song, pos: pos, parts: (sl.medleys && sl.medleys[id] || []).length });
+    });
+    if (!hosts.length) { toast('Add a song before building a medley.'); return; }
+    openSheet(
+        '<div class="sheet-head"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
+        '<div class="sheet-title">Where should the medley begin?</div><button class="tap" onclick="closeSheet()">Cancel</button></div>' +
+        '<div style="font-size:12px;color:var(--muted);line-height:1.45;">Choose the song that plays first. Next, you can add another song, match its key, and choose only the sections you need.</div></div>' +
+        '<div class="sheet-scroll" id="sh-medley-hosts"></div>',
+        true
+    );
+    var box = document.getElementById('sh-medley-hosts');
+    hosts.forEach(function(item) {
+        var row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = '<div class="row-main"><div class="row-title">' + esc(item.song.title) + '</div>' +
+            '<div class="row-sub">' + esc(item.song.artist) + ' · Key ' + esc(item.song.key) +
+            (item.parts ? ' · ' + item.parts + (item.parts === 1 ? ' linked part' : ' linked parts') : '') + '</div></div>' +
+            '<span class="tap primary" style="font-size:13px;">Start here &rsaquo;</span>';
+        makeKeyboardAction(row, 'Start a medley from ' + item.song.title, function() {
+            closeSheet();
+            state.setlistPos = item.pos;
+            openChart(item.song.id, 'setlist');
+            setTimeout(openMedleySheet, 0);
+        });
+        box.appendChild(row);
+    });
+}
+
 function openMedleySheet() {
     medleyPick = null;
+    var host = songById(currentSongId);
     openSheet(
         '<div class="sheet-head">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
-        '<div class="sheet-title">Add to medley</div>' +
+        '<div class="sheet-title">Choose the next song</div>' +
         '<button class="tap" onclick="closeSheet()">Cancel</button></div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">This will play after ' + esc(host ? host.title : 'the current song') + '. You will choose its key and sections next.</div>' +
         '<input class="field" id="sh-medley-search" aria-label="Search songs for medley" placeholder="Search songs&hellip;" oninput="renderMedleyList()" autocomplete="off" style="margin-bottom:0;">' +
         '</div>' +
         '<div class="sheet-scroll" id="sh-medley-list"></div>',
