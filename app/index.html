@@ -380,11 +380,18 @@
             left: calc(14px + env(safe-area-inset-left)); bottom: calc(20px + env(safe-area-inset-bottom));
             max-width: calc(100vw - 100px); padding: 8px 12px; border-radius: 999px;
             background: var(--surface); border: 1px solid var(--border); color: var(--text);
-            box-shadow: var(--shadow-sm); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        body.stage-mode #stage-now-playing.has-media { display: flex; }
+            box-shadow: var(--shadow-sm); font: inherit; font-size: 12px; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; cursor: pointer; }
+        #stage-now-playing.has-media { display: flex; }
         #stage-now-playing .np-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+        #stage-now-playing-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        #stage-now-playing .np-return { color: var(--accent); font-weight: 650; flex-shrink: 0; }
+        body.stage-mode #stage-now-playing { cursor: default; }
+        body.stage-mode #stage-now-playing .np-return { display: none; }
+        body.chart-navbar:not(.stage-mode) #stage-now-playing { bottom: calc(112px + env(safe-area-inset-bottom)); }
         @media (min-width: 980px) {
             body.stage-mode #view-chart .wrap { margin-left: auto; margin-right: auto; max-width: 1040px; padding-left: 44px; padding-right: 44px; }
+            body:not(.stage-mode) #stage-now-playing { left: 318px; }
         }
         #chart-stage.on { color: var(--accent); }
         .btn-google {
@@ -913,6 +920,29 @@
         .songs-sticky { position: sticky; top: 0; z-index: 50; background: var(--bg); }
         #view-songs .bar { position: static; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
         .songs-sticky .search { margin-bottom: 0; padding-bottom: 10px; }
+        .rehearsal-home { padding: 16px 0 14px; }
+        .rh-kicker { color: var(--accent); font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+        .rh-heading { margin: 5px 0 3px; font-size: clamp(23px, 4vw, 32px); letter-spacing: -.035em; line-height: 1.08; }
+        .rh-sub { margin: 0; color: var(--muted); font-size: 14px; }
+        .rh-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 10px; margin-top: 16px; }
+        .rh-card { min-width: 0; padding: 15px; text-align: left; color: var(--text); background: var(--surface);
+            border: 1px solid var(--border); border-radius: 14px; cursor: pointer; font: inherit; }
+        .rh-card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+        .rh-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .rh-card-label { display: block; color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+        .rh-card-title { display: block; margin-top: 7px; font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rh-card-meta { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rh-actions { display: flex; gap: 14px; margin-top: 13px; overflow-x: auto; scrollbar-width: none; }
+        .rh-actions::-webkit-scrollbar { display: none; }
+        .rh-action { padding: 4px 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+        .library-heading { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 1px 2px; }
+        .library-heading h2 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
+        .library-heading span { color: var(--faint); font-size: 12px; }
+        .ob-helper { max-width: 340px; margin: -3px auto 8px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+        @media (max-width: 560px) {
+            .rh-grid { grid-template-columns: 1fr; }
+            .rh-card { padding: 13px 14px; }
+        }
         .chip-row { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 6px 0 10px; }
         .chip { color: var(--muted); cursor: pointer; padding: 8px 2px; font-size: 15px; background: none; border: none; }
         .chip.on { color: var(--accent); font-weight: 650; }
@@ -1046,6 +1076,7 @@
     <div class="wordmark">Chord.ph</div>
     <div class="ob-tagline">Your chords. Your key. Your music.</div>
     <div class="ob-label">What do you play?</div>
+    <div class="ob-helper">We&rsquo;ll tailor chord shapes and practice controls to your instrument.</div>
     <div class="chip-row" id="ob-instruments"></div>
     <input class="field" id="ob-other" placeholder="Name your instrument" autocomplete="off" style="display:none;max-width:280px;margin:0 auto 10px;text-align:center;">
     <div class="ob-label">What should we call you?</div>
@@ -1059,14 +1090,37 @@
 
 <div class="view" id="view-songs">
     <div class="wrap">
-        <div class="songs-sticky">
-            <div class="bar">
-                <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
-                <span class="wordmark" role="link" tabindex="0" title="Go to chord.ph home" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">Chord.ph</span>
-                <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()" aria-label="Add song">+</button></span>
+        <div class="bar">
+            <span class="bar-side"><button class="tap glyph menu-btn notif-dot" onclick="openDrawer()" aria-label="Open menu">&#9776;</button></span>
+            <span class="wordmark" role="link" tabindex="0" title="Go to chord.ph home" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">Chord.ph</span>
+            <span class="bar-side right"><button class="tap glyph" onclick="openSongSheet()" aria-label="Add song">+</button></span>
+        </div>
+        <section class="rehearsal-home" id="rehearsal-home" aria-labelledby="rh-heading">
+            <span class="rh-kicker">Rehearsal workspace</span>
+            <h1 class="rh-heading" id="rh-heading">Ready to rehearse?</h1>
+            <p class="rh-sub" id="rh-sub">Pick up where you left off or prepare your next set.</p>
+            <div class="rh-grid">
+                <button class="rh-card" id="rh-setlist" type="button">
+                    <span class="rh-card-label">Next set</span>
+                    <span class="rh-card-title" id="rh-setlist-title">Create a setlist</span>
+                    <span class="rh-card-meta" id="rh-setlist-meta">Keep Sunday&rsquo;s songs in one place</span>
+                </button>
+                <button class="rh-card" id="rh-recent" type="button">
+                    <span class="rh-card-label">Continue practicing</span>
+                    <span class="rh-card-title" id="rh-recent-title">Choose a song</span>
+                    <span class="rh-card-meta" id="rh-recent-meta">Your recent chart will appear here</span>
+                </button>
             </div>
+            <div class="rh-actions" aria-label="Quick actions">
+                <button class="rh-action" type="button" onclick="openSongSheet()">+ Add a chart</button>
+                <button class="rh-action" type="button" onclick="openNewSetlistSheet()">+ Build a setlist</button>
+                <button class="rh-action" type="button" onclick="location.href='/analyzer/'">Analyze a track &rarr;</button>
+            </div>
+        </section>
+        <div class="songs-sticky">
             <input class="search" id="search" placeholder="Search songs, artists, tags&hellip;" oninput="renderSongList()" autocomplete="off">
         </div>
+        <div class="library-heading"><h2>Your songs</h2><span id="library-count"></span></div>
         <div id="tag-filter" class="tag-filter"></div>
         <div id="songs-sort" class="sort-row"></div>
         <div id="song-list"></div>
@@ -1287,7 +1341,7 @@
 </button>
 <!-- leave stage mode (only visible while in it) -->
 <button id="stage-exit" onclick="toggleStage()" aria-label="Exit stage mode">&times; Exit stage</button>
-<div id="stage-now-playing" aria-live="polite"><span class="np-dot" aria-hidden="true"></span><span id="stage-now-playing-text"></span></div>
+<button id="stage-now-playing" type="button" aria-live="polite" onclick="returnToNowPlaying()"><span class="np-dot" aria-hidden="true"></span><span id="stage-now-playing-text"></span><span class="np-return">Open chart &rsaquo;</span></button>
 <!-- autoscroll speed, reachable in stage mode -->
 <div id="stage-speed" aria-hidden="true">
     <button onclick="scrollSpeedBy(0.5)" aria-label="Scroll faster">+</button>
@@ -1667,6 +1721,15 @@ var state = {
     updatedAt: 0                // last local change (ms) — drives sync merge
 };
 var currentSongId = null;
+var RECENT_SONGS_KEY = 'chordph2_recent_songs';
+var recentSongIds = [];
+try { recentSongIds = JSON.parse(localStorage.getItem(RECENT_SONGS_KEY) || '[]'); } catch (e) { recentSongIds = []; }
+if (!Array.isArray(recentSongIds)) recentSongIds = [];
+function rememberRecentSong(id) {
+    if (!id || !songById(id)) return;
+    recentSongIds = [id].concat(recentSongIds.filter(function(x) { return x !== id; })).slice(0, 6);
+    localStorage.setItem(RECENT_SONGS_KEY, JSON.stringify(recentSongIds));
+}
 
 function save() {
     state.updatedAt = Date.now();
@@ -2488,9 +2551,9 @@ function show(viewId) {
     if (viewId !== 'chart') {
         document.body.classList.remove('chart-navbar');
         if (stageMode) { stageMode = false; document.body.classList.remove('stage-mode'); }  // don't stay in stage off-chart
-        if (typeof stopPractice === 'function') { stopPractice(); practice.open = false; }    // stop practice audio off-chart
     }
     updateScrollFab();
+    if (typeof updateStageNowPlaying === 'function') updateStageNowPlaying();
     lastShownView = viewId;
 }
 function activeViewId() {
@@ -2685,10 +2748,76 @@ function toggleTagFilter(t) {
 }
 function toggleFavFilter() { songFavOnly = !songFavOnly; renderSongList(); }
 function clearTagFilter() { songFilterTags = []; songFavOnly = false; renderSongList(); }
+function dashboardSetlist() {
+    var current = setlistById(state.currentSetlistId);
+    if (current && current.songIds && current.songIds.length) return current;
+    for (var i = 0; i < state.setlists.length; i++) {
+        if (state.setlists[i].songIds && state.setlists[i].songIds.length) return state.setlists[i];
+    }
+    return state.setlists[0] || null;
+}
+function dashboardRecentSong() {
+    for (var i = 0; i < recentSongIds.length; i++) {
+        var song = songById(recentSongIds[i]);
+        if (song) return song;
+    }
+    return null;
+}
+function renderRehearsalHome() {
+    var heading = document.getElementById('rh-heading');
+    var sub = document.getElementById('rh-sub');
+    var setCard = document.getElementById('rh-setlist');
+    var setTitle = document.getElementById('rh-setlist-title');
+    var setMeta = document.getElementById('rh-setlist-meta');
+    var recentCard = document.getElementById('rh-recent');
+    var recentTitle = document.getElementById('rh-recent-title');
+    var recentMeta = document.getElementById('rh-recent-meta');
+    if (!heading || !setCard || !recentCard) return;
+
+    var firstName = state.profile && state.profile.name ? state.profile.name.trim().split(/\s+/)[0] : '';
+    var instrument = state.profile && state.profile.instrument ? state.profile.instrument.toLowerCase() : 'your part';
+    heading.textContent = firstName ? 'Ready to rehearse, ' + firstName + '?' : 'Ready to rehearse?';
+    sub.textContent = 'Prepare ' + instrument + ', practice the hard parts, and walk on stage ready.';
+
+    var sl = dashboardSetlist();
+    if (sl) {
+        var playable = (sl.songIds || []).filter(function(id) { return !!songById(id); }).length;
+        setTitle.textContent = sl.name || 'Untitled setlist';
+        setMeta.textContent = playable + (playable === 1 ? ' song' : ' songs') + ' · Open set';
+        setCard.onclick = function() { openSetlist(sl.id); };
+    } else {
+        setTitle.textContent = 'Create a setlist';
+        setMeta.textContent = 'Keep Sunday\'s songs in one place';
+        setCard.onclick = openNewSetlistSheet;
+    }
+
+    var recent = dashboardRecentSong();
+    if (recent) {
+        var source = audioKeys && audioKeys[recent.id] ? 'Practice track ready' :
+            state.youtube[recent.id] ? 'YouTube attached' : state.spotify[recent.id] ? 'Spotify attached' : 'Open chart';
+        recentTitle.textContent = recent.title;
+        recentMeta.textContent = (recent.key ? 'Key ' + recent.key + ' · ' : '') + source;
+        recentCard.onclick = function() { openChart(recent.id, 'songs'); };
+    } else {
+        recentTitle.textContent = 'Choose a song';
+        recentMeta.textContent = 'Your recent chart will appear here';
+        recentCard.onclick = function() {
+            var search = document.getElementById('search');
+            if (search) { search.scrollIntoView({ behavior: 'smooth', block: 'center' }); search.focus(); }
+        };
+    }
+
+    var count = document.getElementById('library-count');
+    if (count) {
+        var total = allSongs().length + teamSongs.filter(function(s) { return bandMatchesActive(s.team_id); }).length;
+        count.textContent = total + (total === 1 ? ' chart' : ' charts');
+    }
+}
 function renderSongList() {
     var q = (document.getElementById('search').value || '').toLowerCase();
     var box = document.getElementById('song-list');
     renderTagFilter();
+    renderRehearsalHome();
     var sortEl = document.getElementById('songs-sort'); if (sortEl) sortEl.innerHTML = sortSelectHTML();
     box.innerHTML = '';
     // shared BAND library — shown above your own songs
@@ -3518,6 +3647,7 @@ function saveSharedSetlist() {
    ========================================================= */
 function openChart(songId, from) {
     currentSongId = songId;
+    rememberRecentSong(songId);
     state.chartFrom = from || 'songs';
     mediaOpen = false; spotifyOpen = false; youtubeOpen = false;   // each song's media starts collapsed
     stopPractice(); practice.open = false;   // reset the practice audio for the new song
@@ -4098,12 +4228,20 @@ function updateStageNowPlaying() {
     var bar = document.getElementById('stage-now-playing');
     var text = document.getElementById('stage-now-playing-text');
     if (!bar || !text) return;
-    var label = '';
-    if (practice.el && practice.ready && !practice.el.paused && !practice.el.ended) label = 'Now playing · Practice track';
-    else if (youtubeOpen && state.youtube[currentSongId]) label = 'Now playing · YouTube';
-    else if (spotifyOpen && state.spotify[currentSongId]) label = 'Now playing · Spotify';
+    var label = '', song = songById(currentSongId), source = '';
+    if (practice.el && practice.ready) source = practice.el.paused || practice.el.ended ? 'Practice track paused' : 'Practice track';
+    else if (youtubeOpen && state.youtube[currentSongId]) source = 'YouTube';
+    else if (spotifyOpen && state.spotify[currentSongId]) source = 'Spotify';
+    if (source) label = (song ? song.title + ' · ' : '') + source;
     text.textContent = label;
     bar.classList.toggle('has-media', !!label);
+    document.body.classList.toggle('has-now-playing', !!label);
+    bar.setAttribute('aria-label', label ? label + '. Return to chart.' : 'No media open');
+}
+function returnToNowPlaying() {
+    if (!currentSongId || !songById(currentSongId) || activeViewId() === 'chart') return;
+    show('chart');
+    renderSetlistNavbar(state.chartFrom === 'setlist' || state.chartFrom === 'shared-set');
 }
 function setStage(on) {
     stageMode = on;

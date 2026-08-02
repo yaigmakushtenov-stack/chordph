@@ -43,7 +43,24 @@ test('stage mode hides expanded media without destroying playback', () => {
   assert.doesNotMatch(setStage, /mediaOpen = false|practice\.open = false|practice\.el\.pause/);
   assert.match(app, /body\.stage-mode #chart-media/);
   assert.match(app, /id="stage-now-playing"/);
-  assert.match(app, /Now playing · Practice track/);
+  assert.match(app, /Practice track paused/);
+  assert.match(app, /function returnToNowPlaying/);
+});
+
+test('practice playback survives app navigation and offers a return path', () => {
+  const show = app.match(/function show\(viewId\) \{[\s\S]*?\n\}/)?.[0] || '';
+  assert.doesNotMatch(show, /stopPractice\(\)/);
+  assert.match(app, /#stage-now-playing\.has-media \{ display: flex; \}/);
+  assert.match(app, /Open chart/);
+});
+
+test('songs opens as a personalized rehearsal workspace', () => {
+  assert.match(app, /id="rehearsal-home"/);
+  assert.match(app, /Next set/);
+  assert.match(app, /Continue practicing/);
+  assert.match(app, /function rememberRecentSong/);
+  assert.match(app, /function renderRehearsalHome/);
+  assert.match(app, /tailor chord shapes and practice controls to your instrument/);
 });
 
 test('chart rendering preserves the existing media component and iframe nodes', () => {
