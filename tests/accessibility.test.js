@@ -60,7 +60,9 @@ test('songs opens as a personalized rehearsal workspace', () => {
   assert.match(app, /Continue practicing/);
   assert.match(app, /function rememberRecentSong/);
   assert.match(app, /function renderRehearsalHome/);
-  assert.match(app, /tailor chord shapes and practice controls to your instrument/);
+  assert.match(app, /Built around the part you play/);
+  assert.match(app, /What&rsquo;s your main role/);
+  assert.match(app, /aria-pressed/);
 });
 
 test('chart rendering preserves the existing media component and iframe nodes', () => {

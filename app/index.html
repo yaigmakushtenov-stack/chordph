@@ -966,17 +966,64 @@
         #view-onboarding {
             min-height: 100vh;
             display: none;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            text-align: center;
-            padding: 24px;
+            padding: clamp(18px, 4vw, 48px);
         }
-        #view-onboarding .wordmark { font-size: 38px; margin: 0 auto; }
-        .ob-tagline { color: var(--muted); font-size: 14px; margin: 8px 0 44px; }
-        .ob-label { font-size: 15px; font-weight: 650; margin-bottom: 6px; }
-        #view-onboarding .chip-row { justify-content: center; margin-bottom: 30px; }
-        #view-onboarding .field { max-width: 280px; text-align: center; margin-bottom: 34px; }
+        .ob-shell { width: min(980px, 100%); display: grid; grid-template-columns: .82fr 1.18fr; overflow: hidden;
+            border: 1px solid var(--border); border-radius: 24px; background: var(--panel); box-shadow: var(--shadow); }
+        .ob-story { padding: clamp(30px, 5vw, 58px); background: linear-gradient(145deg, var(--bg-2), var(--panel-2));
+            border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; min-height: 620px; }
+        #view-onboarding .wordmark { font-size: 27px; }
+        .ob-story-copy { margin: auto 0; }
+        .ob-kicker { color: var(--accent); font-size: 11px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+        .ob-story h1 { margin: 10px 0 12px; font-size: clamp(30px, 4vw, 43px); line-height: 1.02; letter-spacing: -.045em; }
+        .ob-story p { max-width: 350px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+        .ob-story-note { color: var(--faint); font-size: 12px; line-height: 1.45; }
+        .ob-form { padding: clamp(26px, 5vw, 52px); }
+        .ob-step { color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+        .ob-form h2 { margin: 7px 0 5px; font-size: clamp(24px, 3vw, 31px); letter-spacing: -.035em; }
+        .ob-form-intro { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+        .ob-field-label { display: block; margin-bottom: 7px; color: var(--text); font-size: 13px; font-weight: 650; }
+        #view-onboarding .field { max-width: none; margin: 0 0 23px; text-align: left; }
+        .ob-role-fieldset { border: 0; min-width: 0; }
+        .ob-role-legend { margin-bottom: 4px; font-size: 14px; font-weight: 700; }
+        .ob-role-help { color: var(--muted); font-size: 12px; margin-bottom: 11px; }
+        .ob-role-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .ob-role { min-width: 0; display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; padding: 11px;
+            text-align: left; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+            cursor: pointer; font: inherit; }
+        .ob-role:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+        .ob-role.on { border-color: var(--accent); background: var(--accent-soft); }
+        .ob-role-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--hover); font-size: 19px; }
+        .ob-role.on .ob-role-icon { background: var(--accent); color: #fff; }
+        .ob-role-name { display: block; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ob-role-desc { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.25; }
+        .ob-role-grid.invalid { outline: 1px dashed var(--danger); outline-offset: 5px; border-radius: 10px; }
+        .ob-personalization { min-height: 42px; margin: 13px 0 3px; padding: 10px 12px; border-radius: 10px;
+            background: var(--inset); color: var(--muted); font-size: 12px; line-height: 1.45; }
+        .ob-personalization strong { color: var(--text); }
+        .ob-sync { margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+        .ob-sync summary { color: var(--muted); font-size: 13px; cursor: pointer; }
+        .ob-sync-body { padding-top: 12px; }
+        .ob-sync-body .field { margin-bottom: 8px !important; }
+        #ob-msg { font-size: 12px; color: var(--accent); min-height: 18px; margin: 8px 0 2px; }
+        #ob-go { width: 100%; margin-top: 10px; padding: 13px 16px; border-radius: 11px; background: var(--accent);
+            color: #fff; border: 0; font: inherit; font-weight: 750; cursor: pointer; }
+        #ob-go:hover { filter: brightness(1.08); }
+        @media (max-width: 760px) {
+            #view-onboarding { align-items: flex-start; padding: 0; }
+            .ob-shell { display: block; min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+            .ob-story { min-height: auto; padding: 24px 20px 20px; border-right: 0; border-bottom: 1px solid var(--border); }
+            .ob-story-copy { margin-top: 32px; }
+            .ob-story h1 { font-size: 31px; max-width: 340px; }
+            .ob-story-note { display: none; }
+            .ob-form { padding: 24px 20px 38px; }
+        }
+        @media (max-width: 340px) {
+            .ob-role-grid { grid-template-columns: 1fr; }
+            .ob-role-desc { font-size: 11px; }
+        }
 
         .view { display: none; }
         .view.active { display: block; }
@@ -1083,19 +1130,45 @@
 </nav>
 
 <div id="view-onboarding">
-    <div class="wordmark">Chord.ph</div>
-    <div class="ob-tagline">Your chords. Your key. Your music.</div>
-    <div class="ob-label">What do you play?</div>
-    <div class="ob-helper">We&rsquo;ll tailor chord shapes and practice controls to your instrument.</div>
-    <div class="chip-row" id="ob-instruments"></div>
-    <input class="field" id="ob-other" placeholder="Name your instrument" autocomplete="off" style="display:none;max-width:280px;margin:0 auto 10px;text-align:center;">
-    <div class="ob-label">What should we call you?</div>
-    <input class="field" id="ob-name" placeholder="Your name" autocomplete="off">
-    <div class="ob-label" id="ob-sync-label">Sync across your devices <span style="text-transform:none;letter-spacing:0;color:var(--faint);">— optional</span></div>
-    <div id="ob-google"></div>
-    <input class="field" id="ob-email" type="email" placeholder="or email — we send a one-tap link" autocomplete="email">
-    <div id="ob-msg" style="font-size:12px;color:var(--accent);min-height:16px;margin:2px 0 4px;"></div>
-    <button class="tap primary big" id="ob-go" onclick="finishOnboarding()">Let's play &rarr;</button>
+    <div class="ob-shell">
+        <aside class="ob-story">
+            <div class="wordmark">Chord.ph</div>
+            <div class="ob-story-copy">
+                <span class="ob-kicker">Your rehearsal workspace</span>
+                <h1>Built around the part you play.</h1>
+                <p>Chord.ph adapts the chart, chord references, and practice tools so the first thing you see is the part that matters to you.</p>
+            </div>
+            <div class="ob-story-note">No sign-up required. Your setup stays on this device unless you choose to sync it.</div>
+        </aside>
+        <main class="ob-form">
+            <span class="ob-step">Quick setup · about 20 seconds</span>
+            <h2>Make this space yours</h2>
+            <p class="ob-form-intro">You can change all of this later in Settings.</p>
+
+            <label class="ob-field-label" for="ob-name">What should we call you?</label>
+            <input class="field" id="ob-name" placeholder="Your name" autocomplete="name">
+
+            <fieldset class="ob-role-fieldset">
+                <legend class="ob-role-legend">What&rsquo;s your main role?</legend>
+                <p class="ob-role-help">Choose what you usually play on stage. This controls your default chart view.</p>
+                <div class="ob-role-grid" id="ob-instruments"></div>
+            </fieldset>
+            <label class="ob-field-label" id="ob-other-label" for="ob-other" style="display:none;margin-top:12px;">Name your instrument</label>
+            <input class="field" id="ob-other" placeholder="e.g. Ukulele" autocomplete="off" style="display:none;margin-bottom:8px;">
+            <div class="ob-personalization" id="ob-personalization" aria-live="polite">Choose a role to preview how Chord.ph will adapt.</div>
+
+            <details class="ob-sync" id="ob-sync">
+                <summary>Save this setup across devices <span style="color:var(--faint);">(optional)</span></summary>
+                <div class="ob-sync-body">
+                    <div id="ob-google"></div>
+                    <label class="ob-field-label" for="ob-email">Or use email</label>
+                    <input class="field" id="ob-email" type="email" placeholder="We&rsquo;ll send a one-tap sign-in link" autocomplete="email">
+                </div>
+            </details>
+            <div id="ob-msg" role="status"></div>
+            <button id="ob-go" onclick="finishOnboarding()">Start rehearsing &rarr;</button>
+        </main>
+    </div>
 </div>
 
 <div class="view" id="view-songs">
@@ -1386,6 +1459,15 @@ var CAPO_SHAPES = [
     { shape: 'A', index: 9 }, { shape: 'G', index: 7 }
 ];
 var INSTRUMENTS = ['Lead Guitar', 'Rhythm Guitar', 'Bass', 'Keyboard', 'Drums', 'Vocalist', 'Other'];
+var INSTRUMENT_META = {
+    'Lead Guitar': { icon: '🎸', desc: 'Shapes, capo & lead-friendly charts', benefit: '<strong>Guitar view</strong> adds chord shapes, capo suggestions, and sounding-key guidance.' },
+    'Rhythm Guitar': { icon: '♬', desc: 'Shapes, capo & rhythm-ready charts', benefit: '<strong>Rhythm guitar view</strong> prioritizes chord shapes, capo choices, and clean section flow.' },
+    'Bass': { icon: '𝄢', desc: 'Roots, numbers & song structure', benefit: '<strong>Bass view</strong> keeps roots, Nashville numbers, tempo, and section changes easy to scan.' },
+    'Keyboard': { icon: '🎹', desc: 'Keyboard tones & chord references', benefit: '<strong>Keyboard view</strong> shows chord tones on the keys instead of guitar diagrams.' },
+    'Drums': { icon: '🥁', desc: 'Tempo, feel & section roadmap', benefit: '<strong>Drummer view</strong> puts BPM, song feel, time cues, and sections ahead of chord detail.' },
+    'Vocalist': { icon: '🎤', desc: 'Lyrics-first with quick key changes', benefit: '<strong>Vocalist view</strong> starts lyrics-first while keeping key changes and section cues close.' },
+    'Other': { icon: '+', desc: 'Use the flexible chart view', benefit: '<strong>Flexible view</strong> keeps the full chart and core rehearsal controls available.' }
+};
 var INSTRUMENT_VIEWS = {
     'Lead Guitar': 'guitarist', 'Rhythm Guitar': 'guitarist', 'Bass': 'bassist',
     'Keyboard': 'keys', 'Drums': 'drummer', 'Vocalist': 'vocalist'
@@ -5824,27 +5906,36 @@ function renderOnboarding() {
     var box = document.getElementById('ob-instruments');
     box.innerHTML = '';
     INSTRUMENTS.forEach(function(ins) {
+        var meta = INSTRUMENT_META[ins];
         var b = document.createElement('button');
-        b.className = 'chip';
-        b.textContent = ins;
+        b.type = 'button';
+        b.className = 'ob-role';
+        b.setAttribute('aria-label', ins);
+        b.setAttribute('aria-pressed', 'false');
+        b.innerHTML = '<span class="ob-role-icon" aria-hidden="true">' + meta.icon + '</span>' +
+            '<span><span class="ob-role-name">' + esc(ins) + '</span><span class="ob-role-desc">' + esc(meta.desc) + '</span></span>';
         b.onclick = function() {
             window.__obInstrument = ins;
-            box.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('on'); });
+            box.querySelectorAll('.ob-role').forEach(function(c) { c.classList.remove('on'); c.setAttribute('aria-pressed', 'false'); });
             b.classList.add('on');
+            b.setAttribute('aria-pressed', 'true');
             box.classList.remove('invalid');
             var oth = document.getElementById('ob-other');
+            var othLabel = document.getElementById('ob-other-label');
             oth.style.display = ins === 'Other' ? '' : 'none';
+            if (othLabel) othLabel.style.display = ins === 'Other' ? '' : 'none';
+            document.getElementById('ob-personalization').innerHTML = meta.benefit;
             if (ins === 'Other') oth.focus();
         };
         box.appendChild(b);
     });
     // hide the sync field entirely if cloud sync isn't configured
-    document.getElementById('ob-sync-label').style.display = syncEnabled() ? '' : 'none';
-    document.getElementById('ob-email').style.display = syncEnabled() ? '' : 'none';
+    document.getElementById('ob-sync').style.display = syncEnabled() ? '' : 'none';
     var gwrap = document.getElementById('ob-google');
     if (gwrap) { gwrap.innerHTML = syncEnabled() ? googleBtnHTML() : ''; gwrap.style.display = syncEnabled() ? '' : 'none'; }
     document.body.classList.add('pre-app');
     document.getElementById('view-onboarding').style.display = 'flex';
+    setTimeout(function() { var name = document.getElementById('ob-name'); if (name) name.focus(); }, 0);
 }
 function flashInvalid(el) {
     el.classList.remove('invalid'); void el.offsetWidth; el.classList.add('invalid');
