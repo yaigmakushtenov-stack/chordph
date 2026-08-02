@@ -17,8 +17,10 @@ ambient percussion beds.
 - ✅ **Synthesised pad — DONE & live** (Web Audio, follows the song's key,
   plays across the whole app, floating stop chip). Free for now to validate;
   becomes the anchor paid feature once payments exist.
-- ⏳ **Ambient percussion beds** — still to build (looped ambient percussion
-  under the pad; likely a synth/noise-based groove or short sampled loops).
+- ✅ **Ambient percussion beds — DONE** — three generated Web Audio grooves
+  (Gentle, Pulse and Build) with independent volume, persistent playback, and
+  automatic BPM/time-signature changes through medleys. No recorded or
+  third-party samples are bundled.
 - ⏳ **Sampled pads** for premium quality — later; needs licensed or
   self-produced audio, tens of MB of assets.
 - ⏳ Optional: make the pad follow each medley section's key while scrolling

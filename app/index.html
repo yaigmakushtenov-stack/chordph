@@ -623,6 +623,14 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
         .layer .val { color: var(--text); font-weight: 650; min-width: 30px; text-align: center; display: inline-block; }
         .layer .lbl { color: var(--faint); font-size: 12px; }
+        #layer-pad { align-items: stretch; gap: 8px; }
+        .sound-bed-row { width: 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .sound-bed-row + .sound-bed-row { padding-top: 8px; border-top: 1px solid var(--hairline); }
+        .sound-bed-name { width: 76px; color: var(--muted); font-size: 12px; font-weight: 700; }
+        .sound-bed-row select { max-width: 112px; }
+        .sound-bed-row input[type="range"] { width: 90px; accent-color: var(--accent); }
+        .percussion-step { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+        .percussion-step.pulse { animation: clickPulse .2s ease-out; background: var(--accent-2); }
         .click-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--faint); display: inline-block; transition: background .05s; }
         .click-dot.pulse { animation: clickPulse .16s ease-out; }
         @keyframes clickPulse { 0% { transform: scale(1.7); } 100% { transform: scale(1); } }
@@ -1310,7 +1318,7 @@
                 <button class="ctl ctl-group-start" id="ctl-lyrics" onclick="toggleLyrics()" aria-label="Lyrics only"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 10h14M5 14h9M5 18h11"/></svg><span>Lyrics</span></button>
                 <button class="ctl" id="ctl-text" onclick="toggleLayer('text')" aria-label="Text size"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l4.5-12 4.5 12M4.6 14h5.8M15 18l2.5-7 2.5 7M16 16h3"/></svg><span>Text</span></button>
                 <button class="ctl ctl-group-start" id="ctl-click" onclick="toggleLayer('click')" aria-label="Metronome click"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l3 16H6zM12 4v9M12 13l4-3"/></svg><span>Click</span></button>
-                <button class="ctl" id="ctl-pad" onclick="toggleLayer('pad')" aria-label="Ambient pad"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-6 3 13 3-16 3 12 2-3h3"/></svg><span>Pad</span></button>
+                <button class="ctl" id="ctl-pad" onclick="toggleLayer('pad')" aria-label="Pad and percussion"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-6 3 13 3-16 3 12 2-3h3"/></svg><span>Pad+Beat</span></button>
                 <button class="ctl" id="ctl-medley" onclick="openMedleySheet()" style="display:none;" aria-label="Medley"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h10a2 2 0 0 1 2 2v10M16 8H6a1.8 1.8 0 0 0-1.8 1.8V19a1.8 1.8 0 0 0 1.8 1.8h9.5A1.8 1.8 0 0 0 17.3 19V9.8A1.8 1.8 0 0 0 15.5 8Z"/></svg><span>Medley</span></button>
             </div>
 
@@ -1340,10 +1348,24 @@
             </div>
 
             <div class="layer" id="layer-pad">
-                <button class="tap primary" id="pad-toggle" onclick="togglePad()">&#9654; Play</button>
-                <span class="lbl" id="pad-key">ambient pad</span>
-                <span class="lbl">vol</span>
-                <input type="range" id="pad-vol" min="0" max="100" value="55" oninput="setPadVolume(this.value/100)" aria-label="Pad volume" style="width:90px;vertical-align:middle;accent-color:var(--accent);">
+                <div class="sound-bed-row">
+                    <span class="sound-bed-name">Ambient pad</span>
+                    <button class="tap primary" id="pad-toggle" onclick="togglePad()">&#9654; Play</button>
+                    <span class="lbl" id="pad-key">song key</span>
+                    <input type="range" id="pad-vol" min="0" max="100" value="55" oninput="setPadVolume(this.value/100)" aria-label="Pad volume">
+                </div>
+                <div class="sound-bed-row">
+                    <span class="sound-bed-name">Percussion</span>
+                    <button class="tap primary" id="percussion-toggle" onclick="togglePercussion()">&#9654; Play</button>
+                    <select class="field" id="percussion-style" onchange="setPercussionStyle(this.value)" aria-label="Percussion style" style="margin:0;padding:7px 4px;">
+                        <option value="gentle">Gentle</option>
+                        <option value="pulse">Pulse</option>
+                        <option value="build">Build</option>
+                    </select>
+                    <span class="lbl" id="percussion-bpm">needs BPM</span>
+                    <span class="percussion-step" id="percussion-step" aria-hidden="true"></span>
+                    <input type="range" id="percussion-vol" min="0" max="100" value="32" oninput="setPercussionVolume(this.value/100)" aria-label="Percussion volume">
+                </div>
             </div>
         </div>
 
@@ -1438,8 +1460,8 @@
 
 <div id="pad-chip" style="display:none;">
     <span class="pad-chip-dot"></span>
-    <span>Pad &middot; <b id="pad-chip-key">C</b></span>
-    <button onclick="stopPad()" aria-label="Stop pad">Stop</button>
+    <span id="pad-chip-label">Pad &middot; <b id="pad-chip-key">C</b></span>
+    <button onclick="stopSoundBed()" aria-label="Stop sound bed">Stop</button>
 </div>
 
 <!-- quick-access autoscroll toggle, floats over the chart -->
@@ -4477,9 +4499,9 @@ function renderStageFuncs() {
         row(txtOpts, 'text', stageActiveFunc === 'text');
 }
 
-/* ---- keep the screen awake while performing (scroll / click / pad) ---- */
+/* ---- keep the screen awake while performing (scroll / click / sound bed) ---- */
 var wakeLock = null;
-function wakeLockNeeded() { return state.scroll.playing || metro.playing || pad.playing || stageMode; }
+function wakeLockNeeded() { return state.scroll.playing || metro.playing || pad.playing || (percussion && percussion.playing) || stageMode; }
 function updateWakeLock() {
     if (wakeLockNeeded()) {
         if (!wakeLock && 'wakeLock' in navigator) {
@@ -4603,8 +4625,8 @@ function reviveMetro() {
     if (p && p.then) p.then(finish, function() { stopMetro(); });
     else finish();
 }
-document.addEventListener('visibilitychange', function() { if (!document.hidden) { reviveMetro(); revivePad(); } });
-window.addEventListener('pageshow', function() { reviveMetro(); revivePad(); });
+document.addEventListener('visibilitychange', function() { if (!document.hidden) { reviveMetro(); revivePad(); revivePercussion(); } });
+window.addEventListener('pageshow', function() { reviveMetro(); revivePad(); revivePercussion(); });
 function clickAt(time, accent) {
     var o = metro.ctx.createOscillator(), g = metro.ctx.createGain();
     o.frequency.value = accent ? 1600 : 950;
@@ -4701,6 +4723,7 @@ function buildTempoZones(hostSong) {
     if (ctl) ctl.style.display = anyTempo ? '' : 'none';
     if (!anyTempo && state.openLayer === 'click') state.openLayer = null;
     paintClickLabel();
+    syncPercussionToTempoZone(true);
 }
 /* whichever zone is under the "reading line" ~a third down the screen */
 function activeTempoZone() {
@@ -4723,10 +4746,11 @@ function paintClickLabel() {
     }
 }
 function syncClickToTempoZone() {
-    if (chartTempoZones.length < 2) return;             // nothing to follow
     if (!document.getElementById('view-chart').classList.contains('active')) return;
     var z = activeTempoZone();
     if (!z || !z.tempo) return;
+    syncPercussionToTempoZone(false);
+    if (chartTempoZones.length < 2) return;             // nothing else to re-tempo
     if (metro.playing && (metro.bpm !== z.tempo || metro.beatsPerBar !== z.beats)) {
         metro.bpm = z.tempo;                            // the scheduler reads this each pass
         metro.beatsPerBar = z.beats;
@@ -4894,17 +4918,186 @@ function updatePadUI() {
     var t = document.getElementById('pad-toggle');
     if (t) t.innerHTML = pad.playing ? '&#10074;&#10074; Stop' : '&#9654; Play';
     var lbl = document.getElementById('pad-key');
-    if (lbl) lbl.textContent = pad.playing ? ('key of ' + noteName(pad.keyIndex)) : 'ambient pad';
-    var ctl = document.getElementById('ctl-pad'); if (ctl) ctl.classList.toggle('playing', pad.playing);
+    if (lbl) lbl.textContent = pad.playing ? ('key of ' + noteName(pad.keyIndex)) : 'song key';
+    var percussionOn = !!(percussion && percussion.playing);
+    var ctl = document.getElementById('ctl-pad'); if (ctl) ctl.classList.toggle('playing', pad.playing || percussionOn);
+    var pt = document.getElementById('percussion-toggle');
+    if (pt) pt.innerHTML = percussionOn ? '&#10074;&#10074; Stop' : '&#9654; Play';
+    var ps = document.getElementById('percussion-style'); if (ps) ps.value = percussion.style;
+    var pv = document.getElementById('percussion-vol'); if (pv) pv.value = Math.round(percussion.level * 100);
+    var pb = document.getElementById('percussion-bpm');
+    if (pb) {
+        var target = percussionTarget();
+        pb.textContent = percussionOn ? percussion.bpm + ' BPM' : (target.bpm ? target.bpm + ' BPM' : 'needs BPM');
+    }
     var chip = document.getElementById('pad-chip');
     if (chip) {
-        chip.style.display = pad.playing ? 'flex' : 'none';
+        chip.style.display = (pad.playing || percussionOn) ? 'flex' : 'none';
         var k = document.getElementById('pad-chip-key'); if (k) k.textContent = noteName(pad.keyIndex);
+        var chipLabel = document.getElementById('pad-chip-label');
+        if (chipLabel) {
+            if (pad.playing && percussionOn) chipLabel.innerHTML = 'Pad <b>' + esc(noteName(pad.keyIndex)) + '</b> &middot; ' + esc(percussionStyleLabel()) + ' ' + percussion.bpm + ' BPM';
+            else if (pad.playing) chipLabel.innerHTML = 'Pad &middot; <b>' + esc(noteName(pad.keyIndex)) + '</b>';
+            else chipLabel.innerHTML = esc(percussionStyleLabel()) + ' bed &middot; <b>' + percussion.bpm + ' BPM</b>';
+        }
     }
 }
 function revivePad() {   // resume after a screen lock, like the metronome
     if (pad.playing && pad.ctx && pad.ctx.state === 'suspended') pad.ctx.resume();
 }
+
+/* =========================================================
+   AMBIENT PERCUSSION BED — lightweight, generated Web Audio percussion.
+   No recorded loops or third-party samples: filtered noise makes the shaker,
+   and short sine sweeps make the soft kick/tom. It follows the chart BPM and
+   time signature, including tempo zones while scrolling through a medley.
+   ========================================================= */
+var percussion = { ctx: null, playing: false, bpm: 0, beatsPerBar: 4, next: 0, step: 0,
+                   timer: null, style: 'gentle', level: 0.32, master: null, noise: null };
+try {
+    var _percussionPrefs = JSON.parse(localStorage.getItem('chordph2_percussion') || 'null');
+    if (_percussionPrefs) {
+        if (['gentle', 'pulse', 'build'].indexOf(_percussionPrefs.style) !== -1) percussion.style = _percussionPrefs.style;
+        if (typeof _percussionPrefs.level === 'number') percussion.level = Math.max(0, Math.min(1, _percussionPrefs.level));
+    }
+} catch (e) {}
+function savePercussionPrefs() {
+    localStorage.setItem('chordph2_percussion', JSON.stringify({ style: percussion.style, level: percussion.level }));
+}
+function percussionStyleLabel() {
+    return percussion.style === 'build' ? 'Build' : percussion.style === 'pulse' ? 'Pulse' : 'Gentle';
+}
+function percussionTarget() {
+    var z = activeTempoZone();
+    var song = songById(currentSongId);
+    return { bpm: (z && z.tempo) || (song && song.tempo) || 0,
+             beats: (z && z.beats) || beatsForSong(song) || 4 };
+}
+function percussionCtxReady() {
+    try {
+        if (!percussion.ctx || percussion.ctx.state === 'closed') percussion.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (percussion.ctx.state === 'suspended') percussion.ctx.resume();
+        return true;
+    } catch (e) { return false; }
+}
+function percussionNoiseBuffer(ctx) {
+    var length = Math.floor(ctx.sampleRate * 0.18), buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    var data = buffer.getChannelData(0);
+    for (var i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+    return buffer;
+}
+function percussionNoiseAt(time, gain, duration) {
+    var ctx = percussion.ctx, src = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), amp = ctx.createGain();
+    src.buffer = percussion.noise; filter.type = 'highpass'; filter.frequency.value = 5200;
+    amp.gain.setValueAtTime(Math.max(0.001, gain), time);
+    amp.gain.exponentialRampToValueAtTime(0.001, time + duration);
+    src.connect(filter); filter.connect(amp); amp.connect(percussion.master);
+    src.start(time); src.stop(time + duration + 0.02);
+}
+function percussionKickAt(time, gain) {
+    var ctx = percussion.ctx, osc = ctx.createOscillator(), amp = ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(105, time); osc.frequency.exponentialRampToValueAtTime(46, time + 0.16);
+    amp.gain.setValueAtTime(Math.max(0.001, gain), time); amp.gain.exponentialRampToValueAtTime(0.001, time + 0.24);
+    osc.connect(amp); amp.connect(percussion.master); osc.start(time); osc.stop(time + 0.26);
+}
+function percussionTomAt(time, gain) {
+    var ctx = percussion.ctx, osc = ctx.createOscillator(), amp = ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(138, time); osc.frequency.exponentialRampToValueAtTime(92, time + 0.18);
+    amp.gain.setValueAtTime(Math.max(0.001, gain), time); amp.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+    osc.connect(amp); amp.connect(percussion.master); osc.start(time); osc.stop(time + 0.32);
+}
+function percussionAt(time, beat, secondsPerBeat) {
+    var lastBeat = Math.max(0, percussion.beatsPerBar - 1);
+    if (percussion.style === 'gentle') {
+        if (beat === 0) percussionKickAt(time, 0.32);
+        percussionNoiseAt(time + secondsPerBeat / 2, 0.16, 0.08);
+    } else if (percussion.style === 'pulse') {
+        if (beat === 0 || beat === Math.floor(percussion.beatsPerBar / 2)) percussionKickAt(time, 0.4);
+        percussionNoiseAt(time, 0.09, 0.07);
+        percussionNoiseAt(time + secondsPerBeat / 2, 0.2, 0.07);
+    } else {
+        percussionKickAt(time, beat === 0 ? 0.5 : 0.31);
+        percussionNoiseAt(time, 0.12, 0.075);
+        percussionNoiseAt(time + secondsPerBeat / 2, 0.25, 0.075);
+        if (beat === lastBeat) percussionTomAt(time, 0.2);
+    }
+    (function(t) {
+        setTimeout(function() {
+            if (!percussion.playing) return;
+            var dot = document.getElementById('percussion-step');
+            if (dot) { dot.classList.remove('pulse'); void dot.offsetWidth; dot.classList.add('pulse'); }
+        }, Math.max(0, (t - percussion.ctx.currentTime) * 1000));
+    })(time);
+}
+function schedulePercussion() {
+    if (!percussion.playing) return;
+    if (!percussion.ctx || percussion.ctx.state === 'closed') { stopPercussion(); return; }
+    var now = percussion.ctx.currentTime;
+    if (percussion.next < now - 0.25) { percussion.next = now + 0.06; percussion.step = 0; }
+    var secondsPerBeat = 60 / percussion.bpm;
+    var stepsPerBar = Math.max(1, percussion.beatsPerBar);
+    while (percussion.next < now + 0.2) {
+        percussionAt(percussion.next, percussion.step % stepsPerBar, secondsPerBeat);
+        percussion.next += secondsPerBeat; percussion.step++;
+    }
+    percussion.timer = setTimeout(schedulePercussion, 40);
+}
+function startPercussion() {
+    if (percussion.playing) return;
+    var target = percussionTarget();
+    if (!target.bpm) { toast('Add a BPM to this chart before starting the percussion bed.'); return; }
+    if (!percussionCtxReady()) { toast('Audio is unavailable in this browser.'); return; }
+    var ctx = percussion.ctx;
+    percussion.bpm = target.bpm; percussion.beatsPerBar = target.beats || 4;
+    percussion.master = ctx.createGain(); percussion.master.gain.value = percussion.level;
+    var comp = ctx.createDynamicsCompressor(); percussion.master.connect(comp); comp.connect(ctx.destination);
+    percussion.noise = percussionNoiseBuffer(ctx);
+    percussion.next = ctx.currentTime + 0.08; percussion.step = 0; percussion.playing = true;
+    schedulePercussion(); updateWakeLock(); updatePadUI();
+}
+function stopPercussion() {
+    if (!percussion.playing) { updatePadUI(); return; }
+    percussion.playing = false;
+    if (percussion.timer) clearTimeout(percussion.timer);
+    if (percussion.master && percussion.ctx) {
+        try { percussion.master.gain.setTargetAtTime(0.0001, percussion.ctx.currentTime, 0.06); } catch (e) {}
+    }
+    var dot = document.getElementById('percussion-step'); if (dot) dot.classList.remove('pulse');
+    updateWakeLock(); updatePadUI();
+}
+function togglePercussion() { if (percussion.playing) stopPercussion(); else startPercussion(); }
+function setPercussionStyle(style) {
+    if (['gentle', 'pulse', 'build'].indexOf(style) === -1) return;
+    percussion.style = style; percussion.step = 0; savePercussionPrefs(); updatePadUI();
+}
+function setPercussionVolume(value) {
+    percussion.level = Math.max(0, Math.min(1, value)); savePercussionPrefs();
+    if (percussion.playing && percussion.master) percussion.master.gain.setTargetAtTime(percussion.level || 0.0001, percussion.ctx.currentTime, 0.08);
+}
+function syncPercussionToTempoZone(force) {
+    var target = percussionTarget();
+    var changed = !!force;
+    if (percussion.playing && target.bpm && (force || percussion.bpm !== target.bpm || percussion.beatsPerBar !== target.beats)) {
+        percussion.bpm = target.bpm; percussion.beatsPerBar = target.beats || 4; percussion.step = 0;
+        if (percussion.ctx) percussion.next = percussion.ctx.currentTime + 0.06;
+        changed = true;
+    }
+    if (changed) updatePadUI();
+}
+function revivePercussion() {
+    if (!percussion.playing || !percussion.ctx) return;
+    function finish() {
+        if (!percussion.playing || percussion.ctx.state !== 'running') { stopPercussion(); return; }
+        percussion.next = percussion.ctx.currentTime + 0.06; percussion.step = 0;
+        if (percussion.timer) clearTimeout(percussion.timer);
+        schedulePercussion();
+    }
+    if (percussion.ctx.state === 'suspended') {
+        var resumed = percussion.ctx.resume();
+        if (resumed && resumed.then) resumed.then(finish, function() { stopPercussion(); });
+    }
+}
+function stopSoundBed() { stopPad(); stopPercussion(); }
 
 /* ---- medley ---- */
 function renderMedley(mainSong, keyIdx, capo) {
