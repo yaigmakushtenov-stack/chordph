@@ -5,6 +5,7 @@ create table if not exists public.songs (
     artist text,
     "key" text,
     tempo int,
+    timesig text not null default '4/4',
     feel text,
     chart text not null,
     updated_at timestamptz not null default now()

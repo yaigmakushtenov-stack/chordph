@@ -23,7 +23,7 @@ test('dynamic search controls and duplicate Hide buttons have distinct names', (
 });
 
 test('song editor keeps persistent labels after placeholder text disappears', () => {
-  for (const id of ['sh-song-title', 'sh-song-artist', 'sh-song-key', 'sh-song-tempo', 'sh-song-feel', 'sh-song-tags', 'sh-song-chart']) {
+  for (const id of ['sh-song-title', 'sh-song-artist', 'sh-song-key', 'sh-song-tempo', 'sh-song-timesig', 'sh-song-feel', 'sh-song-tags', 'sh-song-chart']) {
     assert.ok(app.includes(`for="${id}"`), `${id} should have a persistent label`);
   }
 });

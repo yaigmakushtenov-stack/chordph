@@ -9,6 +9,7 @@ create table if not exists public.team_songs (
     artist     text,
     key        text,
     tempo      int,
+    timesig    text not null default '4/4',
     feel       text,
     tags       text[],
     chart      text not null,

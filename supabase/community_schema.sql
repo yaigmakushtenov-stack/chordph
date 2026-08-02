@@ -46,6 +46,7 @@ create table if not exists public.submissions (
     artist          text,
     "key"           text,
     tempo           int,
+    timesig         text not null default '4/4',
     feel            text,
     type            text not null default 'chord' check (type in ('chord','tab')),
     instrument      text,          -- for tabs: lead-guitar, rhythm-guitar, bass, keys...
@@ -82,6 +83,7 @@ create table if not exists public.song_versions (
     created_at        timestamptz not null default now(),
     contributor_name  text,
     "key"             text,
+    timesig           text not null default '4/4',
     type              text not null default 'chord' check (type in ('chord','tab')),
     instrument        text,
     reference_url     text,

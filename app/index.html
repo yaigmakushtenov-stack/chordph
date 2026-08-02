@@ -1530,6 +1530,13 @@ function keyOptionsHTML(selected) {
     return '<optgroup label="Major">' + opts('') + '</optgroup>' +
            '<optgroup label="Minor">' + opts('m') + '</optgroup>';
 }
+var TIME_SIGNATURES = ['4/4', '3/4', '6/8', '12/8', '2/4', '5/4', '7/8'];
+function timeSignatureOptionsHTML(selected) {
+    selected = selected || '4/4';
+    var values = TIME_SIGNATURES.slice();
+    if (values.indexOf(selected) === -1) values.push(selected);
+    return values.map(function(ts) { return '<option' + (selected === ts ? ' selected' : '') + '>' + esc(ts) + '</option>'; }).join('');
+}
 function getStepsToReach(fromKey, toKeyNote) {
     var fromIndex = getNoteIndex(keyRoot(fromKey));
     var toIndex = getNoteIndex(keyRoot(toKeyNote));
@@ -2166,6 +2173,7 @@ var pendingSubmitPrefill = null;   // set when "Submit to library" prefills an e
 function openSubmitSheet() {
     closeDrawer();
     var keyOpts = keyOptionsHTML('');
+    var timeOpts = timeSignatureOptionsHTML('4/4');
     var instOpts = TAB_INSTRUMENTS.map(function(i) { return '<option>' + i + '</option>'; }).join('');
     var signedOut = !currentUser;
     openSheet(
@@ -2178,7 +2186,8 @@ function openSubmitSheet() {
         '<input class="field" id="sub-artist" placeholder="Original artist *" autocomplete="off">' +
         '<div class="field-row">' +
         '<select class="field" id="sub-key"><option value="">Key *</option>' + keyOpts + '</select>' +
-        '<input class="field" id="sub-tempo" type="number" placeholder="BPM"></div>' +
+        '<input class="field" id="sub-tempo" type="number" placeholder="BPM">' +
+        '<select class="field" id="sub-timesig" aria-label="Time signature">' + timeOpts + '</select></div>' +
         '<div class="field-row">' +
         '<select class="field" id="sub-type" onchange="onSubTypeChange()"><option value="chord">Chord chart</option><option value="tab">Tab</option></select>' +
         '<select class="field" id="sub-instrument" style="display:none;"><option value="">Instrument *</option>' + instOpts + '</select></div>' +
@@ -2200,6 +2209,7 @@ function openSubmitSheet() {
         document.getElementById('sub-artist').value = p.artist || '';
         if (p.key) document.getElementById('sub-key').value = p.key;
         document.getElementById('sub-tempo').value = p.tempo || '';
+        document.getElementById('sub-timesig').value = p.timesig || '4/4';
         document.getElementById('sub-tags').value = (p.tags || []).join(', ');
         document.getElementById('sub-chart').value = p.chart || '';
     }
@@ -2240,6 +2250,7 @@ function submitChart() {
     var artist = document.getElementById('sub-artist').value.trim();
     var key = document.getElementById('sub-key').value;
     var tempo = parseInt(document.getElementById('sub-tempo').value, 10) || 0;
+    var timesig = document.getElementById('sub-timesig').value || '4/4';
     var type = document.getElementById('sub-type').value;
     var instrument = type === 'tab' ? document.getElementById('sub-instrument').value : '';
     var ref = document.getElementById('sub-ref').value.trim();
@@ -2258,7 +2269,7 @@ function submitChart() {
     // of an existing library song already exists locally (the override), so skip.
     if (!songId) {
         state.customs.push({ id: 'c' + Date.now(), title: title, artist: artist, key: key,
-                             tempo: tempo, feel: '', tags: tags, chart: chart, custom: true });
+                             tempo: tempo, timesig: timesig, feel: '', tags: tags, chart: chart, custom: true });
         save();
         if (state.view === 'songs') renderSongList();
     }
@@ -2271,7 +2282,7 @@ function submitChart() {
     supa.from('submissions').insert({
         submitter_id: currentUser.id, submitter_email: currentUser.email, song_id: songId,
         submitter_name: (state.profile && state.profile.name) || 'Community musician',
-        title: title, artist: artist, key: key, tempo: tempo || null, feel: null, tags: tags,
+        title: title, artist: artist, key: key, tempo: tempo || null, timesig: timesig, feel: null, tags: tags,
         type: type, instrument: instrument || null, reference_url: ref, chart: chart
     }).then(function(res) {
         closeSheet();
@@ -2297,6 +2308,7 @@ function reviewCard(s) {
     var tags = ['<span class="sc-tag">' + esc(s.type === 'tab' ? 'Tab' + (s.instrument ? ' · ' + esc(s.instrument) : '') : 'Chords') + '</span>',
                 '<span class="sc-tag">Key ' + esc(s.key || '?') + '</span>',
                 s.tempo ? '<span class="sc-tag">' + s.tempo + ' BPM</span>' : '',
+                '<span class="sc-tag">' + esc(s.timesig || '4/4') + '</span>',
                 s.song_id ? '<span class="sc-tag">version of ' + esc(s.song_id) + '</span>' : '<span class="sc-tag">new song</span>'].join('');
     return '<div class="sub-card">' +
         '<div class="sc-title">' + esc(s.title) + '</div>' +
@@ -2322,13 +2334,13 @@ async function createApprovedSong(s) {
         if (exists.data) songId = songId + '-' + Date.now().toString(36).slice(-4);
         var ins = await supa.from('songs').insert({
             id: songId, title: s.title, artist: s.artist, key: s.key,
-            tempo: s.tempo || null, feel: s.feel || null, tags: s.tags || [], chart: s.chart
+            tempo: s.tempo || null, timesig: s.timesig || '4/4', feel: s.feel || null, tags: s.tags || [], chart: s.chart
         });
         if (ins.error) throw ins.error;
     }
     var v = await supa.from('song_versions').insert({
         song_id: songId, contributor_name: s.submitter_name || 'Community musician', key: s.key,
-        type: s.type, instrument: s.instrument, reference_url: s.reference_url, chart: s.chart
+        timesig: s.timesig || '4/4', type: s.type, instrument: s.instrument, reference_url: s.reference_url, chart: s.chart
     });
     if (v.error) throw v.error;
     return songId;
@@ -2353,6 +2365,7 @@ async function openEditSubmission(id) {
     if (got.error) { toast('Couldn’t load: ' + got.error.message); return; }
     var s = editingSub = got.data;
     var keyOpts = keyOptionsHTML(s.key);
+    var timeOpts = timeSignatureOptionsHTML(s.timesig || '4/4');
     var instOpts = TAB_INSTRUMENTS.map(function(i) { return '<option' + (s.instrument === i ? ' selected' : '') + '>' + i + '</option>'; }).join('');
     openSheet(
         '<div class="sheet-head"><div class="sheet-title">Edit &amp; approve</div>' +
@@ -2362,7 +2375,8 @@ async function openEditSubmission(id) {
         '<input class="field" id="ed-artist" value="' + esc(s.artist || '') + '" placeholder="Artist">' +
         '<div class="field-row">' +
         '<select class="field" id="ed-key"><option value="">Key *</option>' + keyOpts + '</select>' +
-        '<input class="field" id="ed-tempo" type="number" value="' + (s.tempo || '') + '" placeholder="BPM"></div>' +
+        '<input class="field" id="ed-tempo" type="number" value="' + (s.tempo || '') + '" placeholder="BPM">' +
+        '<select class="field" id="ed-timesig" aria-label="Time signature">' + timeOpts + '</select></div>' +
         '<div class="field-row">' +
         '<select class="field" id="ed-type" onchange="onEdTypeChange()"><option value="chord"' + (s.type === 'chord' ? ' selected' : '') + '>Chord chart</option><option value="tab"' + (s.type === 'tab' ? ' selected' : '') + '>Tab</option></select>' +
         '<select class="field" id="ed-instrument"' + (s.type === 'tab' ? '' : ' style="display:none;"') + '><option value="">Instrument</option>' + instOpts + '</select></div>' +
@@ -2390,6 +2404,7 @@ async function approveWithEdits() {
         artist: document.getElementById('ed-artist').value.trim(),
         key: document.getElementById('ed-key').value,
         tempo: parseInt(document.getElementById('ed-tempo').value, 10) || null,
+        timesig: document.getElementById('ed-timesig').value || '4/4',
         feel: editingSub.feel || null,
         type: type,
         instrument: type === 'tab' ? document.getElementById('ed-instrument').value : null,
@@ -2405,7 +2420,7 @@ async function approveWithEdits() {
         // persist the edited values + comment back onto the submission so the
         // submitter sees the corrected version and what changed
         var up = await supa.from('submissions').update({
-            title: s.title, artist: s.artist, key: s.key, tempo: s.tempo, type: s.type,
+            title: s.title, artist: s.artist, key: s.key, tempo: s.tempo, timesig: s.timesig, type: s.type,
             instrument: s.instrument, tags: s.tags, reference_url: s.reference_url, chart: s.chart,
             status: 'approved', review_note: note || 'Edited by an admin before approval.',
             reviewed_at: new Date().toISOString()
@@ -2505,7 +2520,7 @@ async function openVersionsSheet(songId) {
         '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Close</button></div>', true);
     try {
         var vres = await supa.from('song_versions')
-            .select('id,song_id,created_at,key,type,instrument,reference_url,chart,votes,contributor_name')
+            .select('id,song_id,created_at,key,timesig,type,instrument,reference_url,chart,votes,contributor_name')
             .eq('song_id', songId).order('votes', { ascending: false });
         if (vres.error) throw vres.error;
         var versions = vres.data || [];
@@ -2525,7 +2540,7 @@ async function openVersionsSheet(songId) {
 function versionCard(v, voted) {
     var tag = v.type === 'tab' ? 'Tab' + (v.instrument ? ' · ' + esc(v.instrument) : '') : 'Chords';
     return '<div class="sub-card">' +
-        '<div class="sc-tags"><span class="sc-tag">' + tag + '</span><span class="sc-tag">Key ' + esc(v.key || '?') + '</span>' +
+        '<div class="sc-tags"><span class="sc-tag">' + tag + '</span><span class="sc-tag">Key ' + esc(v.key || '?') + '</span><span class="sc-tag">' + esc(v.timesig || '4/4') + '</span>' +
         (v.contributor_name ? '<span class="sc-tag">' + esc(v.contributor_name) + '</span>' : '') + '</div>' +
         '<pre class="sc-chart">' + esc(v.chart) + '</pre>' +
         '<div class="sc-actions">' +
@@ -2584,7 +2599,7 @@ function migrate() {
         if (oldMus && oldMus.name) state.profile = { name: oldMus.name, instrument: oldMus.instrument || 'Vocalist' };
         state.customs = oldCustoms.filter(function(c) { return !c.deleted; }).map(function(c) {
             return { id: 'c' + c.id, title: c.title, artist: c.artist, key: c.key,
-                     tempo: c.tempo || 0, feel: c.feel || '', chart: c.chart, custom: true };
+                     tempo: c.tempo || 0, timesig: c.timesig || '4/4', feel: c.feel || '', chart: c.chart, custom: true };
         });
         state.favorites = oldFavs.map(idForIndex).filter(Boolean);
         state.setlists = oldSetlists.map(function(sl, n) {
@@ -2624,8 +2639,17 @@ function fetchLibrary() {
     function get(cols) {
         return fetch(SUPABASE_CONFIG.url + '/rest/v1/songs?select=' + cols + '&order=title', { headers: hdr });
     }
-    get('id,title,artist,key,tempo,feel,chart,tags')
-        .then(function(r) { return r.ok ? r.json() : get('id,title,artist,key,tempo,feel,chart').then(function(r2) { return r2.ok ? r2.json() : null; }); })
+    var columnSets = [
+        'id,title,artist,key,tempo,timesig,feel,chart,tags',
+        'id,title,artist,key,tempo,timesig,feel,chart',
+        'id,title,artist,key,tempo,feel,chart,tags',
+        'id,title,artist,key,tempo,feel,chart'
+    ];
+    function tryColumns(index) {
+        if (index >= columnSets.length) return Promise.resolve(null);
+        return get(columnSets[index]).then(function(r) { return r.ok ? r.json() : tryColumns(index + 1); });
+    }
+    tryColumns(0)
         .then(function(rows) {
             if (!rows || !rows.length) return;          // never blank out a good cache
             LIBRARY = rows;
@@ -3063,11 +3087,11 @@ function guessKeyFromChart(chart) {
 }
 /* Build a custom song from an imported file/paste. */
 function songFromImport(text, fallbackTitle) {
-    var title = '', artist = '', key = '', tempo = 0, chart = '';
+    var title = '', artist = '', key = '', tempo = 0, timesig = '4/4', chart = '';
     if (looksLikeChordPro(text)) {
         var p = parseChordPro(text);
         title = p.meta.title; artist = p.meta.artist; key = p.meta.key;
-        tempo = p.meta.tempo; chart = p.chart;
+        tempo = p.meta.tempo; timesig = p.meta.timesig || '4/4'; chart = p.chart;
     } else {
         chart = text.replace(/\r\n?/g, '\n').replace(/^\n+|\n+$/g, '');   // already chords-over-lyrics
     }
@@ -3076,7 +3100,7 @@ function songFromImport(text, fallbackTitle) {
     return { id: 'c' + Date.now() + Math.floor(Math.random() * 10000),
              title: (title || fallbackTitle || 'Untitled').trim(),
              artist: (artist || 'Unknown').trim(),
-             key: key, tempo: tempo || 0, feel: '', tags: [], chart: chart, custom: true };
+             key: key, tempo: tempo || 0, timesig: timesig, feel: '', tags: [], chart: chart, custom: true };
 }
 function openImportSheet() {
     closeDrawer();
@@ -3260,8 +3284,9 @@ async function refreshTeams() {
         await loadMyInvites();
         var s = await supa.from('team_setlists').select('id,team_id,name,data,updated_at,updated_by').order('updated_at', { ascending: false });
         teamSetlists = s.data || [];
-        var sg = await supa.from('team_songs').select('id,team_id,title,artist,key,tempo,feel,tags,chart').order('title');
-        teamSongs = (sg.data || []).map(function(x) { return { id: x.id, team_id: x.team_id, title: x.title, artist: x.artist, key: x.key, tempo: x.tempo || 0, feel: x.feel || '', tags: x.tags || [], chart: x.chart, band: true }; });
+        var sg = await supa.from('team_songs').select('id,team_id,title,artist,key,tempo,timesig,feel,tags,chart').order('title');
+        if (sg.error) sg = await supa.from('team_songs').select('id,team_id,title,artist,key,tempo,feel,tags,chart').order('title');
+        teamSongs = (sg.data || []).map(function(x) { return { id: x.id, team_id: x.team_id, title: x.title, artist: x.artist, key: x.key, tempo: x.tempo || 0, timesig: x.timesig || '4/4', feel: x.feel || '', tags: x.tags || [], chart: x.chart, band: true }; });
         teamsReady = true;
         refreshBandUI();
         if (document.getElementById('view-songs').classList.contains('active')) renderSongList();
@@ -3316,7 +3341,7 @@ function saveTeamSetlistById(id) {
     var ids = ((ts.data && ts.data.songs) || []).map(function(snap) {
         var cid = 'c' + Date.now() + Math.floor(Math.random() * 100000);
         state.customs.push({ id: cid, title: snap.title, artist: snap.artist, key: snap.key, tempo: snap.tempo || 0,
-                             feel: snap.feel || '', tags: snap.tags || [], chart: snap.chart, custom: true });
+                             timesig: snap.timesig || '4/4', feel: snap.feel || '', tags: snap.tags || [], chart: snap.chart, custom: true });
         return cid;
     });
     state.setlists.push({ id: 's' + Date.now(), name: ts.name, songIds: ids });
@@ -3568,8 +3593,10 @@ function openTeamSetlist(ts) {
 /* ---- shared BAND song library (owner manages, everyone browses) ---- */
 async function addSongToBand(song, teamId) {
     if (!supa || !currentUser || !song) return;
-    var r = await supa.from('team_songs').insert({ team_id: teamId, title: song.title, artist: song.artist || null,
-        key: song.key || null, tempo: song.tempo || null, feel: song.feel || null, tags: song.tags || [], chart: song.chart, added_by: currentUser.id });
+    var payload = { team_id: teamId, title: song.title, artist: song.artist || null,
+        key: song.key || null, tempo: song.tempo || null, timesig: song.timesig || '4/4', feel: song.feel || null, tags: song.tags || [], chart: song.chart, added_by: currentUser.id };
+    var r = await supa.from('team_songs').insert(payload);
+    if (r.error && /timesig/i.test(r.error.message || '')) { delete payload.timesig; r = await supa.from('team_songs').insert(payload); }
     if (r.error) { toast('Couldn’t add to band: ' + r.error.message); return; }
     toast('Added “' + song.title + '” to the band library.');
     refreshTeams();
@@ -3630,7 +3657,7 @@ function shareUrl(url, title) {
     copyLink(url);
 }
 function songSnapshot(s) {
-    return { title: s.title, artist: s.artist, key: s.key, tempo: s.tempo || 0, feel: s.feel || '',
+    return { title: s.title, artist: s.artist, key: s.key, tempo: s.tempo || 0, timesig: s.timesig || '4/4', feel: s.feel || '',
              tags: s.tags || [], chart: s.chart, transpose: state.transpose[s.id] || 0, capo: state.capo[s.id] || 0 };
 }
 /* Short links: store the payload in the cloud and put only a short code in the
@@ -3691,7 +3718,7 @@ function checkSharedLink() {
 function registerSharedSong(snap, idx) {
     var id = 'shared-' + (idx == null ? Date.now() : idx);
     sharedSongs[id] = { id: id, title: snap.title, artist: snap.artist, key: snap.key, tempo: snap.tempo || 0,
-                        feel: snap.feel || '', tags: snap.tags || [], chart: snap.chart, shared: true };
+                        timesig: snap.timesig || '4/4', feel: snap.feel || '', tags: snap.tags || [], chart: snap.chart, shared: true };
     if (snap.transpose) state.transpose[id] = snap.transpose;   // open in the sharer's key
     if (snap.capo) state.capo[id] = snap.capo;
     return id;
@@ -3736,7 +3763,7 @@ function cloneSharedToCustom(id) {
     var s = sharedSongs[id]; if (!s) return null;
     var cid = 'c' + Date.now() + Math.floor(Math.random() * 1000);
     state.customs.push({ id: cid, title: s.title, artist: s.artist, key: s.key, tempo: s.tempo || 0,
-                         feel: s.feel || '', tags: s.tags || [], chart: s.chart, custom: true });
+                         timesig: s.timesig || '4/4', feel: s.feel || '', tags: s.tags || [], chart: s.chart, custom: true });
     if (state.transpose[id]) state.transpose[cid] = state.transpose[id];
     if (state.capo[id]) state.capo[cid] = state.capo[id];
     return cid;
@@ -3842,6 +3869,7 @@ function renderChart() {
     var minorKey = isMinorKey(song.key);
     var meta = esc(song.artist) + ' &middot; Key of <span class="key" onclick="toggleLayer(\'transpose\')">' + esc(keyLabel(keyIdx, minorKey)) + '</span>';
     if (song.tempo) meta += ' &middot; ' + song.tempo + ' BPM';
+    meta += ' &middot; ' + esc(song.timesig || '4/4');
     if (capo > 0) meta += ' &middot; <span class="key" onclick="toggleLayer(\'capo\')">Capo ' + capo +
         ' &rarr; ' + esc(noteName(fingeredKeyIdx)) + ' shapes</span>';
     document.getElementById('chart-meta').innerHTML = meta;
@@ -5562,6 +5590,7 @@ function openSongSheet(songId) {
     editingSongId = song ? song.id : null;
     var hasOverride = isLib && state.overrides && state.overrides[song.id];
     var keyOpts = keyOptionsHTML(song ? song.key : '');
+    var timeOpts = timeSignatureOptionsHTML(song && song.timesig || '4/4');
     var feels = ['Slow Worship', 'Moderate Worship', 'Upbeat Praise', 'Hymn', 'Contemporary'].map(function(f) {
         return '<option' + (song && song.feel === f ? ' selected' : '') + '>' + f + '</option>';
     }).join('');
@@ -5594,6 +5623,7 @@ function openSongSheet(songId) {
         '<div class="field-row">' +
         '<div class="field-group"><label class="field-label" for="sh-song-key">Original key *</label><select class="field" id="sh-song-key"><option value="">Choose key</option>' + keyOpts + '</select></div>' +
         '<div class="field-group"><label class="field-label" for="sh-song-tempo">Tempo (BPM)</label><input class="field" id="sh-song-tempo" type="number" min="20" max="300" inputmode="numeric" placeholder="e.g. 72" value="' + (song && song.tempo ? song.tempo : '') + '"></div>' +
+        '<div class="field-group"><label class="field-label" for="sh-song-timesig">Time signature</label><select class="field" id="sh-song-timesig">' + timeOpts + '</select></div>' +
         '</div>' +
         '<label class="field-label" for="sh-song-feel">Song feel</label><select class="field" id="sh-song-feel"><option value="">Choose feel (optional)</option>' + feels + '</select>' +
         '<label class="field-label" for="sh-song-tags">Tags</label>' +
@@ -5646,6 +5676,7 @@ function readSongForm() {
         artist: document.getElementById('sh-song-artist').value.trim(),
         key: document.getElementById('sh-song-key').value,
         tempo: parseInt(document.getElementById('sh-song-tempo').value, 10) || 0,
+        timesig: document.getElementById('sh-song-timesig').value || '4/4',
         feel: document.getElementById('sh-song-feel').value,
         tags: parseTags(document.getElementById('sh-song-tags').value),
         chart: document.getElementById('sh-song-chart').value.trim()
@@ -5706,7 +5737,7 @@ function saveSong() {
     } else if (editingSongId) {
         var song = songById(editingSongId);
         song.title = f.title; song.artist = f.artist; song.key = f.key;
-        song.tempo = f.tempo; song.feel = f.feel; song.tags = f.tags; song.chart = f.chart;
+        song.tempo = f.tempo; song.timesig = f.timesig; song.feel = f.feel; song.tags = f.tags; song.chart = f.chart;
     } else {
         state.customs.push(Object.assign({ id: 'c' + Date.now(), custom: true }, f));
     }
@@ -5722,7 +5753,7 @@ function resyncSong(id) {
 function submitEditToLibrary() {
     var f = readSongForm();
     if (!f.title || !f.chart) { var e = document.getElementById('sh-song-err'); e.textContent = 'Add a title and chart first.'; e.style.display = 'block'; return; }
-    pendingSubmitPrefill = { title: f.title, artist: f.artist, key: f.key, tempo: f.tempo, tags: f.tags, chart: f.chart, song_id: editingSongId };
+    pendingSubmitPrefill = { title: f.title, artist: f.artist, key: f.key, tempo: f.tempo, timesig: f.timesig, tags: f.tags, chart: f.chart, song_id: editingSongId };
     openSubmitSheet();
 }
 function deleteSong() {

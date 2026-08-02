@@ -26,11 +26,11 @@ ambient percussion beds.
 - ⚠️ Must stay isolated from the analyzer's Essentia/MTG models, which are
   **CC BY-NC-SA (non-commercial)** and cannot sit behind a paywall.
 
-### 2. Per-chart time signature
-The engine already reads `song.timesig` and the metronome already supports any
-signature — remaining: a `timesig` column on `songs` + `submissions`, the field
-on the add/submit forms, and showing it on the chart. Makes the drummer's Click
-correct for 3/4 and 6/8 songs.
+### 2. Per-chart time signature — ✅ DONE
+The editor, submission/review flow, imports, shared and team libraries now keep
+each chart's time signature. It is shown beside the chart metadata and drives
+the Click automatically (including medley tempo zones). Existing charts default
+to 4/4; run `supabase/time_signature_v2.sql` before deploying this app version.
 
 ### 3. Stage / performance mode
 - ✅ **DONE** — a Stage button on the chart hides all chrome and scales the text
