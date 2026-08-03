@@ -1,358 +1,313 @@
-# Chord.ph — roadmap & parked work
+# Chord.ph active roadmap
 
-Everything discussed but not yet built. Kept here so nothing gets lost.
-Last updated: 2026-08-02.
+This roadmap is ordered by delivery sequence, not by feature category. The
+immediate objective is to make V2 genuinely useful as a rehearsal tool within the
+next few days, put it in the owner's hands, and use real practice sessions to
+decide what deserves deeper investment.
 
-The implementation boundary for ministries, subscriptions, private practice-track storage, and MP3-to-chart is now documented in `docs/v2-product-architecture.md`; the staging-only schema is `supabase/product_foundation_v2.sql`.
+Completed work belongs in `docs/completed/shipped-roadmap.md`. Technical
+boundaries for ministries, subscriptions, private practice tracks and
+audio-to-chart are in `docs/v2-product-architecture.md`.
 
----
-
-## Next up (committed)
-
-### 1. Ambient pads & ambient percussion 🎹
-Sustained atmospheric pads in the song's key that play under a set — the thing
-worship teams currently pay Pad / Loop Community / Sunday Sounds for — plus
-ambient percussion beds.
-
-- ✅ **Synthesised pad — DONE & live** (Web Audio, follows the song's key,
-  plays across the whole app, floating stop chip). Free for now to validate;
-  becomes the anchor paid feature once payments exist.
-- ✅ **Ambient percussion beds — DONE** — three generated Web Audio grooves
-  (Gentle, Pulse and Build) with independent volume, persistent playback, and
-  automatic BPM/time-signature changes through medleys. No recorded or
-  third-party samples are bundled.
-- ⏳ **Sampled pads** for premium quality — later; needs licensed or
-  self-produced audio, tens of MB of assets.
-- ⏳ Optional: make the pad follow each medley section's key while scrolling
-  (today it follows the open song).
-- ⚠️ Must stay isolated from the analyzer's Essentia/MTG models, which are
-  **CC BY-NC-SA (non-commercial)** and cannot sit behind a paywall.
-
-### 2. Per-chart time signature — ✅ DONE
-The editor, submission/review flow, imports, shared and team libraries now keep
-each chart's time signature. It is shown beside the chart metadata and drives
-the Click automatically (including medley tempo zones). Existing charts default
-to 4/4; run `supabase/time_signature_v2.sql` before deploying this app version.
-
-### 3. Stage / performance mode
-- ✅ **DONE** — a Stage button on the chart hides all chrome and scales the text
-  up ~1.6x; floating exit; keeps screen awake; swipe still changes songs.
-- ⏳ Still to do: **band-follows-leader** sync across devices (ties into live band
-  sync). A key OnSong differentiator.
-
-### 4. Team / band sync — ✅ FULL SUITE DONE & live
-- ✅ v1 + v2 — create band, invite (accept/decline), roster, publish setlists.
-- ✅ **Live setlist updates** (Supabase realtime — `realtime.sql`).
-- ✅ **Shared band song library** (`team_library.sql`).
-- ✅ **Member editing rights** (`team_editing.sql` — admin grants editors).
-- ✅ **Multi-band switcher** (focus one band's setlists + library).
-- SQL to run: teams.sql, teams_v2.sql, realtime.sql, team_library.sql,
-  team_editing.sql.
-- ⏳ Later ideas: band-follows-leader stage sync; in-place editing of a band
-  song's chart (today band songs are read-only in the chart; add/remove via the
-  library manager).
-- Monetisation: free personal sync + **paid team sync** (Pro) is the paywall.
+Last reorganized: 2026-08-03.
 
 ---
 
-## Competitor gaps (from the Ultimate Guitar / OnSong comparison)
+## Sprint 0 - private-beta access gate
 
-| Gap | Status |
-|---|---|
-| ChordPro / text import | ✅ **Done** |
-| PDF import | Parked — needs pdf.js (~1 MB) + fragile layout extraction |
-| Stage mode | Parked (see above) |
-| Team libraries | Parked (see above) |
-| Catalogue size | Ongoing — the real moat; why submissions matter |
-| Annotations (highlight / notes on a chart) | Parked |
-| Bluetooth foot-pedal page turns (AirTurn) | Parked |
-| Print / export to PDF | Parked |
-| Per-performance arrangement editor (reorder sections) | Parked |
+Complete before publishing additional V2 work to `chord.ph`:
 
-**We already beat them on:** on-device key & BPM analyzer, first-class Nashville
-numbers, and the Filipino worship focus.
+- Add account-bound beta invitations in Supabase with hashed codes, optional
+  email binding, expiry, usage limits and revocation.
+- Give platform admins an owner recovery bypass that cannot be removed through the
+  ordinary invitation screen.
+- Build a phone-friendly Invitations screen with Generate, Copy, Share, Revoke and
+  active-tester status.
+- Put the entire production domain behind a server-enforced gate. A client-only
+  overlay is not sufficient because static assets and Supabase endpoints could be
+  requested directly.
+- Protect existing Supabase reads/writes with the same beta entitlement only after
+  the gate UI and owner recovery path have been tested.
+- Rotate the PWA cache, stop unauthorized app-shell caching and add `noindex` while
+  the private beta is active.
+- Test owner sign-in and recovery in a fresh browser before enabling the final
+  production-domain lock.
 
----
+The invitation foundation may be deployed additively before enforcement. Never
+turn on enforcement until the owner has successfully entered through the new gate.
 
-## Platform & distribution
+## The near-term product outcome
 
-- **Installers (parked, user requested July 27):**
-  - **PC .exe installer** — wrap the PWA in a desktop shell (e.g. Tauri or
-    Electron/PWABuilder) to produce a Windows `.exe`.
-  - **Android .apk installer** — **PWABuilder** wraps the existing PWA into a
-    signed APK/AAB (one-time $25 Play fee). No rewrite needed.
-  - **iPhone iOS installer** — needs a **$99/yr Apple Developer account** + a
-    Mac; Apple scrutinises thin web wrappers.
-  - Free today without any of the above: **Add to Home Screen** runs it
-    standalone and kills the browser's back-swipe gesture.
+A musician should be able to:
 
----
+1. Open the team's lineup or a personal setlist.
+2. Open the correct chart and reference recording.
+3. Attach a personal local audio file when precise practice tools are needed.
+4. Transpose, use Nashville, change instrument view or edit the chart without
+   interrupting native practice playback.
+5. Scrub accurately, slow the recording, shift its key, loop a difficult passage
+   and use a count-in.
+6. Link an audio position to a chart section and leave a rehearsal note.
+7. Return later without losing the useful practice state.
+8. Tell the director whether the assigned material is ready or needs help.
 
-## Cloud / accounts
+Anything that does not materially support this journey is deferred until the
+practice preview is being tested.
 
-- **Email notifications to submitters** — needs custom SMTP so mail comes from
-  `noreply@chord.ph` (Resend + domain verification). Template already written:
-  `supabase/email-magic-link.html`. In-app notifications ship already.
-- **Google sign-in** — after email sign-in is proven.
-- **Admin: re-tag library songs in-app** — today tags are set at submission or
-  via the Supabase table editor.
-- ✅ **Delete tombstones — DONE** (`state.deleted`), so deleting a setlist/song
-  syncs the delete instead of the union-merge resurrecting it.
+## Sprint A - stabilize and publish the owner-only practice preview
 
----
+Do these first because new practice features are not useful if the chart or
+player behaves unpredictably.
 
-## Monetisation — three tiers (decided Jul 27)
+- Fix Lyrics-only recognition for the reported `Sa atin na tunay` line in
+  `Pusong Basag`, then add a regression case for chord-like lyric text.
+- Verify native audio is never restarted by transpose, Nashville, Lyrics,
+  instrument diagrams, text sizing, editor actions or ordinary app navigation.
+- Test Spotify/YouTube behavior separately and show honest provider limitations;
+  do not make the chart lifecycle recreate an embed unnecessarily.
+- Verify tab/background behavior. Preserve native audio where the browser permits
+  it; do not promise uninterrupted third-party embedded playback when the
+  provider/browser suspends it.
+- Make Stage mode collapse Listen & Learn and all configuration panels on entry.
+  Keep only performance-critical controls and the compact Now Playing strip.
+- Remove the redundant Scroll entry from the function dock. Keep any useful
+  chart-integrated autoscroll/speed control in the chart workspace.
+- Test Google login and browser/hardware Back on a real Android device, including
+  the previous return-to-Google-account-picker bug.
+- Review the mobile action toolbar and tag row on real phones. Preserve the useful
+  partial-item discovery cue, but add an edge fade or brief first-use motion and
+  accessible helper text where the row still looks accidentally clipped.
+- Regression-test the already-live Auto-find Spotify/YouTube feature against
+  difficult titles, alternate versions and sparse artist data. Suggestions must
+  remain reviewable and must never silently update the public library.
+- Run the existing song, library, setlist, medley, offline/PWA and synchronization
+  regression tests after the fixes.
+- Publish `v2-stabilization` immediately afterward to an isolated owner-only
+  preview URL. Production cloud writes remain disabled until explicitly approved.
+- Test the current practice journey on real Android and desktop devices, including
+  offline installation, refresh/update behavior and storage recovery.
+- Record preview issues as specific bugs and fix release blockers without taking
+  the preview away from the owner.
 
-Prices are placeholders (localised PH pricing TBD). Payment infra (Stripe /
-local gateway) still to build.
+### Sprint A exit check
 
-### FREE — "Musician" (solo essentials — generous on purpose)
-Library + search + tags; transpose, capo shapes, Nashville numbers, chord
-diagrams; personal setlists + medleys; autoscroll + floating button; premium
-metronome; stage mode; light/dark/colour-blind themes + font sizes; offline PWA;
-**personal** cloud sync (your own devices); submit charts + voting; **Key & BPM
-Analyzer** (MUST stay free — CC BY-NC-SA models can't be paywalled); Spotify link
-(preview); share links; notifications.
+A ten-minute practice session on the live preview must survive repeated chart
+controls, app navigation, phone locking/backgrounding where supported, and
+returning to the song without losing the local track, position, loop, speed or
+pitch setting.
 
-### PRO — "Worship Team" (~₱99–149/mo or annual) — the band + practice tier
-Everything in Free, plus: **band/team sync** (live setlists, shared band song
-library, member editing, multi-band switcher); **ambient pads** + percussion
-beds; **audio practice player** — import your own MP3 + **A/B repeat** + speed
-control (see Spotify note); **private team practice-track storage** — a music
-director uploads an MP3 once and assigns it to the team/setlist; keep-awake;
-band roles. Cloud audio must have per-ministry storage quotas because its
-subscription revenue pays for storage, bandwidth, backups and retention. This
-is the paid-team-sync and rehearsal anchor.
-
-### PREMIUM — "Studio / Pro" (~₱249–349/mo) — heavy AI + audio
-Everything in Pro, plus: **chord & lyric detection from audio** (needs
-commercially-licensed models — NOT the NC analyzer); **Spotify full playback +
-control** (Web Playback SDK, needs Spotify Premium + OAuth); batch analysis + CSV
-export; ID3 tag writing; energy rating; harmonic set planner.
-
-**Constraints:** analyzer + its models stay FREE (non-commercial licence);
-Premium chord-detection needs a *different*, commercially-licensed model.
-
-### Spotify vs MP3 practice player (decided Jul 27)
-The Spotify embed can't do full playback or A/B repeat on mobile (no seek/loop
-control, can't use the app's Premium session). The clean answer is the user's
-idea: an **`<audio>` player that plays the user's own MP3** (local import or a
-URL) with **A/B loop markers + speed control** — full control, no licensing/SDK
-needed (user supplies audio they own; we never host/distribute it). Ship this as
-the real "learn a section" tool (Pro). Keep Spotify link as a convenience only;
-its full-playback/SDK path stays a later Premium extra.
-
-### Practice workspace — product direction (agreed Aug 2)
-
-The chart remains the main screen. “Separate playback from chart rendering” is
-an internal component boundary, not a separate page: musicians still read the
-chart while listening. Chart actions must never destroy or restart the player.
-The expanded practice controls live inside the chart and can collapse to a
-compact **Now playing** strip that keeps playback, elapsed time and play/pause
-available without covering the music.
+## Sprint B - complete the personal rehearsal loop
 
 Build in this order:
 
-1. ✅ **Persistent player — DONE** for native practice audio — survives chart controls, editor and
-   app navigation; the compact strip exposes play/pause, elapsed time and a
-   return path. Each song restores its last position, loop and speed locally.
-2. ✅ **Waveform — DONE** — decoded from the attached audio, keyboard/touch
-   scrubbing, played progress, highlighted loop range and visible A/B markers.
-3. ✅ **Named loops — DONE** — save, label, recall and remove multiple A/B
-   rehearsal ranges per song on the current device.
-4. ✅ **Speed control without changing pitch — DONE** for the native practice
-   player (0.5×, 0.75×, 1× and 1.25× with browser pitch preservation enabled).
-5. ✅ **Optional pitch/key shifting without changing speed — DONE** for native practice
-   audio — shift down or up by six semitones, restore per song, and return to
-   the unprocessed original without changing the chart or playback rate.
-6. ✅ **Count-in before a loop restarts — DONE** — an optional one-bar click
-   count follows the song's time signature and the practice speed, then resumes
-   precisely at A; the preference restores per song.
-7. **Chart-section bookmarks linked to audio positions**.
-8. **Personal rehearsal notes and chart annotations**.
-9. **Offline-downloadable setlist practice packs**, with explicit device-storage
-   usage and removal controls.
-10. **Team practice assignments**, such as “Learn Bridge by Friday”.
-11. **Practice history** showing difficult or repeatedly looped sections.
-12. **Foot-pedal/MIDI controls** for playback, loop markers and chart navigation.
+1. **Chart-section bookmarks linked to audio positions.** A musician can save the
+   current playback time against Verse, Chorus, Bridge or a custom section, then
+   jump in either direction between the chart and audio.
+2. **Personal rehearsal notes and lightweight annotations.** Start with text notes
+   attached to a song or section. Defer freehand drawing and complex markup until
+   real usage proves it is needed.
+3. **Expanded editor workspace.** Make the chart body near-full-screen and allow
+   title, artist, key, BPM and feel to collapse after initial setup.
+4. **Keyboard chord diagrams.** When Keyboard is selected, show an original
+   keyboard voicing visualization rather than the guitar diagram. Do not copy
+   Ultimate Guitar artwork or reproduce its screen design.
+5. **Practice-state restoration audit.** Confirm bookmarks, notes, named loops,
+   count-in, speed, pitch and last position restore predictably per song.
 
-**Required V2 live-preview gate:** before production deployment, publish the
-`v2-stabilization` branch to an isolated Vercel preview URL with production cloud
-writes disabled. The owner tests Google login/back gestures, practice audio,
-mobile/desktop layout, offline installation and the core song/setlist workflow on
-real devices. Record any release-blocking bugs, fix and retest them, then make a
-separate explicit production go/no-go decision. Do not silently promote the preview.
+Provider links remain convenient reference recordings. Accurate waveform,
+scrubbing, looping, speed and pitch processing use a personal file stored on the
+device. The product must never instruct members to find or download an MP3.
 
-**Team cloud workflow (paid):** a music director uploads a legally obtained
-practice MP3 to a private ministry/team library, attaches it to a song or
-setlist, optionally adds named loops/bookmarks and assigns it to members. Team
-members stream it with short-lived authorization or download an encrypted/offline
-practice copy where supported. Access ends when membership is removed. The plan
-needs storage and monthly transfer allowances, visible usage meters, automatic
-orphan cleanup, retention controls and an upgrade path instead of unlimited
-storage. Raw audio is never public and never embedded in shared chart JSON.
+### Sprint B exit check
 
-Spotify and YouTube remain useful reference sources, but provider/browser rules
-make them less dependable for background playback and precise looping. The
-native local or private-cloud practice track is the reliable rehearsal source.
+The owner can rehearse one complete Sunday lineup using Chord.ph as the primary
+practice screen without needing a separate notes app or repeatedly finding the
+same sections in the recording.
 
----
+## Sprint C - add the smallest useful team-practice layer to the preview
 
-## Queued next (agreed July 28)
+Use the already-shipped team, setlist and notification foundations. Avoid building
+the full Ministry Hub before the rehearsal loop is validated.
 
-- ✅ **Stage-view floating controls — DONE** (☰ toggle above the speed dial reveals
-  a vertical Transpose/Numbers/Chords/Lyrics/Text column; Numbers/Chords/Lyrics
-  toggle+highlight, Transpose/Text slide options out horizontally; lyrics shift).
-- ✅ **Landing nav restructure — DONE** (full menu = footer set; Open app + Hi/Login
-  folded in; standalone button removed).
-- **Payments / tiers — architecture (decided)**: **ONE app, not three.** Tier is a
-  property of the account (a `subscription_tier` col / `subscriptions` table in
-  Supabase); the app reads it and unlocks features. Sell upgrades **on the web**
-  (chord.ph) via a **PH-friendly gateway (PayMongo → GCash/Maya/cards)** to avoid
-  Google Play's 15–30% cut and serve local payment methods; the account carries the
-  tier into the web app AND the APK. Publish the **APK to Play Store for reach**,
-  but keep upgrades web-based (mind Play's billing/anti-steering policy — if we ever
-  sell inside the Android app we'd need Google Play Billing). Do this LATER — user
-  prefers building AI key-detection + AI chord-chart first.
-- **Community credits — earning ideas** (user, Jul 28) — earn credits → redeem for
-  free Pro time, to grow an active contributing community. Earn by: submitting an
-  approved chart/tab; **adding a verified reference link (YouTube/Spotify) to a
-  song**; your version getting upvotes (ongoing); fixing/improving an approved
-  chart; correct tagging; referrals (invite a musician who joins); optional light
-  streak/engagement bonus. Anti-abuse: credits only from **approved/vote-gated**
-  contributions, daily caps, quality thresholds. Needs a credits ledger + redemption
-  rule (e.g. X credits = 1 month Pro).
+- Treat a published team setlist as the upcoming lineup.
+- Show chart readiness and whether each song has a Spotify/YouTube reference.
+- Allow the director to assign a song or named section to a member with an
+  optional due date.
+- Give members four clear states: Not started, Practicing, Ready and Need help.
+- Show the director a compact readiness summary for the lineup.
+- Send focused in-app notifications for an assignment, changed arrangement,
+  mention or approaching due date.
+- Improve musician onboarding only as much as assignments require: display name,
+  primary instrument/role and optional secondary instruments or vocal part.
+- Keep discussion attached to a song, section or assignment. Do not build an
+  unrestricted general-purpose chat system in this sprint.
 
-## AI features — architecture + candidates (starting July 28)
+### Sprint C exit check
 
-**How AI works in this app:** the app is a static PWA + Supabase. AI features run
-through **Supabase Edge Functions** (serverless) that hold the API keys server-side
-and call external services; the app just calls the Edge Function (works for web +
-APK). User must provision keys / deploy functions. Costs vary by service.
-
-Candidate features (rough feasibility):
-- **Auto-find Spotify / YouTube links** (user, Jul 28) — when a song has no link,
-  search by title + artist and fill them in. EASIEST + free: YouTube Data API +
-  Spotify Web API search (free quotas) via an Edge Function; optional LLM to pick
-  the best match. Good first AI feature (validates the pipeline). ⚠️ don't
-  auto-write to the shared library without review — fill for the user, or gate
-  cloud links behind admin approval.
-- **AI chord-chart builder** — two very different things: (a) **messy text → clean
-  chart** (LLM formats pasted lyrics/chords into sections + chord-over-lyric) =
-  achievable via LLM Edge Function; (b) **audio → chords** (detect chords from an
-  MP3) = HARD, needs a chord-recognition model / paid service (Klang.io, Music.ai,
-  etc.) — the real "self-building chart from audio". Clarify which.
-- **AI key/BPM** — the analyzer already does on-device key+BPM (free, Essentia).
-  "AI key detection" could mean surfacing it inside the chord app, or a metadata
-  lookup from a link. Cheap if metadata; already solved if on-device.
-- **AI chord + lyric mapping from audio** (Premium) — the full audio→chart+lyrics
-  pipeline; heaviest, paid model, later.
-
-## Parked features (soon)
-
-- **Android file picker opens a chooser, not Files** (user, Jul 28) — on Android,
-  the analyzer + MP3-player file inputs show an intent chooser (voice recorder /
-  photos). This is Android's OS picker driven by the `accept` MIME type; a web
-  page can't force "Files only". Investigate: extension-only `accept`, or a custom
-  "how to pick" hint. For now users tap Files/Browse in the chooser.
-- **Analyzer: listen history + per-item clear** (user, Jul 28) — the Key & BPM
-  Analyzer keeps a history of analysed songs; let users clear ONE entry or all
-  (not just clear-all). Lives in the /analyzer app ([[key-bpm-detector-app]]).
-- **AI chord + lyric mapping from uploaded audio** (user, Jul 28) — Premium:
-  upload an MP3 → AI detects song structure + maps chords & lyrics automatically
-  (audio→chart). Heavy ML; needs a commercially-licensed model (NOT the NC
-  analyzer). Sits with Premium chord-detection.
-- **AI note/tab transcriber** (user, Jul 28) — real-time transcription mapping,
-  incl. guitar tab, AI-powered. A big adjacent product; possibly its own app.
-- **Geo-based pricing** (user, Jul 28) — different price per country for a
-  worldwide launch (Stripe/local gateways support region pricing + PPP tiers).
-- **Translation / i18n** (user, Jul 28) — multi-language UI (start with the PH
-  languages + English). Needs a string-extraction pass + locale files.
-- **About Us** section on the landing page (user, Jul 28) — pair with legal +
-  social links.
-- **Ads — LANDING PAGE ONLY** (user, Jul 28, DECIDED) — the user is open to ads
-  on the **landing page only**; the **app stays 100% ad-free** (no ads in the
-  chart/library/stage — ever). Revenue mainly from the Pro/Premium tiers; landing
-  ads are a secondary lane. Implement later with the payments/marketing round.
-- **Contribution credits → free Pro** (user, Jul 28) — reward users who submit
-  high-quality tabs/charts (via the existing thumbs-up voting): earn credits/points
-  that unlock Pro-tier time for free. Gamifies the community library; needs a
-  credits ledger + a rule for "high quality" (votes/approvals) + redemption.
-- **Landing → social / marketplace (big vision)** (user, Jul 28) — the landing
-  page evolves into a social surface: users post performances/videos; later a
-  marketplace for second-hand instruments and new pro audio gear. Major separate
-  build (feeds, uploads, listings, payments/escrow, moderation). Park as a
-  long-term direction, not near-term.
-- **Legal & disclaimers** (user, Jul 27) — a legal/disclaimer section on the
-  landing page footer AND a small disclaimer under the chord chart (e.g. chords
-  are user-submitted, fair-use for worship/practice, not official transcriptions).
-- **Social media links** (user, Jul 27, soon) — social icons/links (FB, IG, etc.)
-  on the landing page (footer) and possibly in-app.
-- **Personalised / account-synced landing page** (user, Jul 27) — the landing page
-  becomes a signed-in surface tied to the account: greet by name (basic version
-  already live — reads the app's cached Supabase session from localStorage), and
-  later a real logged-in home (their bands, recent setlists, quick "continue"),
-  fully synced with the app. Details TBD; think of it as a lightweight dashboard.
-- **Facebook (and more) sign-in** (user, Jul 27) — add Facebook as an OAuth
-  provider alongside Google (Supabase supports it; needs a Facebook app + config).
-- **Reference "learn the song" links** (user, Jul 27) — per-song YouTube (and
-  other) reference links shown on the chart page (near the Spotify player). Note:
-  `song_versions.reference_url` already exists from the submission flow; surface it
-  on the chart + let users add one.
-- **Spotify — full playback + A/B repeat** (user, Jul 27) — play the WHOLE song
-  in-app and loop a section (A/B markers) so learners don't drag the scrubber.
-  ⚠️ NOT possible with the current embed iframe (no seek/loop control); needs the
-  **Spotify Web Playback SDK + Premium + OAuth**. Premium feature.
-- **Spotify link review/approval** (user, Jul 27) — adding a link works locally
-  now; to attach it to the *global* library song it should go through super-admin
-  review (like the edit-submit flow). Store proposed links on `submissions`.
-- **Spotify per-medley switching** (user, Jul 27) — when a chart medleys song A→B,
-  switch the player to B's track as you scroll in. Needs the SDK (auto-play/seek);
-  today the chart shows the host song's link only.
-- ✅ **Clean-up / de-dupe local library — DONE** (Settings → Backup → "Clean up
-  duplicates"; remaps custom dups onto library/first-custom, rewrites refs).
-- **Android APK** (user, Jul 27, HIGH — most PH musicians are Android) — package
-  via PWABuilder. ✅ **In-app back button handling DONE** (history.pushState +
-  popstate: back navigates views / closes overlays; root = press-back-twice to
-  exit). ✅ **Post-Google-login Back isolation DONE** — the OAuth callback is
-  cleaned and guarded after Supabase finishes sign-in, while drawer/chart gestures
-  avoid the browser-owned screen edge. ⏳ still to do: build/sign the actual APK;
-  confirm hardware-back exit on a real device.
-- **Nashville number trainer** — a practice/learn mode for the number system.
-- **Chord detection from audio** — premium; heavy ML (audio → chords).
-- ✅ **Premium metronome redesign — DONE** (tempo dial, Italian tempo name, ring
-  pulse per beat, beat pips that follow the time signature, gradient Start/Stop).
-- ✅ **Notification center — DONE** (drawer item + badge; list of pending invites,
-  shared band setlists, reviewed submissions; red gear/hamburger dot). ⏳ optional
-  EMAIL notifications still need custom SMTP (Resend).
-- ✅ **Edit song from the setlist view** — DONE. Personal local override
-  (`state.overrides`), "Reset to original", and "Submit to library" (prefills the
-  Submit sheet, linked by `song_id`, for review — no duplicate custom).
-- ✅ **Connect to Spotify (link play) — DONE** — paste a Spotify link per song →
-  embedded player (no API/OAuth; uses the listener's own Spotify). ⏳ Still parked:
-  **auto-detect** the practised song + in-app control (needs Premium + Web
-  Playback SDK + OAuth).
-- **Floating play/scroll button** — ✅ **DONE** (round autoscroll FAB on the chart).
-- **Tap-tempo / BPM-linked auto-scroll** — scroll speed derived from the song's
-  BPM (needs a words-per-beat calibration; BPM alone doesn't map to scroll rate).
-- ✅ **Band invites v2** — DONE. Accept/decline instead of auto-join; roster
-  (members + pending) under each band; admin remove-member / cancel-invite;
-  duplicate-invite guard. Setlists already group per band ("Band setlists").
-  Needs `supabase/teams_v2.sql` run once (invitee reads band name pre-join).
-- ✅ **Settings categories — DONE** (collapsible Profile / Appearance / Account /
-  Band / Backup sections).
-
-## Appearance settings (parked)
-
-A UI/appearance settings panel: **light / dark / auto theme**, **font family**
-choice, base **text size**, maybe accent colour. The app is dark-only today and
-text size is per-chart (A−/A+); this would make it app-wide and user-chosen.
+A director can publish Sunday's lineup, attach reference links, assign the Bridge
+to a musician and see whether the musician is Ready or Needs help.
 
 ---
 
-## Smaller open questions
+## After the practice preview - deepen rehearsal value
 
-- **Capo scoping** — transpose is now per-setlist (library opens reset). Capo is
-  still global per song. Decide whether capo should match.
-- **Spotify Connect** — listen while practising. Needs Premium + OAuth; a
-  YouTube embed is the cheaper first step.
+Order these using evidence from the owner's preview sessions:
+
+1. Offline-downloadable setlist practice packs with visible device-storage use
+   and removal controls.
+2. Practice history showing repeatedly looped or difficult sections.
+3. Foot-pedal/MIDI controls for playback, loop markers and chart navigation.
+4. Per-performance arrangement editor for reordering or omitting sections.
+5. Better medley building: explicit song order and transition points, per-song
+   key, tempo/time-signature zones, rehearsal navigation and stage transitions.
+6. Decide whether capo should be scoped per setlist/performance like transpose.
+7. Print and PDF export.
+8. PDF import, with clear warnings about imperfect layout extraction.
+9. BPM-linked autoscroll using arrangement calibration rather than BPM alone.
+10. Band-follows-leader stage synchronization across devices.
+
+## Full Team Hub and ministry workspace
+
+Build after the small assignment/readiness layer proves valuable:
+
+- Ministry home with the next service, lineup readiness and recent changes.
+- Multiple teams under one ministry, with distinct owner, admin, editor and member
+  permissions.
+- Roster-aware assignments, availability and director views of incomplete work.
+- Shared arrangement notes, acknowledgements and focused comments/mentions.
+- Improved musician profiles: primary role, secondary instruments, vocal
+  range/part and availability.
+- Optional in-app recording of the band's own rehearsal take.
+- Authorized team audio with short-lived access, quotas, usage meters, retention,
+  deletion, orphan cleanup and membership revocation.
+- In-place team-library chart editing with permission checks and history.
+- Band-follows-leader performance controls.
+
+Subscription direction: one ministry/team subscription pays for administration,
+storage and paid capabilities. Invited members can view the hub, lineup, tasks and
+reference links without each purchasing Premium. Individual Pro remains optional.
+
+## Library, catalogue and community
+
+- Continue human musical review for suspected public-library duplicates. Keep
+  automatic deduplication limited to each user's local library.
+- Grow and curate the catalogue; library quality remains a core moat.
+- Admin tools for retagging public-library songs.
+- Reference-link proposals through the existing review flow.
+- Harden Auto-find links with match confidence and alternate-version handling.
+- Community credits for approved charts, verified links, accepted corrections,
+  useful tagging, upvotes and qualified referrals.
+- Add review gates, caps, quality thresholds and a credit ledger before credits
+  can be exchanged for Pro time.
+
+## AI and advanced music tools
+
+- Deploy the already-built Clean up chart Edge Function when it is ready, without
+  making it a blocker for the practice preview. Verify Undo, chord preservation,
+  failure states, usage limits and provider-cost handling.
+- Harden Clean up chart with evaluation fixtures, cost monitoring and safeguards
+  against changing correct chords.
+- Surface the existing on-device key/BPM analyzer inside the chord workflow where
+  it removes duplicate data entry; do not relabel existing analysis as a new paid
+  AI capability.
+- Audio-to-chart using a commercially licensed provider/model: chords, lyrics and
+  structure open as an editable draft, never directly into the public library.
+- Highlight low-confidence AI output and require musician review.
+- Note and guitar-tab transcription as a later adjacent product.
+- Batch analysis and CSV export.
+- Optional studio tools: ID3 tag writing, arrangement energy rating and harmonic
+  set planning. Validate musician demand before implementation.
+- Nashville Number System trainer.
+- Analyzer history with per-item deletion.
+
+The existing analyzer's Essentia/MTG models are non-commercial and remain outside
+paid features. Paid recognition needs a separate commercially licensed model.
+
+## Accounts, payments and distribution
+
+- Keep one app. Resolve server-authorized capabilities from the account or
+  ministry subscription instead of creating separate applications.
+- Select PH-friendly web payments supporting GCash, Maya and cards after a current
+  review of gateway and app-store rules.
+- Add signed payment webhooks, entitlements, refunds/cancellations and metered
+  storage/processing quotas.
+- Build/sign the Android APK/AAB and test hardware Back and audio file selection.
+- Improve Android file-picker guidance; a web app cannot force the OS to open only
+  the Files application.
+- Windows installer later; evaluate iOS packaging after the web/PWA product is
+  established.
+- Custom SMTP/email notifications from the Chord.ph domain.
+- Additional login providers after the main authentication flow is stable.
+- Geographic pricing and internationalized UI.
+
+## Landing page and signed-in home
+
+- Refine the message around one shared, transposable, stage-ready rehearsal
+  workflow rather than a long feature inventory.
+- Explain the progression from solo musician to paid ministry workspace.
+- Add a lightweight signed-in dashboard with the next lineup, recent setlists,
+  team updates and Continue practicing.
+- Keep the chart/library/stage application completely ad-free. Landing-page ads
+  may be evaluated later as secondary revenue.
+- Long-term performance posts and an instrument/pro-audio marketplace are separate
+  products requiring moderation, payments and marketplace safeguards.
+
+## Later experiments
+
+- Sampled premium pads using licensed or self-produced audio.
+- Make pads follow each medley section's key.
+- Spotify Web Playback SDK exploration, subject to Spotify account, API,
+  commercial-use and playback-policy requirements.
+- Spotify per-medley switching if provider controls permit it.
+- App-wide appearance settings: light/dark/auto, font, base size and accent.
+- Broader public social/community surfaces only after the practice and team
+  product is established.
+
+## Product tier direction - not final pricing
+
+- **Free musician:** charts, search, transpose, capo, Nashville, diagrams,
+  personal setlists/medleys, stage mode, offline PWA, analyzer and reference links.
+- **Team/Pro:** Team Hub, assignments, shared arrangements, ministry
+  administration, authorized cloud rehearsal audio, quotas and synchronization.
+- **Premium/Studio:** metered commercially licensed audio-to-chart and advanced
+  audio workflows.
+
+Cloud storage and AI processing must never be sold as unmetered unlimited
+resources. Exact prices and boundaries are decided after practice usage is clear.
+
+---
+
+## Final commercial-release gates
+
+These are intentionally placed after the product shape is stable so policies and
+reviews describe what Chord.ph actually does. They block commercial release, not
+the owner-only practice preview.
+
+### Intellectual property and audio
+
+- Obtain advice from a Philippine intellectual-property lawyer about chord-chart
+  publication, user-supplied audio, team sharing, licensing, platform liability
+  and takedowns.
+- Document which audio may remain local, which may be uploaded, who may access it
+  and how authorization is recorded.
+- An "I have permission" checkbox is supporting evidence, not complete legal
+  protection.
+- Spotify/YouTube remain the default shared references. Do not enable commercial
+  team cloud-audio storage until the upload policy passes review.
+
+### Terms, privacy and operations
+
+- Replace the initial plain-language copy with reviewed Terms, Privacy, upload,
+  retention, deletion and takedown policies.
+- Test authorization for owners, members, outsiders, removed members and cancelled
+  subscriptions.
+- Verify no API/service key, contributor email, private audio URL or sensitive
+  provider response leaks into browser code, logs or shared chart/setlist data.
+- Test refunds, failed renewals, cancellation, webhook replay, quota exhaustion,
+  provider failure and deletion/restore procedures.
+- Confirm local/offline charts remain usable when Supabase, payments or AI
+  providers are unavailable.
+- Complete production backup, monitoring, cost alerts and incident procedures.
+
+Only after these checks pass should the preview be considered for a public paid
+launch.

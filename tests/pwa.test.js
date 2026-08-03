@@ -12,15 +12,11 @@ test('app registers the service worker even when opened directly', () => {
   assert.match(app, /navigator\.serviceWorker\.register\('\/sw\.js'\)/);
 });
 
-test('service worker rejects cross-origin and analyzer caching', () => {
-  assert.match(sw, /url\.origin !== self\.location\.origin/);
-  assert.match(sw, /url\.pathname\.indexOf\('\/analyzer'\)/);
-});
-
-test('offline app shell includes the app and its local runtime files', () => {
-  for (const resource of ['/app/', '/app/index.html', '/app/lib/supabase.js', '/app/lib/music-engine.js']) {
-    assert.ok(sw.includes(`'${resource}'`), `${resource} should be precached`);
-  }
+test('private beta service worker removes the old public app shell', () => {
+  assert.match(sw, /name\.indexOf\(CACHE_PREFIX\) === 0/);
+  assert.match(sw, /caches\.delete\(name\)/);
+  assert.match(sw, /self\.registration\.unregister\(\)/);
+  assert.doesNotMatch(sw, /addAll\(APP_SHELL\)/);
 });
 
 test('installed app does not force portrait orientation', () => {

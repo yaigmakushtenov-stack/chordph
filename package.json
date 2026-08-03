@@ -4,5 +4,8 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "check": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@vercel/functions": "^3.1.1"
   }
 }

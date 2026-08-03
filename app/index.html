@@ -2191,6 +2191,7 @@ async function sendMagicLink(email) {
 }
 async function signOut() {
     if (!supa) return;
+    try { await fetch('/api/beta/session', { method: 'DELETE', credentials: 'same-origin' }); } catch (e) {}
     await supa.auth.signOut();
     currentUser = null;
     isAdminUser = false;
@@ -2200,6 +2201,7 @@ async function signOut() {
     updateNotifBadge();
     updateAuthUI();
     if (document.getElementById('view-setlists').classList.contains('active')) renderSetlists();
+    location.replace('/beta/');
 }
 function updateAuthUI() {
     updateContribUI();   // admin-only Review item + submit availability follow auth
