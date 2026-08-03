@@ -13,29 +13,6 @@ Last reorganized: 2026-08-03.
 
 ---
 
-## Sprint 0 - private-beta access gate
-
-Complete before publishing additional V2 work to `chord.ph`:
-
-- Add account-bound beta invitations in Supabase with hashed codes, optional
-  email binding, expiry, usage limits and revocation.
-- Give platform admins an owner recovery bypass that cannot be removed through the
-  ordinary invitation screen.
-- Build a phone-friendly Invitations screen with Generate, Copy, Share, Revoke and
-  active-tester status.
-- Put the entire production domain behind a server-enforced gate. A client-only
-  overlay is not sufficient because static assets and Supabase endpoints could be
-  requested directly.
-- Protect existing Supabase reads/writes with the same beta entitlement only after
-  the gate UI and owner recovery path have been tested.
-- Rotate the PWA cache, stop unauthorized app-shell caching and add `noindex` while
-  the private beta is active.
-- Test owner sign-in and recovery in a fresh browser before enabling the final
-  production-domain lock.
-
-The invitation foundation may be deployed additively before enforcement. Never
-turn on enforcement until the owner has successfully entered through the new gate.
-
 ## The near-term product outcome
 
 A musician should be able to:
@@ -88,6 +65,10 @@ player behaves unpredictably.
   offline installation, refresh/update behavior and storage recovery.
 - Record preview issues as specific bugs and fix release blockers without taking
   the preview away from the owner.
+- Move the Rehearsal workspace into its own focused home view instead of placing
+  it above the song library. Songs should remain a clean, searchable catalogue.
+- Redesign the synthesized ambient pad so it is warmer and less robotic or harsh.
+  This is explicitly parked until the practice-player regressions are stable.
 
 ### Sprint A exit check
 

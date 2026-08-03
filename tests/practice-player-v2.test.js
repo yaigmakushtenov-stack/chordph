@@ -86,4 +86,20 @@ test('loop count-in pauses at B and counts one tempo-aware bar before A', () => 
   assert.match(app, /s\.countIn = practice\.countIn/);
   assert.match(app, /Play one bar of clicks before the loop restarts/);
   assert.match(app, /practice\.countInSources\.forEach/);
+  assert.match(app, /function estimatePracticeBpm/);
+  assert.match(app, /Number\(practice\.bpm\)/);
+});
+
+test('replacing an MP3 cannot restore stale loop state onto the new file', () => {
+  assert.match(app, /loadPracticeAudio\(id, true, true\)/);
+  assert.match(app, /function loadPracticeAudio\(id, autoplay, replacedFile\)/);
+  assert.match(app, /stopPractice\(!!replacedFile\)/);
+  assert.match(app, /practice\.fileName = String\(\(blob && blob\.name\)/);
+});
+
+test('practice player exposes explicit transport controls', () => {
+  assert.match(app, /onclick="skipPractice\(-10\)"/);
+  assert.match(app, /onclick="restartPractice\(\)"/);
+  assert.match(app, /onclick="stopPracticePlayback\(\)"/);
+  assert.match(app, /onclick="skipPractice\(10\)"/);
 });

@@ -111,4 +111,6 @@ test('medley creation is discoverable from the setlist instead of only inside a 
   assert.match(app, /Where should the medley begin/);
   assert.match(app, /Choose the next song/);
   assert.match(app, /match its key, and choose only the sections/);
+  assert.match(app, /function openMedleyEntry/);
+  assert.match(app, /Add this medley to a setlist/);
 });

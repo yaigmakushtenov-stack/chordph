@@ -4,26 +4,27 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="robots" content="noindex,nofollow,noarchive">
-    <meta name="theme-color" content="#0d1d18">
+    <meta name="theme-color" content="#0f1117">
+    <link rel="manifest" href="/beta/manifest.json">
     <title>Private beta · Chord.ph</title>
     <style>
-        :root { color-scheme: dark; --ink:#f5f2e8; --muted:#a8b7ae; --line:#29443a; --green:#9fe6bb; --green2:#d7f7e3; --bg:#07120e; --panel:#10221b; --danger:#ffaca7; }
+        :root { color-scheme: dark; --ink:#e8eaf0; --muted:#8b93a7; --line:rgba(255,255,255,.10); --accent:#4f8cff; --accent2:#9b6bff; --bg:#0f1117; --panel:#141821; --danger:#ffaca7; }
         * { box-sizing:border-box; }
-        body { margin:0; min-height:100vh; background:radial-gradient(circle at 50% -20%,#224839 0,transparent 45%),var(--bg); color:var(--ink); font:16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; }
+        body { margin:0; min-height:100vh; background:radial-gradient(1100px 560px at 50% -160px,#171c28 0,var(--bg) 62%); color:var(--ink); font:16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; }
         main { width:min(100% - 32px,560px); margin:0 auto; padding:max(42px,env(safe-area-inset-top)) 0 max(42px,env(safe-area-inset-bottom)); }
-        .brand { display:flex; align-items:center; gap:11px; color:var(--green2); font-size:20px; font-weight:800; letter-spacing:-.02em; }
-        .mark { display:grid; place-items:center; width:38px; height:38px; border-radius:12px; background:var(--green); color:#10221b; font-weight:950; }
+        .brand { display:flex; align-items:center; gap:11px; font-size:20px; font-weight:800; letter-spacing:-.02em; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+        .mark { display:grid; place-items:center; width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-weight:950; -webkit-text-fill-color:#fff; }
         h1 { margin:36px 0 12px; font-size:clamp(34px,9vw,54px); line-height:1.02; letter-spacing:-.055em; }
         .lead { margin:0 0 28px; color:var(--muted); font-size:18px; }
         .card { padding:22px; border:1px solid var(--line); border-radius:22px; background:color-mix(in srgb,var(--panel) 94%,transparent); box-shadow:0 22px 70px #0006; }
         .card + .card { margin-top:16px; }
         h2 { margin:0 0 7px; font-size:20px; }
         p { margin:0 0 16px; }
-        label { display:block; margin:14px 0 7px; color:var(--green2); font-size:13px; font-weight:750; }
+        label { display:block; margin:14px 0 7px; color:var(--ink); font-size:13px; font-weight:750; }
         input,select,button { width:100%; min-height:48px; border-radius:13px; font:inherit; }
-        input,select { border:1px solid var(--line); background:#07140f; color:var(--ink); padding:11px 13px; outline:none; }
-        input:focus,select:focus { border-color:var(--green); box-shadow:0 0 0 3px #9fe6bb22; }
-        button { border:0; padding:11px 15px; background:var(--green); color:#0b2017; font-weight:850; cursor:pointer; }
+        input,select { border:1px solid var(--line); background:#0f1117; color:var(--ink); padding:11px 13px; outline:none; }
+        input:focus,select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,140,255,.18); }
+        button { border:0; padding:11px 15px; background:linear-gradient(90deg,var(--accent),var(--accent2)); color:#fff; font-weight:850; cursor:pointer; }
         button.secondary { border:1px solid var(--line); background:transparent; color:var(--ink); }
         button.danger { color:var(--danger); }
         button:disabled { opacity:.55; cursor:wait; }
@@ -33,11 +34,11 @@
         .muted,.status { color:var(--muted); font-size:14px; }
         .status { min-height:22px; margin-top:12px; }
         .status.error { color:var(--danger); }
-        .status.ok { color:var(--green); }
+        .status.ok { color:#63d29a; }
         .hide { display:none !important; }
         .divider { display:flex; align-items:center; gap:12px; margin:17px 0; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.12em; }
         .divider:before,.divider:after { content:""; flex:1; height:1px; background:var(--line); }
-        .code { margin:14px 0; padding:16px; border:1px dashed var(--green); border-radius:14px; background:#07140f; color:var(--green2); text-align:center; font:800 16px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; user-select:all; }
+        .code { margin:14px 0; padding:16px; border:1px dashed var(--accent); border-radius:14px; background:#0f1117; color:#c8d8ff; text-align:center; font:800 16px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; user-select:all; }
         .toolbar { display:flex; gap:10px; margin:16px 0 20px; }
         .toolbar button { width:auto; flex:1; }
         .invite { padding:14px 0; border-top:1px solid var(--line); }
@@ -213,9 +214,10 @@
         if (code) sessionStorage.setItem('chordph_beta_invite', code);
         sessionStorage.setItem('chordph_beta_next', nextPath);
         setBusy($('google-sign-in'), true);
+        var returnPath = wantsAdmin ? '/beta/?admin=1' : '/beta/?next=' + encodeURIComponent(nextPath);
         var result = await client.auth.signInWithOAuth({
             provider: 'google',
-            options: { redirectTo: location.origin + '/app/', queryParams: { prompt: 'select_account' } }
+            options: { redirectTo: location.origin + returnPath, queryParams: { prompt: 'select_account' } }
         });
         if (result.error) { setStatus('gate-status', friendlyError(result.error), 'error'); setBusy($('google-sign-in'), false); }
     }

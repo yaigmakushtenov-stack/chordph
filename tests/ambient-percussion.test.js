@@ -21,11 +21,11 @@ test('percussion is synthesized locally without bundled audio samples', () => {
   assert.doesNotMatch(app, /percussion[^\n]+\.(mp3|wav|ogg)/i);
 });
 
-test('percussion follows chart tempo zones and survives navigation or wake-up', () => {
+test('percussion follows real tempo-zone changes without restarting on chart-control renders', () => {
   assert.match(app, /function syncPercussionToTempoZone/);
   assert.match(app, /percussion\.bpm = target\.bpm/);
   assert.match(app, /percussion\.beatsPerBar = target\.beats \|\| 4/);
-  assert.match(app, /buildTempoZones[\s\S]*syncPercussionToTempoZone\(true\)/);
+  assert.match(app, /buildTempoZones[\s\S]*syncPercussionToTempoZone\(false\)/);
   assert.match(app, /visibilitychange[\s\S]*revivePercussion\(\)/);
   assert.match(app, /wakeLockNeeded[\s\S]*percussion\.playing/);
   assert.match(app, /secondsPerBeat = 60 \/ percussion\.bpm/);

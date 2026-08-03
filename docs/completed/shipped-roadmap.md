@@ -7,6 +7,14 @@ roadmap rather than moving the whole feature back.
 
 Last reorganized: 2026-08-03.
 
+## Private-beta access
+
+- Server-enforced invitation-only gate across the production domain.
+- Hashed, email-bound invitation codes with expiry, usage limits and revocation.
+- Phone-friendly administrator invitation manager with Copy and Share.
+- Platform-owner recovery bypass, expiring access cookie, `noindex` and retired
+  public PWA caches.
+
 ## Chart and performance
 
 - Synthesized ambient pad with persistent playback.

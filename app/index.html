@@ -697,7 +697,8 @@
             padding: 14px 0 12px; margin-top: 8px;
             border-bottom: 1px solid var(--hairline);
         }
-        .chord-dia { flex-shrink: 0; text-align: center; }
+        .chord-dia { flex-shrink: 0; text-align: center; cursor: pointer; touch-action: manipulation; border-radius: 9px; padding: 3px; }
+        .chord-dia:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .cd-name { font-size: 12px; font-weight: 700; color: var(--chord-color); margin-bottom: 3px; }
         .cd-notes { font-size: 9px; color: var(--muted); margin-top: 2px; letter-spacing: .15px; }
         .chord-strip .cd-missing { font-size: 11px; color: var(--faint); align-self: center; }
@@ -1353,7 +1354,7 @@
                 <button class="ctl" id="ctl-text" onclick="toggleLayer('text')" aria-label="Text size"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l4.5-12 4.5 12M4.6 14h5.8M15 18l2.5-7 2.5 7M16 16h3"/></svg><span>Text</span></button>
                 <button class="ctl ctl-group-start" id="ctl-click" onclick="toggleLayer('click')" aria-label="Metronome click"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l3 16H6zM12 4v9M12 13l4-3"/></svg><span>Click</span></button>
                 <button class="ctl" id="ctl-pad" onclick="toggleLayer('pad')" aria-label="Pad and percussion"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-6 3 13 3-16 3 12 2-3h3"/></svg><span>Pad+Beat</span></button>
-                <button class="ctl" id="ctl-medley" onclick="openMedleySheet()" style="display:none;" aria-label="Medley"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h10a2 2 0 0 1 2 2v10M16 8H6a1.8 1.8 0 0 0-1.8 1.8V19a1.8 1.8 0 0 0 1.8 1.8h9.5A1.8 1.8 0 0 0 17.3 19V9.8A1.8 1.8 0 0 0 15.5 8Z"/></svg><span>Medley</span></button>
+                <button class="ctl" id="ctl-medley" onclick="openMedleyEntry()" style="display:none;" aria-label="Build a medley"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h10a2 2 0 0 1 2 2v10M16 8H6a1.8 1.8 0 0 0-1.8 1.8V19a1.8 1.8 0 0 0 1.8 1.8h9.5A1.8 1.8 0 0 0 17.3 19V9.8A1.8 1.8 0 0 0 15.5 8Z"/></svg><span>Medley</span></button>
             </div>
 
             <div class="layer" id="layer-transpose">
@@ -1842,7 +1843,7 @@ function keyboardChordTones(name) {
 function renderKeyboardDiagram(name) {
     var chord = keyboardChordTones(name);
     if (!chord) return '';
-    var W = 104, H = 44, x0 = 2, ww = 14, whiteH = 38, blackW = 9, blackH = 23;
+    var W = 84, H = 38, x0 = 2, ww = 11.4, whiteH = 32, blackW = 7.5, blackH = 19;
     var whitePcs = [0,2,4,5,7,9,11], blackPcs = [1,3,6,8,10], blackAfter = [1,2,4,5,6];
     function fill(pc, fallback) {
         if (chord.tones.indexOf(pc) < 0) return fallback;
@@ -3963,8 +3964,9 @@ function renderChart() {
         banner.style.display = 'none';
         renderChartVersions(song.id);
     }
-    // Medley control lives with the other controls; only meaningful inside a setlist
-    document.getElementById('ctl-medley').style.display = (cf === 'setlist') ? '' : 'none';
+    // Keep this strong feature discoverable everywhere. Outside a setlist, the
+    // entry point first asks where the medley should live.
+    document.getElementById('ctl-medley').style.display = readonly ? 'none' : '';
     if (readonly) document.getElementById('medley-blocks').innerHTML = '';
 
     var star = document.getElementById('chart-star');
@@ -4144,9 +4146,9 @@ function promptYouTube() {
     v = v.trim();
     if (v && !parseYouTube(v)) { toast('That doesn’t look like a YouTube link.'); return; }
     if (v) { state.youtube[currentSongId] = v; youtubeOpen = true; } else { delete state.youtube[currentSongId]; youtubeOpen = false; }
-    save(); renderYouTube();
+    save(); renderMediaPanel();
 }
-function removeYouTube() { delete state.youtube[currentSongId]; youtubeOpen = false; save(); renderYouTube(); }
+function removeYouTube() { delete state.youtube[currentSongId]; youtubeOpen = false; save(); renderMediaPanel(); }
 function openYouTubeMenu(anchor) {
     var readonly = state.chartFrom === 'shared' || state.chartFrom === 'shared-set';
     var items = [{ label: 'Hide video', icon: '▾', onClick: function() { youtubeOpen = false; renderYouTube(); } }];
@@ -4192,9 +4194,9 @@ function promptSpotify() {
     if (v && !parseSpotify(v)) { toast('That doesn’t look like a Spotify link.'); return; }
     if (v) { state.spotify[currentSongId] = v; spotifyOpen = true; }
     else { delete state.spotify[currentSongId]; spotifyOpen = false; }
-    save(); renderSpotifyPanel();
+    save(); renderMediaPanel();
 }
-function removeSpotify() { delete state.spotify[currentSongId]; spotifyOpen = false; save(); renderSpotifyPanel(); }
+function removeSpotify() { delete state.spotify[currentSongId]; spotifyOpen = false; save(); renderMediaPanel(); }
 function openSpotifyMenu(anchor) {
     var readonly = state.chartFrom === 'shared' || state.chartFrom === 'shared-set';
     var items = [
@@ -4234,7 +4236,7 @@ var practiceSessions = {};
 try { practiceSessions = JSON.parse(localStorage.getItem('chordph2_practice_sessions') || '{}') || {}; } catch (e) { practiceSessions = {}; }
 var practiceSaveTimer = null;
 function practiceSession(id) {
-    if (!practiceSessions[id]) practiceSessions[id] = { position: 0, a: null, b: null, loop: false, countIn: false, rate: 1, pitch: 0, loops: [], activeLoopId: null };
+    if (!practiceSessions[id]) practiceSessions[id] = { position: 0, a: null, b: null, loop: false, countIn: false, rate: 1, pitch: 0, bpm: null, fileName: '', loops: [], activeLoopId: null };
     var session = practiceSessions[id];
     if (!Array.isArray(session.loops)) session.loops = [];
     return session;
@@ -4249,7 +4251,7 @@ function queuePracticeSessionSave() {
 }
 var practice = { el: null, url: null, songId: null, chartFrom: 'songs', a: null, b: null, loop: false,
                  countIn: false, countingIn: false, countInBeat: 0, countInBeats: 0, countInTimer: null, countInBeatTimers: [], countInSources: [], countCtx: null,
-                 rate: 1, pitch: 0, pitchGraph: null, loops: [], activeLoopId: null, open: false, ready: false, peaks: null, pendingPosition: 0, loopTimer: null };
+                 rate: 1, pitch: 0, bpm: null, fileName: '', pitchGraph: null, loops: [], activeLoopId: null, open: false, ready: false, peaks: null, pendingPosition: 0, autoplayPending: false, loopTimer: null };
 function practiceAudioEl() {
     if (!practice.el) {
         var a = document.createElement('audio');
@@ -4268,6 +4270,7 @@ function capturePracticeSession(immediate) {
     var s = practiceSession(practice.songId);
     if (practice.el && isFinite(practice.el.currentTime)) s.position = practice.el.currentTime || 0;
     s.a = practice.a; s.b = practice.b; s.loop = practice.loop; s.countIn = practice.countIn; s.rate = practice.rate; s.pitch = practice.pitch;
+    s.bpm = practice.bpm; s.fileName = practice.fileName;
     s.loops = practice.loops.slice(); s.activeLoopId = practice.activeLoopId;
     if (immediate) flushPracticeSessions(); else queuePracticeSessionSave();
 }
@@ -4311,7 +4314,7 @@ function cancelPracticeCountIn() {
 }
 function startPracticeCountIn() {
     if (practice.countingIn || !practice.el || practice.a == null) return;
-    var song = songById(practice.songId), bpm = Math.max(30, Number(song && song.tempo) || 120);
+    var song = songById(practice.songId), bpm = Math.max(30, Number(practice.bpm) || Number(song && song.tempo) || 120);
     var beats = Math.max(1, parseInt(song && song.timesig, 10) || 4), secondsPerBeat = 60 / (bpm * practice.rate);
     var ctx = practiceCountContext();
     if (!ctx || ctx.state !== 'running') { practice.el.currentTime = practice.a; return; }
@@ -4334,9 +4337,11 @@ function startPracticeCountIn() {
     }, (0.04 + beats * secondsPerBeat) * 1000);
 }
 function togglePracticeCountIn() {
+    var resume = practice.countingIn;
     if (practice.countingIn) cancelPracticeCountIn();
     practice.countIn = !practice.countIn;
     if (practice.countIn && !practiceCountContext()) { practice.countIn = false; toast('Count-in is not supported by this browser.'); }
+    if (resume && practice.el && practice.el.paused) playPracticeAudio();
     capturePracticeSession(true); renderAudioPanel();
 }
 function enforcePracticeLoop() {
@@ -4360,9 +4365,9 @@ function stopPractice(discardSession) {
     practice.songId = null; // pause/load events must not recreate a discarded session
     if (practice.el) { try { practice.el.pause(); } catch (e) {} practice.el.removeAttribute('src'); practice.el.load(); }
     if (practice.url) { URL.revokeObjectURL(practice.url); practice.url = null; }
-    practice.a = practice.b = null; practice.loop = false; practice.countIn = false; practice.rate = 1; practice.pitch = 0; practice.loops = []; practice.activeLoopId = null;
+    practice.a = practice.b = null; practice.loop = false; practice.countIn = false; practice.rate = 1; practice.pitch = 0; practice.bpm = null; practice.fileName = ''; practice.loops = []; practice.activeLoopId = null;
     applyPracticePitch();
-    practice.ready = false; practice.peaks = null; practice.pendingPosition = 0;
+    practice.ready = false; practice.peaks = null; practice.pendingPosition = 0; practice.autoplayPending = false;
     updateStageNowPlaying();
 }
 function onPracticeMetadata() {
@@ -4371,6 +4376,7 @@ function onPracticeMetadata() {
     if (practice.pendingPosition > 0 && duration) practice.el.currentTime = Math.min(practice.pendingPosition, Math.max(0, duration - 0.05));
     practice.pendingPosition = 0;
     renderAudioPanel(); updatePracticeProgress();
+    if (practice.autoplayPending) playPracticeAudio();
 }
 function onPracticeTime() {
     enforcePracticeLoop(); updatePracticeProgress(); capturePracticeSession(false);
@@ -4387,7 +4393,7 @@ function onPracticeFile(ev) {
         delete practiceSessions[id]; flushPracticeSessions();
         audioKeys[id] = 1; saveAudioKeys();
         practice.open = true;
-        loadPracticeAudio(id, true);
+        loadPracticeAudio(id, true, true);
     }).catch(function() { toast('Couldn’t save that file.'); });
 }
 function removePracticeAudio() {
@@ -4398,10 +4404,10 @@ function removePracticeAudio() {
         practice.open = false; renderAudioPanel(); updateStageNowPlaying();
     });
 }
-function loadPracticeAudio(id, autoplay) {
+function loadPracticeAudio(id, autoplay, replacedFile) {
     return idbGet('song:' + id).then(function(blob) {
         if (!blob) { renderAudioPanel(); return; }
-        stopPractice();
+        stopPractice(!!replacedFile);
         var saved = practiceSession(id);
         practice.url = URL.createObjectURL(blob);
         var el = practiceAudioEl();
@@ -4409,12 +4415,14 @@ function loadPracticeAudio(id, autoplay) {
         practice.a = saved.a == null ? null : saved.a; practice.b = saved.b == null ? null : saved.b;
         practice.loop = !!saved.loop; practice.countIn = !!saved.countIn; practice.rate = Number(saved.rate) || 1;
         practice.pitch = Math.max(-6, Math.min(6, Math.round(Number(saved.pitch) || 0)));
+        practice.bpm = Number(saved.bpm) || Number((songById(id) || {}).tempo) || null;
+        practice.fileName = String((blob && blob.name) || saved.fileName || 'Practice track');
         practice.loops = saved.loops.filter(function(item) {
             return item && /^[a-zA-Z0-9_-]+$/.test(String(item.id)) && typeof item.name === 'string' && item.name &&
                 isFinite(item.a) && isFinite(item.b) && item.b - item.a >= 0.25;
         });
         practice.activeLoopId = practice.loops.some(function(item) { return item.id === saved.activeLoopId; }) ? saved.activeLoopId : null;
-        practice.pendingPosition = Number(saved.position) || 0; practice.peaks = null;
+        practice.pendingPosition = Number(saved.position) || 0; practice.peaks = null; practice.autoplayPending = !!autoplay;
         el.src = practice.url; applyPracticeRate(); applyPracticePitch();
         practice.ready = true;
         setupPracticeMediaSession();
@@ -4435,7 +4443,7 @@ function setupPracticeMediaSession() {
     var song = songById(practice.songId);
     try {
         navigator.mediaSession.metadata = new MediaMetadata({
-            title: song ? song.title : 'Practice track', artist: song ? (song.artist || 'Chord.ph') : 'Chord.ph', album: 'Chord.ph rehearsal'
+            title: practice.fileName || (song ? song.title : 'Practice track'), artist: song ? (song.artist || 'Chord.ph') : 'Chord.ph', album: song ? song.title : 'Chord.ph rehearsal'
         });
         navigator.mediaSession.setActionHandler('play', playPracticeAudio);
         navigator.mediaSession.setActionHandler('pause', function() { practice.el.pause(); });
@@ -4443,6 +4451,36 @@ function setupPracticeMediaSession() {
         navigator.mediaSession.setActionHandler('seekforward', function(d) { seekPractice(practice.el.currentTime + ((d && d.seekOffset) || 10)); });
         navigator.mediaSession.setActionHandler('seekto', function(d) { if (d && d.seekTime != null) seekPractice(d.seekTime); });
     } catch (e) {}
+}
+function estimatePracticeBpm(audio) {
+    if (!audio || !audio.length || !audio.sampleRate) return null;
+    var hop = 2048, limit = Math.min(audio.length, audio.sampleRate * 180), channels = Math.min(2, audio.numberOfChannels || 1);
+    var energy = [], frame, ch, i;
+    for (frame = 0; frame + hop < limit; frame += hop) {
+        var sum = 0, count = 0;
+        for (ch = 0; ch < channels; ch++) {
+            var samples = audio.getChannelData(ch);
+            for (i = frame; i < frame + hop; i += 4) { var value = samples[i] || 0; sum += value * value; count++; }
+        }
+        energy.push(Math.sqrt(sum / Math.max(1, count)));
+    }
+    if (energy.length < 80) return null;
+    var novelty = [], average = 0;
+    for (i = 0; i < energy.length; i++) {
+        average = average * 0.94 + energy[i] * 0.06;
+        novelty[i] = Math.max(0, energy[i] - average * 1.08);
+    }
+    var framesPerSecond = audio.sampleRate / hop, bestBpm = null, bestScore = -1;
+    for (var bpm = 55; bpm <= 190; bpm++) {
+        var lag = Math.max(1, Math.round(60 * framesPerSecond / bpm)), score = 0, pairs = 0;
+        for (i = lag; i < novelty.length; i++) { score += novelty[i] * novelty[i - lag]; pairs++; }
+        score /= Math.max(1, pairs);
+        // A small musical-tempo prior resolves common half/double ambiguity but
+        // never outweighs a clearly stronger onset correlation.
+        score *= 1 + Math.max(0, 0.08 - Math.abs(bpm - 105) / 1400);
+        if (score > bestScore) { bestScore = score; bestBpm = bpm; }
+    }
+    return bestScore > 0 ? bestBpm : null;
 }
 function decodePracticeWaveform(blob, bars) {
     bars = bars || 180;
@@ -4467,21 +4505,24 @@ function decodePracticeWaveform(blob, bars) {
             }
             peaks.push(peak); globalPeak = Math.max(globalPeak, peak);
         }
+        var bpm = estimatePracticeBpm(audio);
         try { result.ctx.close(); } catch (e) {}
         globalPeak = globalPeak || 1;
-        return peaks.map(function(p) { return Math.max(5, Math.round(Math.sqrt(p / globalPeak) * 100)); });
-    }).catch(function() { return []; });
+        return { peaks: peaks.map(function(p) { return Math.max(5, Math.round(Math.sqrt(p / globalPeak) * 100)); }), bpm: bpm };
+    }).catch(function() { return { peaks: [], bpm: null }; });
 }
 function loadPracticeWaveform(id, blob) {
-    return idbGet('wave:' + id).then(function(peaks) {
-        if (Array.isArray(peaks) && peaks.length) return peaks;
+    return idbGet('wave:' + id).then(function(cached) {
+        if (cached && Array.isArray(cached.peaks) && cached.peaks.length) return cached;
+        if (Array.isArray(cached) && cached.length) return { peaks: cached, bpm: null };
         return decodePracticeWaveform(blob, 180).then(function(created) {
-            if (created.length) idbPut('wave:' + id, created).catch(function() {});
+            if (created.peaks.length) idbPut('wave:' + id, created).catch(function() {});
             return created;
         });
-    }).then(function(peaks) {
+    }).then(function(result) {
         if (practice.songId !== id) return;
-        practice.peaks = peaks || [];
+        practice.peaks = result.peaks || [];
+        if (result.bpm) { practice.bpm = result.bpm; capturePracticeSession(true); }
         if (practice.open) renderAudioPanel();
     }).catch(function() {});
 }
@@ -4519,14 +4560,16 @@ function renderAudioPanel() {
     box.innerHTML = '<div class="audio-panel">' +
         '<div class="audio-row">' +
         '<button class="audio-play" id="audio-play" onclick="togglePracticePlay()" aria-label="Play/pause"></button>' +
-        '<strong style="font-size:13px;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc((songById(practice.songId) || {}).title || 'Practice track') + '</strong>' +
+        '<strong style="font-size:13px;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(practice.fileName || 'Practice track') + '">' + esc(practice.fileName || 'Practice track') + '</strong>' +
         '<span class="audio-time" id="audio-time">' + fmtTime(practice.el.currentTime) + ' / ' + fmtTime(practice.el.duration) + '</span></div>' +
+        '<div class="audio-speed" aria-label="Playback controls"><button class="sp-btn" onclick="skipPractice(-10)">&minus;10s</button>' +
+        '<button class="sp-btn" onclick="restartPractice()">Restart</button><button class="sp-btn" onclick="stopPracticePlayback()">Stop</button><button class="sp-btn" onclick="skipPractice(10)">+10s</button></div>' +
         practiceWaveformHTML() +
         '<div class="audio-ab">' +
         '<button class="ab-btn' + (practice.a != null ? ' on' : '') + '" onclick="setPracticeMark(\'a\')">Set A</button>' +
         '<button class="ab-btn' + (practice.b != null ? ' on' : '') + '" onclick="setPracticeMark(\'b\')">Set B</button>' +
         ((practice.a != null && practice.b != null && practice.b - practice.a >= 0.25) ? '<button class="ab-btn" onclick="saveNamedPracticeLoop()">Save loop</button>' : '') +
-        '<button class="ab-btn' + (practice.countIn ? ' on' : '') + '" onclick="togglePracticeCountIn()" title="Play one bar of clicks before the loop restarts">Count-in</button>' +
+        '<button class="ab-btn' + (practice.countIn ? ' on' : '') + '" onclick="togglePracticeCountIn()" title="Play one bar of clicks before the loop restarts">Count-in' + (practice.bpm ? ' · ' + Math.round(practice.bpm * practice.rate) + ' BPM' : '') + '</button>' +
         ((practice.a != null || practice.b != null) ? '<button class="ab-btn" onclick="clearPracticeAB()">Clear</button>' : '') +
         '<span class="ab-mark" id="practice-loop-status">A ' + (practice.a != null ? fmtTime(practice.a) : '—') + ' · B ' + (practice.b != null ? fmtTime(practice.b) : '—') + (practice.loop ? ' · looping ↺' : '') + practiceCountInStatus() + '</span></div>' +
         namedPracticeLoopsHTML() +
@@ -4562,9 +4605,24 @@ function playPracticeAudio() {
     if (practice.countIn) practiceCountContext();
     var graph = practice.pitch !== 0 ? ensurePracticePitchGraph() : practice.pitchGraph;
     if (graph && graph.ctx.state === 'suspended') graph.ctx.resume().catch(function() {});
-    practice.el.play().catch(function() {});
+    var attempt = practice.el.play();
+    if (attempt && attempt.then) attempt.then(function() { practice.autoplayPending = false; }, function() {});
+    return attempt;
 }
 function togglePracticePlay() { if (!practice.el) return; if (practice.el.paused) playPracticeAudio(); else practice.el.pause(); }
+function skipPractice(seconds) { if (!practice.el) return; seekPractice((practice.el.currentTime || 0) + Number(seconds || 0)); }
+function restartPractice() {
+    if (!practice.el) return;
+    seekPractice(practice.loop && practice.a != null ? practice.a : 0);
+    playPracticeAudio();
+}
+function stopPracticePlayback() {
+    if (!practice.el) return;
+    if (practice.countingIn) cancelPracticeCountIn();
+    practice.el.pause();
+    seekPractice(0);
+    renderAudioControls();
+}
 function seekPractice(v) {
     if (!practice.el) return;
     if (practice.countingIn) cancelPracticeCountIn();
@@ -4719,13 +4777,16 @@ function changePracticePitch(amount) { setPracticePitch(practice.pitch + amount)
 function setPracticeRate(r) { if (practice.countingIn) cancelPracticeCountIn(); practice.rate = r; applyPracticeRate(); capturePracticeSession(true); renderAudioPanel(); }
 function saveNamedPracticeLoop() {
     if (practice.a == null || practice.b == null || practice.b - practice.a < 0.25) { toast('Set A and B before saving a loop.'); return; }
+    var resume = practice.countingIn || (practice.el && !practice.el.paused);
+    if (practice.countingIn) cancelPracticeCountIn();
+    if (practice.el && !practice.el.paused) practice.el.pause();
     var name = prompt('Name this rehearsal loop', 'Chorus practice');
-    if (name == null) return;
+    if (name == null) { if (resume) playPracticeAudio(); return; }
     name = name.trim().slice(0, 60);
-    if (!name) { toast('Give the loop a short name.'); return; }
+    if (!name) { toast('Give the loop a short name.'); if (resume) playPracticeAudio(); return; }
     var item = { id: String(Date.now()) + String(Math.floor(Math.random() * 1000)), name: name, a: practice.a, b: practice.b };
     practice.loops.push(item); practice.activeLoopId = item.id; practice.loop = true;
-    capturePracticeSession(true); renderAudioPanel(); toast('Saved “' + name + '”.');
+    capturePracticeSession(true); renderAudioPanel(); if (resume) playPracticeAudio(); toast('Saved “' + name + '”.');
 }
 function loadNamedPracticeLoop(id) {
     var item = practice.loops.find(function(loop) { return loop.id === id; });
@@ -4741,7 +4802,13 @@ function removeNamedPracticeLoop(id) {
     capturePracticeSession(true); renderAudioPanel();
     if (item) toast('Removed “' + item.name + '”.');
 }
-function clearPracticeAB() { if (practice.countingIn) cancelPracticeCountIn(); practice.a = null; practice.b = null; practice.loop = false; practice.activeLoopId = null; capturePracticeSession(true); renderAudioPanel(); }
+function clearPracticeAB() {
+    var resume = practice.countingIn;
+    if (practice.countingIn) cancelPracticeCountIn();
+    practice.a = null; practice.b = null; practice.loop = false; practice.activeLoopId = null;
+    capturePracticeSession(true); renderAudioPanel();
+    if (resume && practice.el && practice.el.paused) playPracticeAudio();
+}
 function renderChordStrip(strip, chartText, instrumentView) {
     var names = uniqueChords(chartText);
     var html = names.map(function(n) {
@@ -4749,7 +4816,26 @@ function renderChordStrip(strip, chartText, instrumentView) {
         var shape = getGuitarShape(n);
         return shape ? renderChordDiagram(n, shape) : '';
     }).filter(Boolean).join('');
-    strip.innerHTML = html || '<span class="cd-missing">No diagrams for these chords.</span>';
+    strip.innerHTML = html || '<span class="cd-missing">No chord references found in this chart.</span>';
+    Array.prototype.forEach.call(strip.querySelectorAll('.chord-dia'), function(card) {
+        var label = card.querySelector('.cd-name');
+        var name = label ? label.textContent : 'Chord';
+        card.tabIndex = 0; card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', 'Open ' + name + ' chord reference');
+        card.onclick = function() { openChordReference(name, instrumentView); };
+        card.onkeydown = function(event) {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openChordReference(name, instrumentView); }
+        };
+        card.ondblclick = function(event) { event.preventDefault(); openChordReference(name, instrumentView); };
+    });
+}
+function openChordReference(name, instrumentView) {
+    var shape = instrumentView === 'keys' ? null : getGuitarShape(name);
+    var content = instrumentView === 'keys' ? renderKeyboardDiagram(name) : (shape ? renderChordDiagram(name, shape) : '');
+    if (!content) return;
+    openSheet('<div class="sheet-title">' + esc(name) + '</div>' +
+        '<div style="display:flex;justify-content:center;padding:28px 0;transform:scale(1.35);transform-origin:center;">' + content + '</div>' +
+        '<div class="sheet-actions"><button class="tap primary" onclick="closeSheet()">Done</button></div>');
 }
 function toggleNashville() {
     state.nashville = !state.nashville;
@@ -4881,7 +4967,7 @@ function updateStageNowPlaying() {
     if (nativeTrack) source = practice.el.paused || practice.el.ended ? 'Practice track paused' : 'Practice track';
     else if (youtubeOpen && state.youtube[currentSongId]) source = 'YouTube';
     else if (spotifyOpen && state.spotify[currentSongId]) source = 'Spotify';
-    if (source) label = (song ? song.title + ' · ' : '') + source;
+    if (source) label = nativeTrack ? ((practice.fileName || (song && song.title) || 'Practice track') + ' · ' + source) : ((song ? song.title + ' · ' : '') + source);
     text.textContent = label;
     var time = document.getElementById('stage-now-playing-time');
     if (time) time.textContent = nativeTrack ? fmtTime(practice.el.currentTime || 0) : '';
@@ -4893,7 +4979,12 @@ function updateStageNowPlaying() {
         toggle.setAttribute('aria-label', isPlaying ? 'Pause practice track' : 'Play practice track');
     }
     var open = document.getElementById('stage-now-playing-open');
-    if (open) open.setAttribute('aria-label', label ? label + '. Open its chart.' : 'No media open');
+    if (open) {
+        var alreadyOnChart = nativeTrack && activeViewId() === 'chart' && currentSongId === practice.songId;
+        open.setAttribute('aria-label', label ? (label + (alreadyOnChart ? '. Show player.' : '. Open its chart.')) : 'No media open');
+        var returnHint = open.querySelector('.np-return');
+        if (returnHint) { returnHint.style.display = alreadyOnChart ? 'none' : ''; returnHint.textContent = 'Open chart ›'; }
+    }
     bar.classList.toggle('has-media', !!label);
     document.body.classList.toggle('has-now-playing', !!label);
 }
@@ -5190,7 +5281,7 @@ function buildTempoZones(hostSong) {
     if (ctl) ctl.style.display = anyTempo ? '' : 'none';
     if (!anyTempo && state.openLayer === 'click') state.openLayer = null;
     paintClickLabel();
-    syncPercussionToTempoZone(true);
+    syncPercussionToTempoZone(false);
 }
 /* whichever zone is under the "reading line" ~a third down the screen */
 function activeTempoZone() {
@@ -6054,8 +6145,9 @@ function createSetlist() {
     var name = document.getElementById('sh-setlist-name').value.trim();
     var err = document.getElementById('sh-setlist-err');
     if (!name) { err.textContent = 'Give it a name.'; err.style.display = 'block'; return; }
-    state.setlists.push({ id: 's' + Date.now(), name: name, songIds: [] });
-    save(); closeSheet(); renderSetlists(); window.scrollTo(0, 0);
+    var id = 's' + Date.now();
+    state.setlists.push({ id: id, name: name, songIds: [] });
+    save(); closeSheet(); openSetlist(id); window.scrollTo(0, 0);
 }
 
 /* ---- add song(s) to setlist ---- */
@@ -6101,6 +6193,44 @@ function filterAddList() { renderAddList(); }
 
 /* ---- medley picker: step 1 pick a song, step 2 pick key + parts ---- */
 var medleyPick = null; // { songId, keyOption, sections:[idx] }
+
+function beginMedleyInSetlist(setlistId, songId) {
+    var sl = setlistById(setlistId);
+    if (!sl || !songId) return;
+    var pos = sl.songIds.indexOf(songId);
+    if (pos === -1) { sl.songIds.push(songId); pos = sl.songIds.length - 1; }
+    state.currentSetlistId = sl.id;
+    state.setlistPos = pos;
+    save(); closeSheet(); openChart(songId, 'setlist');
+    setTimeout(openMedleySheet, 0);
+}
+
+function openMedleyEntry() {
+    if (state.chartFrom === 'setlist' && state.currentSetlistId) { openMedleySheet(); return; }
+    var song = songById(currentSongId);
+    if (!song) return;
+    if (!state.setlists.length) {
+        openSheet(
+            '<div class="sheet-title">Start a medley</div>' +
+            '<p style="color:var(--muted);line-height:1.5;">Medleys live inside a setlist so their song order, keys and selected sections stay together.</p>' +
+            '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button>' +
+            '<button class="tap primary" onclick="closeSheet();openNewSetlistSheet()">Create a setlist</button></div>'
+        );
+        return;
+    }
+    var rows = state.setlists.map(function(sl) {
+        var count = (sl.songIds || []).filter(songById).length;
+        return '<button class="row" style="width:100%;text-align:left;" onclick="beginMedleyInSetlist(\'' + esc(sl.id) + '\',\'' + esc(song.id) + '\')">' +
+            '<span class="row-main"><span class="row-title">' + esc(sl.name) + '</span><span class="row-sub">' + count + ' song' + (count === 1 ? '' : 's') + '</span></span>' +
+            '<span class="tap primary">Choose &rsaquo;</span></button>';
+    }).join('');
+    openSheet(
+        '<div class="sheet-head"><div class="sheet-title">Add this medley to a setlist</div>' +
+        '<p style="color:var(--muted);font-size:12px;line-height:1.45;">' + esc(song.title) + ' will be the first song.</p></div>' +
+        '<div class="sheet-scroll">' + rows + '</div>' +
+        '<div class="sheet-actions"><button class="tap" onclick="closeSheet()">Cancel</button></div>', true
+    );
+}
 
 function openSetlistMedleyBuilder() {
     var sl = setlistById(state.currentSetlistId);

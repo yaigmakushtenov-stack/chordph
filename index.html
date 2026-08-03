@@ -383,7 +383,9 @@
                 <a href="#contact" onclick="closeNavMenu()">Contact</a>
                 <a href="#about" onclick="closeNavMenu()">About</a>
                 <a href="#legal" onclick="closeNavMenu()">Terms</a>
+                <a href="/beta/?admin=1" id="nav-invitations" style="display:none;">Invitations</a>
                 <a href="/app/#signin" id="nav-login">Log in</a>
+                <a href="#" id="nav-logout" style="display:none;" onclick="logoutFromLanding(event)">Log out</a>
             </span>
             <button class="nav-burger" id="nav-burger" aria-label="Menu" aria-expanded="false" onclick="toggleNavMenu(event)">&#9776;</button>
         </span>
@@ -640,19 +642,20 @@ At sasambahin ka sa dakong lihim</div>
     </div>
 </footer>
 
+<script src="/app/lib/supabase.js"></script>
 <script>
     // Greet a signed-in visitor. The app (same origin, /app/) stores its Supabase
     // session in localStorage, so we can read the name here without loading the SDK.
     (function reflectAuth() {
         function apply() {
-            var name = null;
+            var name = null, email = '';
             try {
                 for (var i = 0; i < localStorage.length; i++) {
                     var k = localStorage.key(i);
                     if (!/^sb-.*-auth-token$/.test(k)) continue;
                     var s = JSON.parse(localStorage.getItem(k) || 'null') || {};
                     var u = s.user || (s.currentSession && s.currentSession.user);
-                    if (u) { name = (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || (u.email || '').split('@')[0]; break; }
+                    if (u) { email = (u.email || '').toLowerCase(); name = (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || email.split('@')[0]; break; }
                 }
             } catch (e) {}
             var first = name ? name.split(' ')[0] : '';
@@ -661,6 +664,10 @@ At sasambahin ka sa dakong lihim</div>
                 if (name) { link.textContent = 'Hi, ' + first; link.href = '/app/'; link.classList.add('nav-hi'); }
                 else { link.textContent = 'Log in'; link.href = '/app/#signin'; link.classList.remove('nav-hi'); }
             }
+            var invitations = document.getElementById('nav-invitations');
+            if (invitations) invitations.style.display = email === 'yaigmakushtenov@gmail.com' ? '' : 'none';
+            var logout = document.getElementById('nav-logout');
+            if (logout) logout.style.display = name ? '' : 'none';
             var wel = document.getElementById('welcome'), hi = document.getElementById('wc-hi');
             if (wel) wel.classList.toggle('show', !!name);
             if (hi && name) hi.textContent = 'Welcome back, ' + first + ' 👋';
@@ -670,6 +677,16 @@ At sasambahin ka sa dakong lihim</div>
         window.addEventListener('storage', apply);   // update live if they sign in/out in the app tab
         var fy = document.getElementById('foot-year'); if (fy) fy.textContent = new Date().getFullYear();
     })();
+
+    async function logoutFromLanding(event) {
+        if (event) event.preventDefault();
+        try { await fetch('/api/beta/session', { method:'DELETE', credentials:'same-origin' }); } catch (e) {}
+        try {
+            var client = window.supabase.createClient('https://icykdrauegbgkzcwwsvi.supabase.co', 'sb_publishable_MVJjUxOe827PftmJlDiTsQ_RN0hLIII');
+            await client.auth.signOut();
+        } catch (e) {}
+        location.replace('/beta/');
+    }
 
     // Mobile nav menu (the text links collapse into a tap-to-open dropdown on phones)
     function toggleNavMenu(e) {

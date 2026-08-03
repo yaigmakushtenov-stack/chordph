@@ -7,6 +7,7 @@ const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'beta_access_
 const middleware = fs.readFileSync(path.join(__dirname, '..', 'middleware.ts'), 'utf8');
 const session = fs.readFileSync(path.join(__dirname, '..', 'api', 'beta', 'session.ts'), 'utf8');
 const gate = fs.readFileSync(path.join(__dirname, '..', 'beta', 'index.html'), 'utf8');
+const inviteManifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'beta', 'manifest.json'), 'utf8'));
 
 test('beta invitation codes are hashed and raw codes are returned only by creation', () => {
   assert.match(sql, /code_hash\s+text not null unique/i);
@@ -60,4 +61,11 @@ test('phone invitation manager creates, shares, lists, and revokes invites', () 
   assert.match(gate, /Codes are displayed only once/);
   assert.match(gate, /id="email"[^>]*required/i);
   assert.match(gate, /<option value="24">24 hours<\/option><option value="168">7 days<\/option><option value="720">30 days<\/option>/i);
+});
+
+test('administrator sign-in returns to the invitation manager and supports a home-screen shortcut', () => {
+  assert.match(gate, /wantsAdmin \? '\/beta\/\?admin=1'/);
+  assert.match(gate, /redirectTo: location\.origin \+ returnPath/);
+  assert.equal(inviteManifest.start_url, '/beta/?admin=1');
+  assert.equal(inviteManifest.display, 'standalone');
 });
