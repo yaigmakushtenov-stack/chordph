@@ -102,6 +102,9 @@ begin
     end if;
 
     v_email := nullif(lower(trim(p_allowed_email)), '');
+    if v_email is null then
+        raise exception 'invite_email_required' using errcode = '22023';
+    end if;
     v_expires := now() + make_interval(hours => p_expires_in_hours);
 
     -- 96 bits of randomness, grouped for phone sharing. The raw code is returned

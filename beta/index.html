@@ -93,11 +93,12 @@
             <h2>New invitation</h2>
             <label for="label">Who is this for?</label>
             <input id="label" maxlength="80" placeholder="e.g. Grace Worship keyboardist">
-            <label for="email">Bind to an email <span class="muted">(recommended)</span></label>
-            <input id="email" type="email" autocomplete="email" placeholder="musician@example.com">
+            <label for="email">Google email <span class="muted">(required)</span></label>
+            <input id="email" type="email" autocomplete="email" placeholder="musician@example.com" required>
+            <p class="muted" style="margin:6px 0 12px">This code will work only when the musician signs in with this exact Google email.</p>
             <div class="row">
                 <div><label for="max-uses">Uses</label><select id="max-uses"><option value="1">1 person</option><option value="3">3 people</option><option value="5">5 people</option><option value="10">10 people</option></select></div>
-                <div><label for="expiry">Expires</label><select id="expiry"><option value="168">7 days</option><option value="24">24 hours</option><option value="720">30 days</option></select></div>
+                <div><label for="expiry">Expires</label><select id="expiry"><option value="24">24 hours</option><option value="168">7 days</option><option value="720">30 days</option></select></div>
             </div>
             <button id="create-invite" style="margin-top:16px">Create invitation</button>
             <div id="new-code" class="hide">
@@ -135,6 +136,7 @@
         var message = (error && error.message) || String(error || 'Something went wrong.');
         if (message.indexOf('invalid_or_expired_invite') >= 0) return 'That invitation is invalid, expired, already used, or revoked.';
         if (message.indexOf('invite_email_mismatch') >= 0) return 'This invitation was made for a different Google email.';
+        if (message.indexOf('invite_email_required') >= 0) return 'Enter the Google email that must redeem this invitation.';
         if (message.indexOf('admin_required') >= 0) return 'Only a Chord.ph administrator can do that.';
         return message;
     }
@@ -243,9 +245,15 @@
 
     async function createInvite() {
         var button = $('create-invite'); setBusy(button, true); setStatus('admin-status', 'Creating invitation…');
+        var email = $('email').value.trim().toLowerCase();
+        if (!email || !$('email').checkValidity()) {
+            setBusy(button, false);
+            $('email').reportValidity();
+            return setStatus('admin-status', 'Enter the exact Google email that will use this invitation.', 'error');
+        }
         var result = await client.rpc('create_beta_invite', {
             p_label: $('label').value.trim() || null,
-            p_allowed_email: $('email').value.trim().toLowerCase() || null,
+            p_allowed_email: email,
             p_max_uses: Number($('max-uses').value),
             p_expires_in_hours: Number($('expiry').value)
         });

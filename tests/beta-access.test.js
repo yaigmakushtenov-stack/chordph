@@ -19,6 +19,7 @@ test('beta invite creation is admin-only with bounded expiry and usage', () => {
   assert.match(sql, /if not public\.is_admin\(\)/i);
   assert.match(sql, /p_max_uses < 1 or p_max_uses > 100/i);
   assert.match(sql, /p_expires_in_hours < 1 or p_expires_in_hours > 2160/i);
+  assert.match(sql, /if v_email is null then\s+raise exception 'invite_email_required'/i);
 });
 
 test('redemption requires authentication and enforces expiry, usage, and email binding', () => {
@@ -57,4 +58,6 @@ test('phone invitation manager creates, shares, lists, and revokes invites', () 
   assert.match(gate, /beta_invites/);
   assert.match(gate, /revoke_beta_invite/);
   assert.match(gate, /Codes are displayed only once/);
+  assert.match(gate, /id="email"[^>]*required/i);
+  assert.match(gate, /<option value="24">24 hours<\/option><option value="168">7 days<\/option><option value="720">30 days<\/option>/i);
 });
