@@ -25,6 +25,12 @@ Last reorganized: 2026-08-03.
 - ChordPro/text import.
 - Premium metronome redesign.
 - Floating chart autoscroll button.
+- Function dock no longer duplicates the chart-integrated autoscroll control.
+- Stage mode collapses Listen & Learn and configuration panels while retaining
+  the compact performance-critical Now Playing strip.
+- Original slim keyboard chord diagrams and focused guitar/keyboard chord popup.
+- Medley entry restored to the chart controls and made discoverable outside an
+  existing setlist; new setlists open immediately after creation.
 - Edit a song from a setlist using a personal override, reset and library-submit
   flow.
 
@@ -56,6 +62,10 @@ Last reorganized: 2026-08-03.
 - Spotify expectation copy and an Open in Spotify path.
 - Auto-find Spotify/YouTube reference links through the configured Supabase Edge
   Function and provider APIs. Suggestions remain user-reviewed.
+- Auto-find refreshes immediately when either provider link is added or removed.
+- Practice-track replacement clears stale loop/count-in state, uses the uploaded
+  filename, and exposes play/pause, ten-second seek, restart and stop controls.
+- Waveform analysis provides a best-effort automatic BPM for tempo-aware count-in.
 
 ## Library, navigation and settings
 
@@ -81,8 +91,8 @@ Last reorganized: 2026-08-03.
 
 ## Notes
 
-- Completed code still requires regression testing in the V2 preview before
-  production. A failed verification creates a focused stabilization bug in the
-  active roadmap; it does not erase the feature's implementation history.
+- V2 is deployed to the invitation-only production site. Real-device failures
+  create focused stabilization bugs in the active roadmap; they do not erase the
+  feature's implementation history.
 - Ambient percussion is shipped but currently parked from further investment at
   the owner's request while practice and team workflows are prioritized.

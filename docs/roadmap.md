@@ -38,17 +38,11 @@ player behaves unpredictably.
 
 - Fix Lyrics-only recognition for the reported `Sa atin na tunay` line in
   `Pusong Basag`, then add a regression case for chord-like lyric text.
-- Verify native audio is never restarted by transpose, Nashville, Lyrics,
-  instrument diagrams, text sizing, editor actions or ordinary app navigation.
 - Test Spotify/YouTube behavior separately and show honest provider limitations;
   do not make the chart lifecycle recreate an embed unnecessarily.
 - Verify tab/background behavior. Preserve native audio where the browser permits
   it; do not promise uninterrupted third-party embedded playback when the
   provider/browser suspends it.
-- Make Stage mode collapse Listen & Learn and all configuration panels on entry.
-  Keep only performance-critical controls and the compact Now Playing strip.
-- Remove the redundant Scroll entry from the function dock. Keep any useful
-  chart-integrated autoscroll/speed control in the chart workspace.
 - Test Google login and browser/hardware Back on a real Android device, including
   the previous return-to-Google-account-picker bug.
 - Review the mobile action toolbar and tag row on real phones. Preserve the useful
@@ -57,10 +51,6 @@ player behaves unpredictably.
 - Regression-test the already-live Auto-find Spotify/YouTube feature against
   difficult titles, alternate versions and sparse artist data. Suggestions must
   remain reviewable and must never silently update the public library.
-- Run the existing song, library, setlist, medley, offline/PWA and synchronization
-  regression tests after the fixes.
-- Publish `v2-stabilization` immediately afterward to an isolated owner-only
-  preview URL. Production cloud writes remain disabled until explicitly approved.
 - Test the current practice journey on real Android and desktop devices, including
   offline installation, refresh/update behavior and storage recovery.
 - Record preview issues as specific bugs and fix release blockers without taking
@@ -89,10 +79,7 @@ Build in this order:
    real usage proves it is needed.
 3. **Expanded editor workspace.** Make the chart body near-full-screen and allow
    title, artist, key, BPM and feel to collapse after initial setup.
-4. **Keyboard chord diagrams.** When Keyboard is selected, show an original
-   keyboard voicing visualization rather than the guitar diagram. Do not copy
-   Ultimate Guitar artwork or reproduce its screen design.
-5. **Practice-state restoration audit.** Confirm bookmarks, notes, named loops,
+4. **Practice-state restoration audit.** Confirm bookmarks, notes, named loops,
    count-in, speed, pitch and last position restore predictably per song.
 
 Provider links remain convenient reference recordings. Accurate waveform,
